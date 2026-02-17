@@ -54,6 +54,7 @@ pub use db::orm::{
 };
 pub use db::query::{
     mesh_query_from, mesh_query_where, mesh_query_where_op, mesh_query_where_in,
+    mesh_query_where_not_in, mesh_query_where_between, mesh_query_where_or,
     mesh_query_where_null, mesh_query_where_not_null, mesh_query_select, mesh_query_order_by,
     mesh_query_limit, mesh_query_offset, mesh_query_join, mesh_query_group_by,
     mesh_query_having, mesh_query_fragment,

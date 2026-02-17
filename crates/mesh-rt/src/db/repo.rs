@@ -209,6 +209,25 @@ fn build_select_sql_from_parts(
         let mut conditions = Vec::new();
         let mut wp_idx = 0;
         for clause in where_clauses {
+            // OR clause: "OR:field1,field2,...:N"
+            if clause.starts_with("OR:") {
+                let parts: Vec<&str> = clause.splitn(3, ':').collect();
+                if parts.len() == 3 {
+                    let fields: Vec<&str> = parts[1].split(',').collect();
+                    let count: usize = parts[2].parse().unwrap_or(0);
+                    let mut or_parts = Vec::new();
+                    for field in fields.iter().take(count) {
+                        or_parts.push(format!("{} = ${}", quote_ident(field), param_idx));
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    conditions.push(format!("({})", or_parts.join(" OR ")));
+                }
+                continue;
+            }
             if let Some(raw) = clause.strip_prefix("RAW:") {
                 // Raw WHERE clause: emit verbatim, replace ? with $N
                 let mut raw_sql = String::new();
@@ -254,6 +273,41 @@ fn build_select_sql_from_parts(
                         param_idx += 1;
                     }
                     continue; // skip default param handling
+                } else if op.starts_with("NOT_IN:") {
+                    // NOT IN clause: "field NOT_IN:N"
+                    let count: usize = op[7..].parse().unwrap_or(0);
+                    let placeholders: Vec<String> = (0..count)
+                        .map(|i| format!("${}", param_idx + i))
+                        .collect();
+                    conditions.push(format!(
+                        "{} NOT IN ({})",
+                        quote_ident(col),
+                        placeholders.join(", ")
+                    ));
+                    for _ in 0..count {
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    continue;
+                } else if op == "BETWEEN" {
+                    // BETWEEN clause: consumes two params
+                    conditions.push(format!(
+                        "{} BETWEEN ${} AND ${}",
+                        quote_ident(col),
+                        param_idx,
+                        param_idx + 1
+                    ));
+                    for _ in 0..2 {
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    continue;
                 } else {
                     // Regular operator: "field op" -> "field" op $N
                     conditions.push(format!(
@@ -413,6 +467,25 @@ fn build_count_sql_from_parts(
         let mut conditions = Vec::new();
         let mut wp_idx = 0;
         for clause in where_clauses {
+            // OR clause: "OR:field1,field2,...:N"
+            if clause.starts_with("OR:") {
+                let parts: Vec<&str> = clause.splitn(3, ':').collect();
+                if parts.len() == 3 {
+                    let fields: Vec<&str> = parts[1].split(',').collect();
+                    let count: usize = parts[2].parse().unwrap_or(0);
+                    let mut or_parts = Vec::new();
+                    for field in fields.iter().take(count) {
+                        or_parts.push(format!("{} = ${}", quote_ident(field), param_idx));
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    conditions.push(format!("({})", or_parts.join(" OR ")));
+                }
+                continue;
+            }
             if let Some(raw) = clause.strip_prefix("RAW:") {
                 // Raw WHERE clause: emit verbatim, replace ? with $N
                 let mut raw_sql = String::new();
@@ -445,6 +518,39 @@ fn build_count_sql_from_parts(
                         placeholders.join(", ")
                     ));
                     for _ in 0..count {
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    continue;
+                } else if op.starts_with("NOT_IN:") {
+                    let count: usize = op[7..].parse().unwrap_or(0);
+                    let placeholders: Vec<String> = (0..count)
+                        .map(|i| format!("${}", param_idx + i))
+                        .collect();
+                    conditions.push(format!(
+                        "{} NOT IN ({})",
+                        quote_ident(col),
+                        placeholders.join(", ")
+                    ));
+                    for _ in 0..count {
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    continue;
+                } else if op == "BETWEEN" {
+                    conditions.push(format!(
+                        "{} BETWEEN ${} AND ${}",
+                        quote_ident(col),
+                        param_idx,
+                        param_idx + 1
+                    ));
+                    for _ in 0..2 {
                         if wp_idx < where_params.len() {
                             params.push(where_params[wp_idx].clone());
                             wp_idx += 1;
@@ -554,6 +660,25 @@ fn build_exists_sql_from_parts(
         let mut conditions = Vec::new();
         let mut wp_idx = 0;
         for clause in where_clauses {
+            // OR clause: "OR:field1,field2,...:N"
+            if clause.starts_with("OR:") {
+                let parts: Vec<&str> = clause.splitn(3, ':').collect();
+                if parts.len() == 3 {
+                    let fields: Vec<&str> = parts[1].split(',').collect();
+                    let count: usize = parts[2].parse().unwrap_or(0);
+                    let mut or_parts = Vec::new();
+                    for field in fields.iter().take(count) {
+                        or_parts.push(format!("{} = ${}", quote_ident(field), param_idx));
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    conditions.push(format!("({})", or_parts.join(" OR ")));
+                }
+                continue;
+            }
             if let Some(raw) = clause.strip_prefix("RAW:") {
                 // Raw WHERE clause: emit verbatim, replace ? with $N
                 let mut raw_sql = String::new();
@@ -586,6 +711,39 @@ fn build_exists_sql_from_parts(
                         placeholders.join(", ")
                     ));
                     for _ in 0..count {
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    continue;
+                } else if op.starts_with("NOT_IN:") {
+                    let count: usize = op[7..].parse().unwrap_or(0);
+                    let placeholders: Vec<String> = (0..count)
+                        .map(|i| format!("${}", param_idx + i))
+                        .collect();
+                    conditions.push(format!(
+                        "{} NOT IN ({})",
+                        quote_ident(col),
+                        placeholders.join(", ")
+                    ));
+                    for _ in 0..count {
+                        if wp_idx < where_params.len() {
+                            params.push(where_params[wp_idx].clone());
+                            wp_idx += 1;
+                        }
+                        param_idx += 1;
+                    }
+                    continue;
+                } else if op == "BETWEEN" {
+                    conditions.push(format!(
+                        "{} BETWEEN ${} AND ${}",
+                        quote_ident(col),
+                        param_idx,
+                        param_idx + 1
+                    ));
+                    for _ in 0..2 {
                         if wp_idx < where_params.len() {
                             params.push(where_params[wp_idx].clone());
                             wp_idx += 1;
@@ -1641,6 +1799,25 @@ fn build_where_from_query_parts(
     let mut wp_idx = 0;
 
     for clause in where_clauses {
+        // OR clause: "OR:field1,field2,...:N"
+        if clause.starts_with("OR:") {
+            let parts: Vec<&str> = clause.splitn(3, ':').collect();
+            if parts.len() == 3 {
+                let fields: Vec<&str> = parts[1].split(',').collect();
+                let count: usize = parts[2].parse().unwrap_or(0);
+                let mut or_parts = Vec::new();
+                for field in fields.iter().take(count) {
+                    or_parts.push(format!("{} = ${}", quote_ident(field), param_idx));
+                    if wp_idx < where_params.len() {
+                        params.push(where_params[wp_idx].clone());
+                        wp_idx += 1;
+                    }
+                    param_idx += 1;
+                }
+                conditions.push(format!("({})", or_parts.join(" OR ")));
+            }
+            continue;
+        }
         if clause.starts_with("RAW:") {
             let raw_sql = &clause[4..];
             let mut frag_sql = String::new();
@@ -1673,6 +1850,37 @@ fn build_where_from_query_parts(
                     placeholders.join(", ")
                 ));
                 for _ in 0..count {
+                    if wp_idx < where_params.len() {
+                        params.push(where_params[wp_idx].clone());
+                        wp_idx += 1;
+                    }
+                    param_idx += 1;
+                }
+            } else if op.starts_with("NOT_IN:") {
+                let count: usize = op[7..].parse().unwrap_or(0);
+                let placeholders: Vec<String> = (0..count)
+                    .map(|i| format!("${}", param_idx + i))
+                    .collect();
+                conditions.push(format!(
+                    "{} NOT IN ({})",
+                    quote_ident(col),
+                    placeholders.join(", ")
+                ));
+                for _ in 0..count {
+                    if wp_idx < where_params.len() {
+                        params.push(where_params[wp_idx].clone());
+                        wp_idx += 1;
+                    }
+                    param_idx += 1;
+                }
+            } else if op == "BETWEEN" {
+                conditions.push(format!(
+                    "{} BETWEEN ${} AND ${}",
+                    quote_ident(col),
+                    param_idx,
+                    param_idx + 1
+                ));
+                for _ in 0..2 {
                     if wp_idx < where_params.len() {
                         params.push(where_params[wp_idx].clone());
                         wp_idx += 1;
@@ -1882,6 +2090,94 @@ mod tests {
             "SELECT * FROM \"users\" WHERE \"status\" IN ($1, $2, $3)"
         );
         assert_eq!(params, vec!["active", "pending", "trial"]);
+    }
+
+    // ── Phase 106: Advanced WHERE operators ──────────────────────────────
+
+    #[test]
+    fn test_select_with_not_in() {
+        let (sql, params) = build_select_sql_from_parts(
+            "issues", &[],
+            &["status NOT_IN:2".into()],
+            &["archived".into(), "deleted".into()],
+            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(
+            sql,
+            "SELECT * FROM \"issues\" WHERE \"status\" NOT IN ($1, $2)"
+        );
+        assert_eq!(params, vec!["archived", "deleted"]);
+    }
+
+    #[test]
+    fn test_select_with_between() {
+        let (sql, params) = build_select_sql_from_parts(
+            "events", &[],
+            &["age BETWEEN".into()],
+            &["18".into(), "65".into()],
+            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(
+            sql,
+            "SELECT * FROM \"events\" WHERE \"age\" BETWEEN $1 AND $2"
+        );
+        assert_eq!(params, vec!["18", "65"]);
+    }
+
+    #[test]
+    fn test_select_with_or() {
+        let (sql, params) = build_select_sql_from_parts(
+            "issues", &[],
+            &["OR:status,level:2".into()],
+            &["active".into(), "error".into()],
+            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(
+            sql,
+            "SELECT * FROM \"issues\" WHERE (\"status\" = $1 OR \"level\" = $2)"
+        );
+        assert_eq!(params, vec!["active", "error"]);
+    }
+
+    #[test]
+    fn test_select_with_ilike() {
+        let (sql, params) = build_select_sql_from_parts(
+            "users", &[],
+            &["name ILIKE".into()],
+            &["%alice%".into()],
+            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(
+            sql,
+            "SELECT * FROM \"users\" WHERE \"name\" ILIKE $1"
+        );
+        assert_eq!(params, vec!["%alice%"]);
+    }
+
+    #[test]
+    fn test_mixed_where_clauses() {
+        // Combines: WHERE + NOT IN + BETWEEN + OR to verify $N sequencing
+        let (sql, params) = build_select_sql_from_parts(
+            "events", &[],
+            &[
+                "project_id =".into(),
+                "status NOT_IN:2".into(),
+                "age BETWEEN".into(),
+                "OR:status,priority:2".into(),
+            ],
+            &[
+                "abc".into(),
+                "archived".into(), "deleted".into(),
+                "18".into(), "65".into(),
+                "active".into(), "high".into(),
+            ],
+            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(
+            sql,
+            "SELECT * FROM \"events\" WHERE \"project_id\" = $1 AND \"status\" NOT IN ($2, $3) AND \"age\" BETWEEN $4 AND $5 AND (\"status\" = $6 OR \"priority\" = $7)"
+        );
+        assert_eq!(params, vec!["abc", "archived", "deleted", "18", "65", "active", "high"]);
     }
 
     #[test]

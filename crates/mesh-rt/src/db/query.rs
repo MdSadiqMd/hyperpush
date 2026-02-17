@@ -96,6 +96,7 @@ fn atom_to_sql_op(atom: &str) -> &str {
         "lte" => "<=",
         "gte" => ">=",
         "like" => "LIKE",
+        "ilike" => "ILIKE",
         _ => "=", // default to equality
     }
 }
@@ -226,6 +227,93 @@ pub extern "C" fn mesh_query_where_in(
         // Append each value from the list to where_params
         let mut wp = query_get(new_q, SLOT_WHERE_PARAMS);
         for i in 0..list_len {
+            let elem = mesh_list_get(values, i);
+            wp = mesh_list_append(wp, elem);
+        }
+        query_set(new_q, SLOT_WHERE_PARAMS, wp);
+        new_q
+    }
+}
+
+/// Add a WHERE NOT IN clause: `field NOT IN (values...)`.
+///
+/// `Query.where_not_in(q, :status, ["archived", "deleted"])` -> new Query with WHERE status NOT IN ($N, $M)
+#[no_mangle]
+pub extern "C" fn mesh_query_where_not_in(
+    q: *mut u8,
+    field: *mut u8,
+    values: *mut u8,
+) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_str = mesh_str_ref(field);
+        let list_len = mesh_list_length(values);
+        let clause = format!("{} NOT_IN:{}", field_str, list_len);
+        let clause_mesh = rust_str_to_mesh(&clause);
+        let wc = query_get(new_q, SLOT_WHERE_CLAUSES);
+        query_set(new_q, SLOT_WHERE_CLAUSES, mesh_list_append(wc, clause_mesh as u64));
+        // Append each value from the list to where_params
+        let mut wp = query_get(new_q, SLOT_WHERE_PARAMS);
+        for i in 0..list_len {
+            let elem = mesh_list_get(values, i);
+            wp = mesh_list_append(wp, elem);
+        }
+        query_set(new_q, SLOT_WHERE_PARAMS, wp);
+        new_q
+    }
+}
+
+/// Add a WHERE BETWEEN clause: `field BETWEEN low AND high`.
+///
+/// `Query.where_between(q, :age, "18", "65")` -> new Query with WHERE age BETWEEN $N AND $M
+#[no_mangle]
+pub extern "C" fn mesh_query_where_between(
+    q: *mut u8,
+    field: *mut u8,
+    low: *mut u8,
+    high: *mut u8,
+) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_str = mesh_str_ref(field);
+        let clause = format!("{} BETWEEN", field_str);
+        let clause_mesh = rust_str_to_mesh(&clause);
+        let wc = query_get(new_q, SLOT_WHERE_CLAUSES);
+        query_set(new_q, SLOT_WHERE_CLAUSES, mesh_list_append(wc, clause_mesh as u64));
+        let mut wp = query_get(new_q, SLOT_WHERE_PARAMS);
+        wp = mesh_list_append(wp, low as u64);
+        wp = mesh_list_append(wp, high as u64);
+        query_set(new_q, SLOT_WHERE_PARAMS, wp);
+        new_q
+    }
+}
+
+/// Add a WHERE OR clause: `(field1 = $N OR field2 = $M ...)`.
+///
+/// `Query.where_or(q, [:status, :level], ["active", "error"])` -> new Query with WHERE (status = $N OR level = $M)
+#[no_mangle]
+pub extern "C" fn mesh_query_where_or(
+    q: *mut u8,
+    fields: *mut u8,
+    values: *mut u8,
+) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_count = mesh_list_length(fields);
+        // Build OR clause encoding: "OR:field1,field2,...:N"
+        let mut field_names = Vec::new();
+        for i in 0..field_count {
+            let f = mesh_list_get(fields, i) as *mut u8;
+            field_names.push(mesh_str_ref(f).to_string());
+        }
+        let clause = format!("OR:{}:{}", field_names.join(","), field_count);
+        let clause_mesh = rust_str_to_mesh(&clause);
+        let wc = query_get(new_q, SLOT_WHERE_CLAUSES);
+        query_set(new_q, SLOT_WHERE_CLAUSES, mesh_list_append(wc, clause_mesh as u64));
+        // Append values to where_params
+        let mut wp = query_get(new_q, SLOT_WHERE_PARAMS);
+        let val_count = mesh_list_length(values);
+        for i in 0..val_count {
             let elem = mesh_list_get(values, i);
             wp = mesh_list_append(wp, elem);
         }
