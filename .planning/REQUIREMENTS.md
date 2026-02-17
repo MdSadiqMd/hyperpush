@@ -1,98 +1,131 @@
 # Requirements: Mesh
 
-**Defined:** 2026-02-16
+**Defined:** 2026-02-17
 **Core Value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
 
-## v10.1 Requirements
+## v11.0 Requirements
 
-Requirements for stabilization milestone. Fix Mesher compilation errors and verify endpoints.
+Requirements for Query Builder milestone. Expand ORM with comprehensive query capabilities and rewrite Mesher to eliminate all raw SQL.
 
-### Compilation Fixes
+### JOINs
 
-- [ ] **FIX-01**: All type mismatches in queries.mpl resolved (Ptr vs Map, Map vs Result)
-- [ ] **FIX-02**: All undefined variable errors in service files resolved (org.mpl, project.mpl, user.mpl)
-- [ ] **FIX-03**: All `?` operator errors resolved (functions using `?` on non-Result returns)
-- [ ] **FIX-04**: All module reference errors resolved (team.mpl, main.mpl)
-- [ ] **FIX-05**: All argument count mismatches resolved
-- [ ] **FIX-06**: `meshc build mesher` completes with zero errors
+- [ ] **JOIN-01**: Query builder supports inner join with on-clause expression
+- [ ] **JOIN-02**: Query builder supports left join with on-clause expression
+- [ ] **JOIN-03**: Query builder supports multiple joins in a single query
+- [ ] **JOIN-04**: JOIN results include columns from all joined tables
 
-### Verification
+### Aggregations
 
-- [ ] **VER-01**: Mesher binary starts and connects to PostgreSQL
-- [ ] **VER-02**: HTTP API endpoints return correct responses (GET/POST tested)
-- [ ] **VER-03**: WebSocket endpoints accept connections and respond
+- [ ] **AGG-01**: Query builder supports count() aggregation
+- [ ] **AGG-02**: Query builder supports sum()/avg()/min()/max() aggregations
+- [ ] **AGG-03**: Query builder supports group_by clause
+- [ ] **AGG-04**: Query builder supports having clause with conditions
 
-## v10.0 Requirements (Complete)
+### Advanced WHERE
 
-All v10.0 ORM requirements shipped. 50 requirements across 8 phases (96-103).
+- [ ] **WHERE-01**: Query builder supports comparison operators (>, <, >=, <=, !=)
+- [ ] **WHERE-02**: Query builder supports IN and NOT IN with value lists
+- [ ] **WHERE-03**: Query builder supports IS NULL and IS NOT NULL
+- [ ] **WHERE-04**: Query builder supports BETWEEN for range checks
+- [ ] **WHERE-05**: Query builder supports LIKE and ILIKE for pattern matching
+- [ ] **WHERE-06**: Query builder supports OR conditions and grouped conditions
 
-### Compiler Additions
+### Upsert, RETURNING, Subqueries
 
-- [x] **COMP-01**: Atom literal syntax -- v10.0 Phase 96
-- [x] **COMP-02**: Keyword argument syntax -- v10.0 Phase 96
-- [x] **COMP-03**: Multi-line pipe chain support -- v10.0 Phase 96
-- [x] **COMP-04**: Struct update syntax -- v10.0 Phase 96
-- [x] **COMP-05**: deriving(Schema) infrastructure -- v10.0 Phase 96
-- [x] **COMP-06**: Relationship declaration syntax -- v10.0 Phase 96, 100
-- [x] **COMP-07**: Fix Map.collect string key propagation -- v10.0 Phase 96
-- [x] **COMP-08**: Fix cross-module from_row/from_json resolution -- v10.0 Phase 96
+- [ ] **UPS-01**: Repo supports upsert (INSERT ON CONFLICT DO UPDATE) with conflict target
+- [ ] **UPS-02**: Repo insert/update/delete support RETURNING clause
+- [ ] **UPS-03**: Query builder supports subqueries in WHERE clause
 
-### Schema Definition
+### Raw SQL Fragments
 
-- [x] **SCHM-01**: Table name from struct name -- v10.0 Phase 97
-- [x] **SCHM-02**: Field metadata with SQL type mapping -- v10.0 Phase 97
-- [x] **SCHM-03**: Primary key configuration -- v10.0 Phase 97
-- [x] **SCHM-04**: Timestamps support -- v10.0 Phase 97
-- [x] **SCHM-05**: Column accessor functions -- v10.0 Phase 97
-
-### Query Builder
-
-- [x] **QBLD-01** through **QBLD-09**: Full query builder -- v10.0 Phase 98
-
-### Repo Operations
-
-- [x] **REPO-01** through **REPO-11**: Full repo operations -- v10.0 Phases 98, 100
-
-### Changesets
-
-- [x] **CHST-01** through **CHST-09**: Full changeset system -- v10.0 Phase 99
-
-### Migrations
-
-- [x] **MIGR-01** through **MIGR-08**: Full migration tooling -- v10.0 Phase 101
+- [ ] **FRAG-01**: Query.fragment() embeds raw SQL with parameter binding in queries
+- [ ] **FRAG-02**: Fragments work in WHERE, SELECT, ORDER BY, and GROUP BY positions
+- [ ] **FRAG-03**: Fragments support PG functions (crypt, gen_random_bytes, date_trunc, random)
+- [ ] **FRAG-04**: Fragments support JSONB operators and full-text search expressions
 
 ### Mesher Rewrite
 
-- [x] **MSHR-01** through **MSHR-04**: Mesher ORM conversion -- v10.0 Phase 102-103
-- [ ] **MSHR-05**: All existing Mesher functionality verified working -- **v10.1**
+- [ ] **REWR-01**: User/session/API-key queries rewritten with ORM (8 queries)
+- [ ] **REWR-02**: Issue management queries rewritten with ORM + upserts (10 queries)
+- [ ] **REWR-03**: Search/filtering queries rewritten with ORM + fragments (4 queries)
+- [ ] **REWR-04**: Dashboard/analytics queries rewritten with ORM aggregations (7 queries)
+- [ ] **REWR-05**: Alert system queries rewritten with ORM + fragments (12 queries)
+- [ ] **REWR-06**: Retention/storage queries rewritten with ORM (6 queries)
+- [ ] **REWR-07**: Event writer/extraction rewritten with ORM + fragments (2 queries)
+- [ ] **REWR-08**: Zero Repo.query_raw/execute_raw in Mesher data queries
+
+### Verification
+
+- [ ] **VER-01**: Mesher compiles with zero errors
+- [ ] **VER-02**: All HTTP API endpoints return correct responses
+- [ ] **VER-03**: WebSocket endpoints function correctly
+
+## v10.0/v10.1 Requirements (Complete)
+
+All v10.0 ORM requirements shipped (50 requirements, phases 96-103). v10.1 stabilization fixed codegen ABI issues (phases 104-105.1).
+
+## Future Requirements
+
+### Query Builder Extensions
+
+- **QEXT-01**: Right/full outer join support
+- **QEXT-02**: Window functions (ROW_NUMBER, RANK, etc.)
+- **QEXT-03**: Common table expressions (WITH / CTE)
+- **QEXT-04**: UNION/INTERSECT/EXCEPT set operations
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| New ORM features | Stabilization only -- no new functionality |
-| Compiler changes | Unless required to fix a compilation error |
-| Documentation updates | Not in scope for this patch milestone |
+| DDL/partition management | Schema operations stay as raw SQL -- not data queries |
+| System catalog queries (pg_inherits) | PostgreSQL internals, not application data |
+| New Mesher features | Rewrite only -- no new functionality |
+| Multi-database support | PostgreSQL-only for now |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 104 | Pending |
-| FIX-02 | Phase 104 | Pending |
-| FIX-03 | Phase 104 | Pending |
-| FIX-04 | Phase 104 | Pending |
-| FIX-05 | Phase 104 | Pending |
-| FIX-06 | Phase 104 | Pending |
-| VER-01 | Phase 105 | Pending |
-| VER-02 | Phase 105 | Pending |
-| VER-03 | Phase 105 | Pending |
+| JOIN-01 | TBD | Pending |
+| JOIN-02 | TBD | Pending |
+| JOIN-03 | TBD | Pending |
+| JOIN-04 | TBD | Pending |
+| AGG-01 | TBD | Pending |
+| AGG-02 | TBD | Pending |
+| AGG-03 | TBD | Pending |
+| AGG-04 | TBD | Pending |
+| WHERE-01 | TBD | Pending |
+| WHERE-02 | TBD | Pending |
+| WHERE-03 | TBD | Pending |
+| WHERE-04 | TBD | Pending |
+| WHERE-05 | TBD | Pending |
+| WHERE-06 | TBD | Pending |
+| UPS-01 | TBD | Pending |
+| UPS-02 | TBD | Pending |
+| UPS-03 | TBD | Pending |
+| FRAG-01 | TBD | Pending |
+| FRAG-02 | TBD | Pending |
+| FRAG-03 | TBD | Pending |
+| FRAG-04 | TBD | Pending |
+| REWR-01 | TBD | Pending |
+| REWR-02 | TBD | Pending |
+| REWR-03 | TBD | Pending |
+| REWR-04 | TBD | Pending |
+| REWR-05 | TBD | Pending |
+| REWR-06 | TBD | Pending |
+| REWR-07 | TBD | Pending |
+| REWR-08 | TBD | Pending |
+| VER-01 | TBD | Pending |
+| VER-02 | TBD | Pending |
+| VER-03 | TBD | Pending |
 
 **Coverage:**
-- v10.1 requirements: 9 total
-- Mapped to phases: 9
-- Unmapped: 0
+- v11.0 requirements: 32 total
+- Mapped to phases: 0
+- Unmapped: 32 ⚠️
 
 ---
-*Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after v10.1 milestone definition*
+*Requirements defined: 2026-02-17*
+*Last updated: 2026-02-17 after initial definition*
