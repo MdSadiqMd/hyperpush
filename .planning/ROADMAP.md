@@ -189,7 +189,7 @@ See milestones/v9.0-ROADMAP.md for full phase details.
 **Milestone Goal:** Expand the Mesh ORM with comprehensive query builder capabilities (JOINs, aggregations, upserts, advanced WHERE, raw SQL fragments, RETURNING, subqueries) and rewrite all 68+ Mesher raw SQL data queries to use the ORM, validating every addition end-to-end.
 
 - [x] **Phase 106: Advanced WHERE Operators and Raw SQL Fragments** - Comparison operators, IN/NULL/BETWEEN/LIKE/OR, and Query.fragment() for PG-specific expressions (shipped 2026-02-17)
-- [ ] **Phase 107: JOINs** - Inner and left join with on-clause expressions, multi-join, and joined-table column access
+- [x] **Phase 107: JOINs** - Inner and left join with on-clause expressions, multi-join, and joined-table column access (completed 2026-02-17)
 - [ ] **Phase 108: Aggregations** - count/sum/avg/min/max, group_by, having clause
 - [ ] **Phase 109: Upserts, RETURNING, and Subqueries** - INSERT ON CONFLICT, RETURNING clause, subqueries in WHERE
 - [ ] **Phase 110: Mesher Rewrite -- Auth and Users** - User, session, and API-key queries rewritten with ORM + fragments
@@ -333,7 +333,7 @@ Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -
 | 96-103 | v10.0 | 25/25 | Complete | 2026-02-17 |
 | 104-105.1 | v10.1 | 6/6 | Complete | 2026-02-17 |
 | 106. Advanced WHERE + Fragments | v11.0 | 2/2 | Complete | 2026-02-17 |
-| 107. JOINs | v11.0 | 0/TBD | Not started | - |
+| 107. JOINs | 1/1 | Complete   | 2026-02-17 | - |
 | 108. Aggregations | v11.0 | 0/TBD | Not started | - |
 | 109. Upserts/RETURNING/Subqueries | v11.0 | 0/TBD | Not started | - |
 | 110. Rewrite: Auth & Users | v11.0 | 0/TBD | Not started | - |
