@@ -3988,6 +3988,110 @@ end
     assert_eq!(output, "ok\n");
 }
 
+// ── Phase 106 Plan 02: Fragment renumbering and raw ORDER BY/GROUP BY E2E ────
+
+/// Query.order_by_raw emits raw ORDER BY expression.
+#[test]
+fn e2e_query_builder_order_by_raw() {
+    let output = compile_and_run(r#"
+fn main() do
+  let q = Query.from("events")
+    |> Query.where(:project_id, "abc")
+    |> Query.order_by_raw("random()")
+  println("ok")
+end
+"#);
+    assert_eq!(output, "ok\n");
+}
+
+/// Query.group_by_raw emits raw GROUP BY expression.
+#[test]
+fn e2e_query_builder_group_by_raw() {
+    let output = compile_and_run(r#"
+fn main() do
+  let q = Query.from("events")
+    |> Query.group_by_raw("date_trunc('hour', received_at)")
+  println("ok")
+end
+"#);
+    assert_eq!(output, "ok\n");
+}
+
+/// Query.select_raw with count(*) and group_by_raw for analytics.
+#[test]
+fn e2e_query_builder_select_raw_with_group_by_raw() {
+    let output = compile_and_run(r#"
+fn main() do
+  let q = Query.from("events")
+    |> Query.select_raw(["count(*)::text AS count", "level"])
+    |> Query.where(:project_id, "abc")
+    |> Query.group_by_raw("level")
+    |> Query.order_by_raw("count DESC")
+  println("ok")
+end
+"#);
+    assert_eq!(output, "ok\n");
+}
+
+/// Query.where_raw with $1 style placeholders.
+#[test]
+fn e2e_query_builder_where_raw_dollar() {
+    let output = compile_and_run(r#"
+fn main() do
+  let q = Query.from("users")
+    |> Query.where(:active, "true")
+    |> Query.where_raw("email ILIKE $1", ["%@example.com"])
+  println("ok")
+end
+"#);
+    assert_eq!(output, "ok\n");
+}
+
+/// Query.fragment with PG crypt function.
+#[test]
+fn e2e_query_builder_fragment_crypt() {
+    let output = compile_and_run(r#"
+fn main() do
+  let q = Query.from("users")
+    |> Query.where(:email, "alice@example.com")
+    |> Query.fragment("AND password_hash = crypt(?, password_hash)", ["secret"])
+  println("ok")
+end
+"#);
+    assert_eq!(output, "ok\n");
+}
+
+/// Query.where_raw for JSONB containment check.
+#[test]
+fn e2e_query_builder_jsonb_fragment() {
+    let output = compile_and_run(r#"
+fn main() do
+  let q = Query.from("events")
+    |> Query.where(:project_id, "abc")
+    |> Query.where_raw("tags @> ?::jsonb", ["{\"env\":\"production\"}"])
+  println("ok")
+end
+"#);
+    assert_eq!(output, "ok\n");
+}
+
+/// Combined: all fragment positions (SELECT, WHERE, GROUP BY, ORDER BY).
+#[test]
+fn e2e_query_builder_fragments_all_positions() {
+    let output = compile_and_run(r#"
+fn main() do
+  let q = Query.from("events")
+    |> Query.select_raw(["count(*)::text AS count"])
+    |> Query.where(:project_id, "abc")
+    |> Query.where_raw("received_at > now() - interval '24 hours'", [])
+    |> Query.group_by_raw("date_trunc('hour', received_at)")
+    |> Query.order_by_raw("date_trunc('hour', received_at)")
+  println("ok")
+end
+"#);
+    assert_eq!(output, "ok\n");
+}
+
 // ── Phase 99: Changeset e2e tests ────────────────────────────────────
 
 /// Test 1: Changeset.cast creates changeset from params, filtering to allowed fields.

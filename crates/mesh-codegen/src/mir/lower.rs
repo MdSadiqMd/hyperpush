@@ -887,6 +887,10 @@ impl<'a> Lowerer<'a> {
         // mesh_query_fragment(q: ptr, sql: ptr, params: ptr) -> ptr
         self.known_functions.insert("mesh_query_fragment".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
         // ── Phase 103: Query Builder Raw Extensions ─────────────────────
+        // mesh_query_order_by_raw(q: ptr, expression: ptr) -> ptr
+        self.known_functions.insert("mesh_query_order_by_raw".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        // mesh_query_group_by_raw(q: ptr, expression: ptr) -> ptr
+        self.known_functions.insert("mesh_query_group_by_raw".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
         // mesh_query_select_raw(q: ptr, expressions: ptr) -> ptr
         self.known_functions.insert("mesh_query_select_raw".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
         // mesh_query_where_raw(q: ptr, clause: ptr, params: ptr) -> ptr
@@ -10515,6 +10519,9 @@ fn map_builtin_name(name: &str) -> String {
         // ── Phase 103: Query Builder Raw Extensions ─────────────────────
         "query_select_raw" => "mesh_query_select_raw".to_string(),
         "query_where_raw" => "mesh_query_where_raw".to_string(),
+        // ── Phase 106: Raw ORDER BY / GROUP BY ──────────────────────────
+        "query_order_by_raw" => "mesh_query_order_by_raw".to_string(),
+        "query_group_by_raw" => "mesh_query_group_by_raw".to_string(),
         // ── Phase 98: Repo Read Operations ──────────────────────────────
         "repo_all" => "mesh_repo_all".to_string(),
         "repo_one" => "mesh_repo_one".to_string(),

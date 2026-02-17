@@ -289,6 +289,9 @@ fn register_runtime_symbols() {
     // Query Builder Raw Extensions (Phase 103)
     add_sym("mesh_query_select_raw", mesh_rt::mesh_query_select_raw as *const ());
     add_sym("mesh_query_where_raw", mesh_rt::mesh_query_where_raw as *const ());
+    // Raw ORDER BY / GROUP BY (Phase 106)
+    add_sym("mesh_query_order_by_raw", mesh_rt::mesh_query_order_by_raw as *const ());
+    add_sym("mesh_query_group_by_raw", mesh_rt::mesh_query_group_by_raw as *const ());
 
     // Repo Read Operations (Phase 98)
     add_sym("mesh_repo_all", mesh_rt::mesh_repo_all as *const ());

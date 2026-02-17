@@ -1130,9 +1130,9 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
             vec![ptr_t.clone(), Ty::string(), Ty::string()],
             ptr_t.clone(),
         )));
-        // Query.fragment(Ptr, String, Ptr) -> Ptr  (raw sql, params list)
+        // Query.fragment(Ptr, String, List<String>) -> Ptr  (raw sql, params list)
         query_mod.insert("fragment".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::string(), ptr_t.clone()],
+            vec![ptr_t.clone(), Ty::string(), Ty::list(Ty::string())],
             ptr_t.clone(),
         )));
         // Query.select_raw(Ptr, List<String>) -> Ptr  (raw SQL expressions list)
@@ -1143,6 +1143,16 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         // Query.where_raw(Ptr, String, List<String>) -> Ptr  (raw clause, params list)
         query_mod.insert("where_raw".to_string(), Scheme::mono(Ty::fun(
             vec![ptr_t.clone(), Ty::string(), Ty::list(Ty::string())],
+            ptr_t.clone(),
+        )));
+        // Query.order_by_raw(Ptr, String) -> Ptr  (raw ORDER BY expression)
+        query_mod.insert("order_by_raw".to_string(), Scheme::mono(Ty::fun(
+            vec![ptr_t.clone(), Ty::string()],
+            ptr_t.clone(),
+        )));
+        // Query.group_by_raw(Ptr, String) -> Ptr  (raw GROUP BY expression)
+        query_mod.insert("group_by_raw".to_string(), Scheme::mono(Ty::fun(
+            vec![ptr_t.clone(), Ty::string()],
             ptr_t.clone(),
         )));
         modules.insert("Query".to_string(), query_mod);

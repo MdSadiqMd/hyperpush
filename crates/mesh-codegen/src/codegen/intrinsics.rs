@@ -1017,6 +1017,18 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
         ptr_type.fn_type(&[ptr_type.into(), ptr_type.into(), ptr_type.into()], false),
         Some(inkwell::module::Linkage::External));
 
+    // ── Phase 106: Raw ORDER BY / GROUP BY ───────────────────────────
+
+    // mesh_query_order_by_raw(q: ptr, expression: ptr) -> ptr
+    module.add_function("mesh_query_order_by_raw",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External));
+
+    // mesh_query_group_by_raw(q: ptr, expression: ptr) -> ptr
+    module.add_function("mesh_query_group_by_raw",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External));
+
     // ── Phase 98: Repo Read Operations ───────────────────────────────
 
     // mesh_repo_all(pool: i64, query: ptr) -> ptr
@@ -1607,6 +1619,9 @@ mod tests {
         assert!(module.get_function("mesh_query_group_by").is_some());
         assert!(module.get_function("mesh_query_having").is_some());
         assert!(module.get_function("mesh_query_fragment").is_some());
+        // Phase 106: Raw ORDER BY / GROUP BY
+        assert!(module.get_function("mesh_query_order_by_raw").is_some());
+        assert!(module.get_function("mesh_query_group_by_raw").is_some());
     }
 
     #[test]
