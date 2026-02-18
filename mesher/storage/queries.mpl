@@ -281,6 +281,11 @@ end
 # Handles GROUP-04 (new issue), GROUP-05 (event_count + last_seen), and
 # ISSUE-02 (regression: resolved flips to unresolved on new event).
 # Returns Ok(issue_id) or Err.
+# ORM boundary: Repo.insert_or_update cannot express custom SET expressions --
+# event_count = issues.event_count + 1 (arithmetic) and
+# status = CASE WHEN issues.status = 'resolved' THEN 'unresolved' ELSE issues.status END
+# (conditional). The ORM upsert uses SET field = EXCLUDED.field which only copies the
+# INSERT value, not computed expressions. Intentional raw SQL.
 pub fn upsert_issue(pool :: PoolHandle, project_id :: String, fingerprint :: String, title :: String, level :: String) -> String!String do
   let sql = "INSERT INTO issues (project_id, fingerprint, title, level, event_count) VALUES ($1::uuid, $2, $3, $4, 1) ON CONFLICT (project_id, fingerprint) DO UPDATE SET event_count = issues.event_count + 1, last_seen = now(), status = CASE WHEN issues.status = 'resolved' THEN 'unresolved' ELSE issues.status END RETURNING id::text"
   let rows = Repo.query_raw(pool, sql, [project_id, fingerprint, title, level])?
@@ -398,6 +403,10 @@ end
 # last hour, it's auto-escalated to 'unresolved'. The WHERE status='archived'
 # naturally prevents re-escalation after the first flip (research Pitfall 5).
 # Returns number of escalated issues.
+# ORM boundary: Repo.update_where cannot express nested subquery with JOIN + HAVING +
+# GREATEST + interval arithmetic. The WHERE ... IN (SELECT ... JOIN ... GROUP BY ...
+# HAVING count(*) > GREATEST(10, subquery / 168 * 10)) pattern exceeds ORM query
+# builder expressiveness. Intentional raw SQL.
 pub fn check_volume_spikes(pool :: PoolHandle) -> Int!String do
   Repo.execute_raw(pool, "UPDATE issues SET status = 'unresolved' WHERE status = 'archived' AND id IN (SELECT i.id FROM issues i JOIN events e ON e.issue_id = i.id AND e.received_at > now() - interval '1 hour' WHERE i.status = 'archived' GROUP BY i.id HAVING count(*) > GREATEST(10, (SELECT count(*) FROM events e2 WHERE e2.issue_id = i.id AND e2.received_at > now() - interval '7 days') / 168 * 10))", [])
 end
