@@ -285,51 +285,80 @@ end
 
 # Check if an issue with the given fingerprint is discarded (ISSUE-05 suppression).
 # Returns true if the issue exists with status = 'discarded', false otherwise.
+# Uses ORM Query.where + Repo.all instead of Repo.query_raw.
 pub fn is_issue_discarded(pool :: PoolHandle, project_id :: String, fingerprint :: String) -> Bool!String do
-  let rows = Repo.query_raw(pool, "SELECT 1 AS found FROM issues WHERE project_id = $1::uuid AND fingerprint = $2 AND status = 'discarded'", [project_id, fingerprint])?
-  if List.length(rows) > 0 do
-    Ok(true)
-  else
-    Ok(false)
-  end
+  let q = Query.from(Issue.__table__())
+    |> Query.where_raw("project_id = ?::uuid", [project_id])
+    |> Query.where(:fingerprint, fingerprint)
+    |> Query.where(:status, "discarded")
+    |> Query.select_raw(["1 AS found"])
+  let rows = Repo.all(pool, q)?
+  Ok(List.length(rows) > 0)
 end
 
 # --- Issue management queries (Phase 89 Plan 02) ---
 
 # Transition an issue to 'resolved' status (ISSUE-01).
+# Uses ORM Repo.update_where instead of raw SQL.
 pub fn resolve_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
-  Repo.execute_raw(pool, "UPDATE issues SET status = 'resolved' WHERE id = $1::uuid AND status != 'resolved'", [issue_id])
+  let q = Query.from(Issue.__table__())
+    |> Query.where_raw("id = ?::uuid", [issue_id])
+    |> Query.where_raw("status != 'resolved'", [])
+  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "resolved"}, q)?
+  Ok(1)
 end
 
 # Transition an issue to 'archived' status (ISSUE-01).
+# Uses ORM Repo.update_where instead of raw SQL.
 pub fn archive_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
-  Repo.execute_raw(pool, "UPDATE issues SET status = 'archived' WHERE id = $1::uuid", [issue_id])
+  let q = Query.from(Issue.__table__())
+    |> Query.where_raw("id = ?::uuid", [issue_id])
+  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "archived"}, q)?
+  Ok(1)
 end
 
 # Reopen an issue -- set status back to 'unresolved' (ISSUE-01).
+# Uses ORM Repo.update_where instead of raw SQL.
 pub fn unresolve_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
-  Repo.execute_raw(pool, "UPDATE issues SET status = 'unresolved' WHERE id = $1::uuid", [issue_id])
+  let q = Query.from(Issue.__table__())
+    |> Query.where_raw("id = ?::uuid", [issue_id])
+  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "unresolved"}, q)?
+  Ok(1)
 end
 
 # Assign an issue to a user. Pass empty string to unassign (ISSUE-04).
+# Uses ORM Repo.update_where for the assign branch.
+# Unassign branch retains Repo.execute_raw since ORM Map<String,String> cannot represent NULL.
 pub fn assign_issue(pool :: PoolHandle, issue_id :: String, user_id :: String) -> Int!String do
   if String.length(user_id) > 0 do
-    Repo.execute_raw(pool, "UPDATE issues SET assigned_to = $2::uuid WHERE id = $1::uuid", [issue_id, user_id])
+    let q = Query.from(Issue.__table__())
+      |> Query.where_raw("id = ?::uuid", [issue_id])
+    let _ = Repo.update_where(pool, Issue.__table__(), %{"assigned_to" => user_id}, q)?
+    Ok(1)
   else
     Repo.execute_raw(pool, "UPDATE issues SET assigned_to = NULL WHERE id = $1::uuid", [issue_id])
   end
 end
 
 # Mark an issue as discarded -- future events with this fingerprint are suppressed (ISSUE-05).
+# Uses ORM Repo.update_where instead of raw SQL.
 pub fn discard_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
-  Repo.execute_raw(pool, "UPDATE issues SET status = 'discarded' WHERE id = $1::uuid", [issue_id])
+  let q = Query.from(Issue.__table__())
+    |> Query.where_raw("id = ?::uuid", [issue_id])
+  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "discarded"}, q)?
+  Ok(1)
 end
 
 # Delete an issue and all associated events (ISSUE-05).
 # Events deleted first due to FK constraint on issue_id.
+# Uses ORM Repo.delete_where instead of raw SQL.
 pub fn delete_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
-  let _ = Repo.execute_raw(pool, "DELETE FROM events WHERE issue_id = $1::uuid", [issue_id])?
-  Repo.execute_raw(pool, "DELETE FROM issues WHERE id = $1::uuid", [issue_id])
+  let q_events = Query.from(Event.__table__())
+    |> Query.where_raw("issue_id = ?::uuid", [issue_id])
+  let _ = Repo.delete_where(pool, Event.__table__(), q_events)?
+  let q_issue = Query.from(Issue.__table__())
+    |> Query.where_raw("id = ?::uuid", [issue_id])
+  Repo.delete_where(pool, Issue.__table__(), q_issue)
 end
 
 # Helper: parse event_count string to Int, defaulting to 0 on failure.
