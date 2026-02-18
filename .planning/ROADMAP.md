@@ -298,10 +298,10 @@ Plans:
 **Depends on**: Phase 111 (sequential rewrite; needs all ORM features proven on simpler domains first)
 **Requirements**: REWR-03, REWR-04, REWR-05
 **Success Criteria** (what must be TRUE):
-  1. Search queries use `Query.fragment("to_tsvector('english', $1) @@ plainto_tsquery('english', $2)", ...)` for full-text search instead of raw SQL FTS
-  2. Dashboard queries use `Query.select(count())` with `Query.group_by` and `Query.fragment("date_trunc('hour', $1)", ...)` for time-bucketed analytics
-  3. Alert queries use `Query.fragment("metadata @> $1::jsonb", [filter])` for JSONB containment checks and `Query.fragment("metadata ? $1", [key])` for key existence
-  4. All 23 search + dashboard + alert queries in queries.mpl are replaced with ORM calls
+  1. Search queries use `Query.where_raw` with full-text search expressions and `Query.select_raw` for projected columns instead of raw SQL FTS
+  2. Dashboard queries use `Query.select_raw(["count(*)::text"])` with `Query.group_by_raw` and `Query.where_raw` for time-bucketed analytics instead of raw SQL
+  3. Alert queries use `Query.where_raw` with `condition_json->>'condition_type'` for JSONB field access and `Query.select_raw` for projected columns instead of raw SQL
+  4. Of the 23 search + dashboard + alert queries, all ORM-expressible queries are rewritten; remaining queries retain intentional raw SQL with documented ORM boundary rationale (server-side functions in SET, parameterized SELECT expressions, cross-join derived tables, JSONB build in INSERT)
 **Plans**: 2 plans
 Plans:
 - [ ] 112-01-PLAN.md -- Rewrite search, dashboard, detail, and team queries to ORM (11 rewritten, 7 documented boundaries)
