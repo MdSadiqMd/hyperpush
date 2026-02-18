@@ -3517,6 +3517,54 @@ impl<'ctx> CodeGen<'ctx> {
                 let arg_val = self.builder
                     .build_load(load_ty, arg_ptr, &format!("arg_{}", arg_idx))
                     .map_err(|e| e.to_string())?;
+
+                // Convert loaded i64 to the expected handler parameter type.
+                // The sender (coerce_to_i64) encodes: Bool→zext i1→i64, Float→bitcast f64→i64,
+                // Struct→store+load as i64. We reverse those operations here.
+                let arg_val = if param_idx < handler_param_types.len() {
+                    let expected_meta_ty = handler_param_types[param_idx];
+                    if expected_meta_ty.is_int_type() {
+                        let int_ty = expected_meta_ty.into_int_type();
+                        if int_ty.get_bit_width() < 64 {
+                            // Bool (i1) or other narrow int: truncate i64 -> iN
+                            self.builder
+                                .build_int_truncate(
+                                    arg_val.into_int_value(),
+                                    int_ty,
+                                    &format!("trunc_arg_{}", arg_idx),
+                                )
+                                .map_err(|e| e.to_string())?
+                                .into()
+                        } else {
+                            arg_val
+                        }
+                    } else if expected_meta_ty.is_float_type() {
+                        // Float: bitcast i64 -> f64 via alloca
+                        let alloca = self.builder
+                            .build_alloca(self.context.i64_type(), &format!("arg_{}_f64_tmp", arg_idx))
+                            .map_err(|e| e.to_string())?;
+                        self.builder.build_store(alloca, arg_val).map_err(|e| e.to_string())?;
+                        self.builder
+                            .build_load(self.context.f64_type(), alloca, &format!("arg_{}_as_f64", arg_idx))
+                            .map_err(|e| e.to_string())?
+                    } else if expected_meta_ty.is_struct_type() {
+                        // Small struct: bitcast i64 -> struct via alloca
+                        let expected_ty = inkwell::types::BasicTypeEnum::try_from(expected_meta_ty)
+                            .map_err(|_| format!("Cannot convert struct param type for arg {}", arg_idx))?;
+                        let alloca = self.builder
+                            .build_alloca(self.context.i64_type(), &format!("arg_{}_struct_tmp", arg_idx))
+                            .map_err(|e| e.to_string())?;
+                        self.builder.build_store(alloca, arg_val).map_err(|e| e.to_string())?;
+                        self.builder
+                            .build_load(expected_ty, alloca, &format!("arg_{}_as_struct", arg_idx))
+                            .map_err(|e| e.to_string())?
+                    } else {
+                        arg_val
+                    }
+                } else {
+                    arg_val
+                };
+
                 handler_args.push(arg_val.into());
             }
 
