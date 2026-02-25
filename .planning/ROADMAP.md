@@ -231,7 +231,10 @@ See milestones/v11.0-ROADMAP.md for full phase details.
   2. User can use any N >= 2 in `|N>` and it inserts the piped value at that argument position
   3. User can chain slot pipes with regular pipes (`a |2> f(b) |> g()`) and all positions resolve correctly
   4. Compiler emits a clear, actionable error when slot position N exceeds the target function's arity
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 116-01-PLAN.md — Lexer + Parser + AST: SlotPipe token, SLOT_PIPE_EXPR node, SlotPipeExpr with slot() accessor
+- [ ] 116-02-PLAN.md — Type checker + MIR lowering: infer_slot_pipe, error variants, E2E tests
 
 ### Phase 117: String Interpolation & Heredocs
 **Goal**: Users can embed expressions directly in strings with `#{expr}` and write multiline strings with `"""..."""`
