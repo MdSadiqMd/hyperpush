@@ -9,10 +9,10 @@ Requirements for v12.0 Language Ergonomics & Open Source Readiness. Each maps to
 
 ### Slot Pipe Operator
 
-- [ ] **PIPE-01**: User can write `expr |2> func(a)` to pipe result as second argument (becomes `func(a, expr)`)
-- [ ] **PIPE-02**: User can write `expr |N>` for any argument position N ≥ 2
-- [ ] **PIPE-03**: Slot pipes are chainable: `a |2> f(b) |> g()` works correctly
-- [ ] **PIPE-04**: Type inference validates slot pipe position against function arity with a clear error
+- [x] **PIPE-01**: User can write `expr |2> func(a)` to pipe result as second argument (becomes `func(a, expr)`)
+- [x] **PIPE-02**: User can write `expr |N>` for any argument position N ≥ 2
+- [x] **PIPE-03**: Slot pipes are chainable: `a |2> f(b) |> g()` works correctly
+- [x] **PIPE-04**: Type inference validates slot pipe position against function arity with a clear error
 - [ ] **PIPE-05**: Mesher codebase updated using slot pipe where it improves readability (dogfooding verified)
 
 ### Regular Expressions
@@ -91,10 +91,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PIPE-01 | Phase 116 | Pending |
-| PIPE-02 | Phase 116 | Pending |
-| PIPE-03 | Phase 116 | Pending |
-| PIPE-04 | Phase 116 | Pending |
+| PIPE-01 | Phase 116 | Complete |
+| PIPE-02 | Phase 116 | Complete |
+| PIPE-03 | Phase 116 | Complete |
+| PIPE-04 | Phase 116 | Complete |
 | PIPE-05 | Phase 120 | Pending |
 | REGEX-01 | Phase 119 | Pending |
 | REGEX-02 | Phase 119 | Pending |

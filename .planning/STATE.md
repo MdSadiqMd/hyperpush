@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 Phase: 116 of 123 (Phase 116: Slot Pipe Operator)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-02-25 — v12.0 roadmap created (8 phases, 33 requirements mapped)
+Plan: 01 complete, 02 next
+Status: In progress
+Last activity: 2026-02-25 — 116-01 complete: SlotPipe token + SLOT_PIPE_EXPR parser/AST
 
-Progress: [░░░░░░░░░░] 0% (v12.0)
+Progress: [█░░░░░░░░░] 5% (v12.0)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [░░░░░░░░░░] 0% (v12.0)
 | 114   | 02   | 15min    | 1     | 1     |
 | 115   | 01   | 3min     | 2     | 3     |
 | 115   | 02   | 3min     | 2     | 2     |
+| 116   | 01   | 4min     | 2     | 7     |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - [v12.0 Roadmap]: PIPE-05 and STRG-06 bundled into Phase 120 (Mesher Dogfooding) after all compiler work done
 - [v12.0 Roadmap]: REPO (Phase 122) scheduled after Mesher dogfooding -- disruptive restructure deferred until language features stable
 - [v12.0 Roadmap]: BENCH (Phase 123) scheduled last -- depends on repo being stable for benchmark code commit location
+- [Phase 116-01]: |0> and |1> emit TokenKind::Error at lex time (hard error by design, not recoverable parse error)
+- [Phase 116-01]: SlotPipe uses same Pratt binding power (3, 4) as Pipe -- chain with equal precedence
+- [Phase 116-01]: todo!() placeholders added to mesh-typeck and mesh-codegen to unblock builds until Plan 02
 
 ### Roadmap Evolution
 
@@ -80,6 +84,6 @@ None. v11.0 fully shipped and verified. Zero known compiler correctness issues.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: v12.0 roadmap created and written to .planning/ROADMAP.md
+Stopped at: Completed 116-01-PLAN.md (SlotPipe token + SLOT_PIPE_EXPR AST)
 Resume file: None
-Next action: /gsd:plan-phase 116
+Next action: /gsd:execute-phase 116-02
