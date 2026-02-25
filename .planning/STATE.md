@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Query Builder
 status: unknown
-last_updated: "2026-02-25T22:19:33.718Z"
+last_updated: "2026-02-25T22:22:15.881Z"
 progress:
   total_phases: 122
-  completed_phases: 121
+  completed_phases: 122
   total_plans: 319
-  completed_plans: 318
+  completed_plans: 319
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-17)
 ## Current Position
 
 Phase: 115 of 115 (v11.0 Query Builder)
-Plan: 1 of 2 in current phase (115-01 complete)
-Status: In Progress -- Phase 115 Plan 01 complete, Plan 02 pending
-Last activity: 2026-02-25 -- Completed 115-01 (requirement tracking gap closure: 13 requirements marked complete)
+Plan: 2 of 2 in current phase (115-01 complete, 115-02 complete)
+Status: Complete -- all plans in phase 115 finished; v11.0 Query Builder milestone complete
+Last activity: 2026-02-25 -- Completed 115-02 (Phase 109 positional API acceptance + dead code removal from queries.mpl)
 
 Progress: [██████████] 100% (v11.0)
 
@@ -68,6 +68,7 @@ Progress: [██████████] 100% (v11.0)
 | 114   | 01   | 30min    | 2     | 2     |
 | 114   | 02   | 15min    | 1     | 1     |
 | 115   | 01   | 3min     | 2     | 3     |
+| 115   | 02   | 3min     | 2     | 2     |
 
 ## Accumulated Context
 
@@ -114,11 +115,15 @@ Recent decisions affecting current work:
 - [Phase 114]: Event ingestion uses x-sentry-auth header (not X-Api-Key) -- confirmed from mesher/ingestion/auth.mpl
 - [Phase 114]: POST /api/v1/events returns 202 Accepted; all 8 HTTP domain endpoints return 2xx; WebSocket :8081 returns 101; process alive -- MirType::Tuple SIGSEGV confirmed resolved
 - [Phase 115]: Documentation-only gap closure: Phase 106/109 implementations were correct, only tracking records were missing
+- [Phase 115]: Phase 109 positional API (insert_or_update, delete_where_returning, where_sub) accepted as canonical v11.0 API; keyword-option style was never implemented
+- [Phase 115]: get_project_id_by_key and get_user_orgs removed from queries.mpl (zero import sites; superseded and unwired respectively)
 
 ### Roadmap Evolution
 
 - v11.0 roadmap created: 9 phases (106-114), 32 requirements mapped
 - Phase 109.1 inserted after Phase 109: Fix the issues encountered in 109 (URGENT)
+- Phase 115 added: Tracking corrections and API acceptance (shipped 2026-02-25)
+- v11.0 Query Builder complete: all 10 phases (106-115) shipped 2026-02-25
 
 ### Pending Todos
 
@@ -131,6 +136,6 @@ None. The EventProcessor SIGSEGV blocker is confirmed resolved (MirType::Tuple f
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 115-01-PLAN.md (requirement tracking gap closure: WHERE-01..06, FRAG-01..04, UPS-01..03 marked complete)
+Stopped at: Completed 115-02-PLAN.md (Phase 109 positional API acceptance + dead code removal from queries.mpl)
 Resume file: None
-Next action: Phase 115 Plan 02 (API acceptance testing).
+Next action: v11.0 complete. All phases 106-115 shipped. Plan next milestone if applicable.

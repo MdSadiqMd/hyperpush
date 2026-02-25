@@ -22,7 +22,7 @@
 - [x] **v9.0 Mesher** - Phases 87-95 (shipped 2026-02-15)
 - [x] **v10.0 ORM** - Phases 96-103 (shipped 2026-02-17)
 - [x] **v10.1 Stabilization** - Phases 104-105.1 (shipped 2026-02-17)
-- [ ] **v11.0 Query Builder** - Phases 106-115 (in progress)
+- [x] **v11.0 Query Builder** - Phases 106-115 (shipped 2026-02-25)
 
 ## Phases
 
@@ -184,7 +184,7 @@ See milestones/v9.0-ROADMAP.md for full phase details.
 
 </details>
 
-### v11.0 Query Builder (In Progress)
+### v11.0 Query Builder (Shipped 2026-02-25)
 
 **Milestone Goal:** Expand the Mesh ORM with comprehensive query builder capabilities (JOINs, aggregations, upserts, advanced WHERE, raw SQL fragments, RETURNING, subqueries) and rewrite all 68+ Mesher raw SQL data queries to use the ORM, validating every addition end-to-end.
 
@@ -197,7 +197,7 @@ See milestones/v9.0-ROADMAP.md for full phase details.
 - [x] **Phase 112: Mesher Rewrite -- Search, Dashboard, and Alerts** - FTS search, aggregation dashboards, alert system with JSONB (completed 2026-02-18)
 - [x] **Phase 113: Mesher Rewrite -- Retention and Final Cleanup** - Retention/storage queries, zero remaining raw SQL data queries (completed 2026-02-25)
 - [x] **Phase 114: Compile, Run, and End-to-End Verification** - Zero-error build, all HTTP/WS endpoints verified (Plan 01 complete: compile + startup verified) (completed 2026-02-25)
-- [ ] **Phase 115: Tracking Corrections and API Acceptance** - Close 13 requirement tracking gaps, accept Phase 109 positional API, remove dead code
+- [x] **Phase 115: Tracking Corrections and API Acceptance** - Close 13 requirement tracking gaps, accept Phase 109 positional API, remove dead code (completed 2026-02-25)
 
 ## Phase Details
 
@@ -391,6 +391,6 @@ Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -
 | 112. Rewrite: Search/Dashboard/Alerts | 2/2 | Complete    | 2026-02-18 | - |
 | 113. Rewrite: Retention & Cleanup | 1/1 | Complete    | 2026-02-25 | - |
 | 114. Verification | 2/2 | Complete    | 2026-02-25 | - |
-| 115. Tracking Corrections & API Acceptance | 1/2 | In Progress|  | - |
+| 115. Tracking Corrections & API Acceptance | 2/2 | Complete   | 2026-02-25 | 2026-02-25 |
 
-**Total: 106 phases shipped across 20 milestones. 313 plans completed. 9 phases remaining for v11.0.**
+**Total: 115 phases shipped across 21 milestones. 319 plans completed. v11.0 Query Builder complete.**
