@@ -50,9 +50,9 @@ Requirements for Query Builder milestone. Expand ORM with comprehensive query ca
 - [x] **REWR-03**: Search/filtering queries rewritten with ORM + fragments (4 queries)
 - [x] **REWR-04**: Dashboard/analytics queries rewritten with ORM aggregations (7 queries)
 - [x] **REWR-05**: Alert system queries rewritten with ORM + fragments (12 queries)
-- [ ] **REWR-06**: Retention/storage queries rewritten with ORM (6 queries)
+- [x] **REWR-06**: Retention/storage queries rewritten with ORM (6 queries)
 - [x] **REWR-07**: Event writer/extraction rewritten with ORM + fragments (2 queries)
-- [ ] **REWR-08**: Zero Repo.query_raw/execute_raw in Mesher data queries
+- [x] **REWR-08**: Zero Repo.query_raw/execute_raw in Mesher data queries
 
 ### Verification
 
@@ -115,8 +115,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REWR-03 | Phase 112 | Complete |
 | REWR-04 | Phase 112 | Complete |
 | REWR-05 | Phase 112 | Complete |
-| REWR-06 | Phase 113 | Pending |
-| REWR-08 | Phase 113 | Pending |
+| REWR-06 | Phase 113 | Complete |
+| REWR-08 | Phase 113 | Complete |
 | VER-01 | Phase 114 | Pending |
 | VER-02 | Phase 114 | Pending |
 | VER-03 | Phase 114 | Pending |

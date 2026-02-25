@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: Query Builder
+status: unknown
+last_updated: "2026-02-25T20:55:43.677Z"
+progress:
+  total_phases: 120
+  completed_phases: 120
+  total_plans: 315
+  completed_plans: 315
+---
+
 # Project State
 
 ## Project Reference
@@ -51,6 +64,7 @@ Progress: [███████░░░] 67% (v11.0)
 | 111   | 02   | 1min     | 2     | 2     |
 | 112   | 01   | 5min     | 2     | 1     |
 | 112   | 02   | 3min     | 2     | 1     |
+| 113   | 01   | 5min     | 2     | 1     |
 
 ## Accumulated Context
 
@@ -88,6 +102,9 @@ Recent decisions affecting current work:
 - [Phase 112]: acknowledge_alert and resolve_fired_alert retain execute_raw for SET column = now() server-side function calls
 - [Phase 112]: toggle_alert_rule and check_new_issue verified as already rewritten by Plan 01
 - [Phase 112]: list_alerts uses Query.join_as with status passed 3 times for optional status filter
+- [Phase 113]: delete_expired_events uses Repo.delete_where + Query.where_raw for interval expression -- interval arithmetic expressible via where_raw
+- [Phase 113]: update_project_settings retains raw SQL: COALESCE with server-side JSONB extraction + fallback to current column not expressible via Repo.update_where Map<String,String>
+- [Phase 113]: check_sample_rate retains raw SQL: random() comparison with scalar subquery + COALESCE default not expressible via ORM query builder
 
 ### Roadmap Evolution
 
@@ -104,7 +121,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-18
-Stopped at: Completed 112-02-PLAN.md (Rewrite alert system queries to ORM)
+Last session: 2026-02-25
+Stopped at: Completed 113-01-PLAN.md (Retention/storage ORM rewrite + zero raw SQL data query audit)
 Resume file: None
-Next action: Plan and execute Phase 113 (retention query cleanup).
+Next action: Continue Phase 113 if more plans remain, or advance to Phase 114.
