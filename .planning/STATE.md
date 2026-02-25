@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 Phase: 116 of 123 (Phase 116: Slot Pipe Operator)
-Plan: 01 complete, 02 next
-Status: In progress
-Last activity: 2026-02-25 — 116-01 complete: SlotPipe token + SLOT_PIPE_EXPR parser/AST
+Plan: 02 complete, phase complete
+Status: Phase 116 complete
+Last activity: 2026-02-25 — 116-02 complete: |N> type checker + MIR lowering + E2E tests
 
 Progress: [█░░░░░░░░░] 5% (v12.0)
 
@@ -48,6 +48,7 @@ Progress: [█░░░░░░░░░] 5% (v12.0)
 | 115   | 01   | 3min     | 2     | 3     |
 | 115   | 02   | 3min     | 2     | 2     |
 | 116   | 01   | 4min     | 2     | 7     |
+| 116   | 02   | 8min     | 2     | 6     |
 
 ## Accumulated Context
 
@@ -67,6 +68,8 @@ Recent decisions affecting current work:
 - [Phase 116-01]: |0> and |1> emit TokenKind::Error at lex time (hard error by design, not recoverable parse error)
 - [Phase 116-01]: SlotPipe uses same Pratt binding power (3, 4) as Pipe -- chain with equal precedence
 - [Phase 116-01]: todo!() placeholders added to mesh-typeck and mesh-codegen to unblock builds until Plan 02
+- [Phase 116-02]: Slot pipe uses insertion semantics — x |2> f(a,b,c) = f(a,x,b,c); conflict check removed, arity unification handles mismatches
+- [Phase 116-02]: SlotPositionConflict error variant exists in enum but not emitted in normal insertion; SlotPipeOutOfRange emitted when slot > known arity
 
 ### Roadmap Evolution
 
@@ -84,6 +87,6 @@ None. v11.0 fully shipped and verified. Zero known compiler correctness issues.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 116-01-PLAN.md (SlotPipe token + SLOT_PIPE_EXPR AST)
+Stopped at: Completed 116-02-PLAN.md (|N> type checker + MIR lowering + E2E tests)
 Resume file: None
-Next action: /gsd:execute-phase 116-02
+Next action: /gsd:execute-phase 117
