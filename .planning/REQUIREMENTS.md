@@ -23,25 +23,25 @@ Requirements for Query Builder milestone. Expand ORM with comprehensive query ca
 
 ### Advanced WHERE
 
-- [ ] **WHERE-01**: Query builder supports comparison operators (>, <, >=, <=, !=)
-- [ ] **WHERE-02**: Query builder supports IN and NOT IN with value lists
-- [ ] **WHERE-03**: Query builder supports IS NULL and IS NOT NULL
-- [ ] **WHERE-04**: Query builder supports BETWEEN for range checks
-- [ ] **WHERE-05**: Query builder supports LIKE and ILIKE for pattern matching
-- [ ] **WHERE-06**: Query builder supports OR conditions and grouped conditions
+- [x] **WHERE-01**: Query builder supports comparison operators (>, <, >=, <=, !=)
+- [x] **WHERE-02**: Query builder supports IN and NOT IN with value lists
+- [x] **WHERE-03**: Query builder supports IS NULL and IS NOT NULL
+- [x] **WHERE-04**: Query builder supports BETWEEN for range checks
+- [x] **WHERE-05**: Query builder supports LIKE and ILIKE for pattern matching
+- [x] **WHERE-06**: Query builder supports OR conditions and grouped conditions
 
 ### Upsert, RETURNING, Subqueries
 
-- [ ] **UPS-01**: Repo supports upsert (INSERT ON CONFLICT DO UPDATE) with conflict target
-- [ ] **UPS-02**: Repo insert/update/delete support RETURNING clause
-- [ ] **UPS-03**: Query builder supports subqueries in WHERE clause
+- [x] **UPS-01**: Repo supports upsert (INSERT ON CONFLICT DO UPDATE) with conflict target
+- [x] **UPS-02**: Repo insert/update/delete support RETURNING clause
+- [x] **UPS-03**: Query builder supports subqueries in WHERE clause
 
 ### Raw SQL Fragments
 
-- [ ] **FRAG-01**: Query.fragment() embeds raw SQL with parameter binding in queries
-- [ ] **FRAG-02**: Fragments work in WHERE, SELECT, ORDER BY, and GROUP BY positions
-- [ ] **FRAG-03**: Fragments support PG functions (crypt, gen_random_bytes, date_trunc, random)
-- [ ] **FRAG-04**: Fragments support JSONB operators and full-text search expressions
+- [x] **FRAG-01**: Query.fragment() embeds raw SQL with parameter binding in queries
+- [x] **FRAG-02**: Fragments work in WHERE, SELECT, ORDER BY, and GROUP BY positions
+- [x] **FRAG-03**: Fragments support PG functions (crypt, gen_random_bytes, date_trunc, random)
+- [x] **FRAG-04**: Fragments support JSONB operators and full-text search expressions
 
 ### Mesher Rewrite
 
@@ -88,16 +88,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WHERE-01 | Phase 115 | Pending |
-| WHERE-02 | Phase 115 | Pending |
-| WHERE-03 | Phase 115 | Pending |
-| WHERE-04 | Phase 115 | Pending |
-| WHERE-05 | Phase 115 | Pending |
-| WHERE-06 | Phase 115 | Pending |
-| FRAG-01 | Phase 115 | Pending |
-| FRAG-02 | Phase 115 | Pending |
-| FRAG-03 | Phase 115 | Pending |
-| FRAG-04 | Phase 115 | Pending |
+| WHERE-01 | Phase 106 | Complete |
+| WHERE-02 | Phase 106 | Complete |
+| WHERE-03 | Phase 106 | Complete |
+| WHERE-04 | Phase 106 | Complete |
+| WHERE-05 | Phase 106 | Complete |
+| WHERE-06 | Phase 106 | Complete |
+| FRAG-01 | Phase 106 | Complete |
+| FRAG-02 | Phase 106 | Complete |
+| FRAG-03 | Phase 106 | Complete |
+| FRAG-04 | Phase 106 | Complete |
 | JOIN-01 | Phase 107 | Complete |
 | JOIN-02 | Phase 107 | Complete |
 | JOIN-03 | Phase 107 | Complete |
@@ -106,9 +106,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGG-02 | Phase 108 | Complete |
 | AGG-03 | Phase 108 | Complete |
 | AGG-04 | Phase 108 | Complete |
-| UPS-01 | Phase 115 | Pending |
-| UPS-02 | Phase 115 | Pending |
-| UPS-03 | Phase 115 | Pending |
+| UPS-01 | Phase 109 | Complete |
+| UPS-02 | Phase 109 | Complete |
+| UPS-03 | Phase 109 | Complete |
 | REWR-01 | Phase 110 | Complete |
 | REWR-02 | Phase 111 | Complete |
 | REWR-07 | Phase 111 | Complete |
@@ -128,4 +128,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-17*
-*Last updated: 2026-02-25 after gap closure plan (phases 114-115 added)*
+*Last updated: 2026-02-25 after Phase 115 corrections (WHERE-01..06, FRAG-01..04, UPS-01..03 marked complete)*
