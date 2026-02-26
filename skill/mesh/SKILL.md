@@ -12,7 +12,7 @@ description: Mesh programming language — use for any question about Mesh synta
 4. Only document what exists in the codebase — never mention planned or roadmap features.
 
 ## What is Mesh
-1. Mesh is a statically-typed, compiled programming language designed for expressive, readable concurrency.
+1. Mesh is a statically-typed, compiled programming language designed for expressive, readable concurrency. Source files use the `.mpl` extension.
 2. It compiles to native code via LLVM and targets production backend workloads: HTTP servers, databases, distributed actor systems.
 3. Design philosophy: writing concurrent programs should feel as natural and clean as writing sequential code, with supervision and fault tolerance built into the language.
 4. Mesh draws from Elixir (actors, supervisors), Rust (type safety, Result/Option), and ML (pipe operator, ADTs, pattern matching).
