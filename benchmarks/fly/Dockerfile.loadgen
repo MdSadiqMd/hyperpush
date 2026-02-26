@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
-    curl git build-essential libssl-dev bc \
+    curl git build-essential libssl-dev bc unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Build wrk from source (not in Ubuntu 22.04 apt)
