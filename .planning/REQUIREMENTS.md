@@ -27,8 +27,8 @@ Requirements for v12.0 Language Ergonomics & Open Source Readiness. Each maps to
 ### String Ergonomics
 
 - [x] **STRG-01**: User can write string interpolation `"Value: #{expr}"` supporting arbitrary expressions
-- [ ] **STRG-02**: User can write heredoc strings `"""..."""` for multiline content without escape sequences
-- [ ] **STRG-03**: Heredoc strings support interpolation: `"""{"id": "#{id}"}"""`
+- [x] **STRG-02**: User can write heredoc strings `"""..."""` for multiline content without escape sequences
+- [x] **STRG-03**: Heredoc strings support interpolation: `"""{"id": "#{id}"}"""`
 - [ ] **STRG-04**: User can read env var with default: `Env.get("KEY", "default") -> String`
 - [ ] **STRG-05**: User can parse env var as integer with default: `Env.get_int("PORT", 8080) -> Int`
 - [ ] **STRG-06**: Mesher server code updated using new string features (dogfooding verified)
@@ -103,8 +103,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REGEX-05 | Phase 119 | Pending |
 | REGEX-06 | Phase 119 | Pending |
 | STRG-01 | Phase 117 | Complete |
-| STRG-02 | Phase 117 | Pending |
-| STRG-03 | Phase 117 | Pending |
+| STRG-02 | Phase 117 | Complete |
+| STRG-03 | Phase 117 | Complete |
 | STRG-04 | Phase 118 | Pending |
 | STRG-05 | Phase 118 | Pending |
 | STRG-06 | Phase 120 | Pending |
