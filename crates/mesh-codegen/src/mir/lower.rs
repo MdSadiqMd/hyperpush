@@ -7712,20 +7712,66 @@ impl<'a> Lowerer<'a> {
     fn lower_string_expr(&mut self, str_expr: &StringExpr) -> MirExpr {
         // Walk the STRING_EXPR node's children to find STRING_CONTENT and
         // INTERPOLATION segments.
+
+        // Detect triple-quoted string from STRING_START token text (""" vs ")
+        let is_triple = str_expr
+            .syntax()
+            .children_with_tokens()
+            .filter_map(|c| c.into_token())
+            .find(|t| t.kind() == SyntaxKind::STRING_START)
+            .map(|t| t.text().starts_with("\"\"\""))
+            .unwrap_or(false);
+
+        // For triple-quoted strings, determine the trim level from the last STRING_CONTENT token.
+        // The last STRING_CONTENT ends with "\n<indent>" where <indent> matches the closing """.
+        let trim_level: usize = if is_triple {
+            str_expr
+                .syntax()
+                .children_with_tokens()
+                .filter_map(|c| c.into_token())
+                .filter(|t| t.kind() == SyntaxKind::STRING_CONTENT)
+                .last()
+                .map(|t| {
+                    let text = t.text().to_string();
+                    // The last line of the last STRING_CONTENT is the closing indent line
+                    text.split('\n')
+                        .last()
+                        .unwrap_or("")
+                        .chars()
+                        .take_while(|c| *c == ' ' || *c == '\t')
+                        .count()
+                })
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
         let mut segments: Vec<MirExpr> = Vec::new();
+        // Track whether the next STRING_CONTENT is the first one (for leading newline stripping)
+        let mut is_first_content = is_triple;
 
         for child in str_expr.syntax().children_with_tokens() {
             match child.kind() {
                 SyntaxKind::STRING_CONTENT => {
-                    let text = child
+                    let raw_text = child
                         .as_token()
                         .map(|t| unescape_string(t.text()))
                         .unwrap_or_default();
+
+                    let text = if is_triple {
+                        apply_heredoc_content(raw_text, is_first_content, trim_level)
+                    } else {
+                        raw_text
+                    };
+                    is_first_content = false;
+
                     if !text.is_empty() {
                         segments.push(MirExpr::StringLit(text, MirType::String));
                     }
                 }
                 SyntaxKind::INTERPOLATION => {
+                    // After any interpolation, subsequent STRING_CONTENT is not first
+                    is_first_content = false;
                     // INTERPOLATION node contains an expression child.
                     if let Some(node) = child.as_node() {
                         for inner in node.children() {
@@ -10747,6 +10793,49 @@ fn to_snake_case(name: &str) -> String {
         }
     }
     result
+}
+
+/// Process a STRING_CONTENT segment from a triple-quoted heredoc.
+///
+/// - `is_first`: strip the leading newline (the one after the opening `"""`)
+/// - `trim_level`: strip this many leading spaces from each line
+/// - For the last segment, the last line contains only the closing indent — it is dropped.
+///   Detection: if the last line is all-whitespace (pure spaces/tabs), it is the closing
+///   indent line and must be stripped.
+fn apply_heredoc_content(text: String, is_first: bool, trim_level: usize) -> String {
+    // Strip leading newline from first segment
+    let s: String = if is_first {
+        if text.starts_with("\r\n") {
+            text[2..].to_string()
+        } else if text.starts_with('\n') {
+            text[1..].to_string()
+        } else {
+            text
+        }
+    } else {
+        text
+    };
+
+    // Split into lines to process each one
+    let mut lines: Vec<&str> = s.split('\n').collect();
+
+    // Drop last line if it's purely whitespace (closing indent line before closing """)
+    if lines.last().map(|l| l.chars().all(|c| c == ' ' || c == '\t')).unwrap_or(false) {
+        lines.pop();
+    }
+
+    let stripped_lines: Vec<String> = lines
+        .iter()
+        .map(|line| {
+            if line.len() >= trim_level {
+                line[trim_level..].to_string()
+            } else {
+                line.trim_start_matches(|c: char| c == ' ' || c == '\t').to_string()
+            }
+        })
+        .collect();
+
+    stripped_lines.join("\n")
 }
 
 /// Process escape sequences in a raw string token, converting `\"` → `"`,
