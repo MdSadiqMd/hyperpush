@@ -297,9 +297,20 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
 
     // ── Env module ─────────────────────────────────────────────────
     let mut env_mod = HashMap::new();
+    // Env.get(key, default) -> String  (Phase 118: 2-arg API replaces old Option-returning 1-arg)
     env_mod.insert(
         "get".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::option(Ty::string()))),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())),
+    );
+    // Env.get_int(key, default) -> Int
+    env_mod.insert(
+        "get_int".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::int()], Ty::int())),
+    );
+    // Env.args() -> List<String>
+    env_mod.insert(
+        "args".to_string(),
+        Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
     );
     modules.insert("Env".to_string(), env_mod);
 

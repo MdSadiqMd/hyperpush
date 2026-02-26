@@ -47,6 +47,40 @@ fn compile_and_run(source: &str) -> String {
     String::from_utf8_lossy(&run_output.stdout).to_string()
 }
 
+/// Helper: compile a Mesh source file and run the resulting binary with environment variables set.
+fn compile_and_run_with_env(source: &str, env_vars: &[(&str, &str)]) -> String {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let project_dir = temp_dir.path().join("project");
+    std::fs::create_dir_all(&project_dir).expect("failed to create project dir");
+
+    let main_mesh = project_dir.join("main.mpl");
+    std::fs::write(&main_mesh, source).expect("failed to write main.mpl");
+
+    let meshc = find_meshc();
+    let output = Command::new(&meshc)
+        .args(["build", project_dir.to_str().unwrap()])
+        .output()
+        .expect("failed to invoke meshc");
+
+    assert!(output.status.success(), "meshc build failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr));
+
+    let binary = project_dir.join("project");
+    let mut cmd = Command::new(&binary);
+    for (key, val) in env_vars {
+        cmd.env(key, val);
+    }
+    let run_output = cmd.output()
+        .unwrap_or_else(|e| panic!("failed to run binary: {}", e));
+
+    assert!(run_output.status.success(), "binary execution failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&run_output.stdout),
+        String::from_utf8_lossy(&run_output.stderr));
+
+    String::from_utf8_lossy(&run_output.stdout).to_string()
+}
+
 /// Helper: compile a Mesh source file, return the compilation error.
 fn compile_expect_error(source: &str) -> String {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
@@ -190,6 +224,43 @@ fn e2e_heredoc_interp() {
         output,
         "{\"id\": 42, \"name\": \"Alice\"}\n",
         "Heredoc interpolation must evaluate #{{expr}} and trim indentation"
+    );
+}
+
+/// STRG-04: Env.get(key, default) returns env value when set, default when unset.
+#[test]
+fn e2e_env_get() {
+    let source = read_fixture("env_get.mpl");
+    let output = compile_and_run_with_env(
+        &source,
+        &[
+            ("MESH_TEST_VAR", "hello"),
+            ("MESH_TEST_EMPTY_VAR", ""),
+        ],
+    );
+    assert_eq!(
+        output,
+        "default_val\nhello\n\n",
+        "Env.get must return default for missing var, env value for set var, empty string for empty var"
+    );
+}
+
+/// STRG-05: Env.get_int(key, default) parses int or returns default.
+#[test]
+fn e2e_env_get_int() {
+    let source = read_fixture("env_get_int.mpl");
+    let output = compile_and_run_with_env(
+        &source,
+        &[
+            ("MESH_INT_TEST_VAR", "3000"),
+            ("MESH_INT_BAD_VAR", "notanint"),
+            ("MESH_INT_NEG_VAR", "-1"),
+        ],
+    );
+    assert_eq!(
+        output,
+        "8080\n3000\n8080\n-1\n",
+        "Env.get_int must return default for missing/non-numeric, parsed value for valid int, negative int supported"
     );
 }
 
