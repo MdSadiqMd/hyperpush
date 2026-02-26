@@ -37,7 +37,7 @@ Requirements for v12.0 Language Ergonomics & Open Source Readiness. Each maps to
 
 - [x] **SKILL-01**: Mesh language agent skill created in GSD skill format with progressive disclosure
 - [x] **SKILL-02**: Skill has a main entry command providing language overview and available sub-topics
-- [ ] **SKILL-03**: Skill has per-topic deep-dive commands (syntax, types, actors, ORM, HTTP/WS, stdlib, distributed actors)
+- [x] **SKILL-03**: Skill has per-topic deep-dive commands (syntax, types, actors, ORM, HTTP/WS, stdlib, distributed actors)
 - [x] **SKILL-04**: Skill registered and usable by AI for all Mesh-related questions without explicit invocation
 
 ### Repository Reorganization
@@ -110,7 +110,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STRG-06 | Phase 120 | Complete |
 | SKILL-01 | Phase 121 | Complete |
 | SKILL-02 | Phase 121 | Complete |
-| SKILL-03 | Phase 121 | Pending |
+| SKILL-03 | Phase 121 | Complete |
 | SKILL-04 | Phase 121 | Complete |
 | REPO-01 | Phase 122 | Pending |
 | REPO-02 | Phase 122 | Pending |

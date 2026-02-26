@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Language Ergonomics & Open Source Readiness
 status: unknown
-last_updated: "2026-02-26T05:12:17.199Z"
+last_updated: "2026-02-26T05:16:22Z"
 progress:
   total_phases: 129
   completed_phases: 127
   total_plans: 334
-  completed_plans: 331
+  completed_plans: 332
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 Phase: 121 of 123 (Phase 121: Mesh Agent Skill)
-Plan: 01 complete (1 of 4 plans)
-Status: Phase 121 in progress — root SKILL.md + syntax + types sub-skills written; 3 remaining sub-skill plans
-Last activity: 2026-02-26 — 121-01 complete: Mesh agent skill scaffold created (skill/mesh/SKILL.md + syntax + types sub-skills)
+Plan: 02 complete (2 of 4 plans)
+Status: Phase 121 in progress — pattern-matching, error-handling, and traits sub-skills written; 2 remaining sub-skill plans
+Last activity: 2026-02-26 — 121-02 complete: pattern-matching, error-handling, traits sub-skills written
 
 Progress: [█░░░░░░░░░] 5% (v12.0)
 
@@ -59,6 +59,7 @@ Progress: [█░░░░░░░░░] 5% (v12.0)
 | 120   | 01   | 4min     | 2     | 6     |
 | Phase 120 P02 | 70min | 2 tasks | 3 files |
 | Phase 121 P01 | 3min | 3 tasks | 3 files |
+| Phase 121 P02 | 2min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,7 @@ Recent decisions affecting current work:
 - [Phase 120]: Heredocs used for JSON builders with 2+ embedded double quotes; simple error strings use regular #{} without heredoc
 - [Phase 120]: HTTP test assertions fixed: unescape_string() in MIR lowerer correctly processes backslash escapes; test comments claiming otherwise were stale since Phase 117
 - [Phase 121]: Skill lives at skill/mesh/ inside snow repo with SKILL.md format (frontmatter + numbered rules + code examples from tests/e2e/)
+- [Phase 121-02]: Sub-skills use cross-references via 'See also: skills/<name>' pattern for related concept linking
 
 ### Roadmap Evolution
 
@@ -118,6 +120,6 @@ None. v11.0 fully shipped and verified. Zero known compiler correctness issues.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 121-01-PLAN.md (Mesh agent skill scaffold: root SKILL.md + syntax + types sub-skills)
+Stopped at: Completed 121-02-PLAN.md (pattern-matching, error-handling, traits sub-skills)
 Resume file: None
-Next action: /gsd:execute-phase 121 Plan 02 (remaining sub-skills or next phase)
+Next action: /gsd:execute-phase 121 Plan 03 (remaining sub-skills: actors, supervisors, collections, strings, http, database)
