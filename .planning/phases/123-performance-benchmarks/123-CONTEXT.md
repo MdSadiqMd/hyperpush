@@ -30,7 +30,7 @@ Publish HTTP benchmark results comparing Mesh performance against Rust (axum), G
 - Each endpoint benchmarked and reported separately
 - Protocol: HTTP/1.1 only (wrk default)
 - Worker/thread count: match CPU core count (natural optimal for each runtime)
-- Load generator and servers run on the same machine (localhost) — documented as such
+- Load topology: TWO dedicated Fly.io performance-2x VMs. Server VM hosts all four language servers; load generator VM hosts wrk. Both in the same region, communicating over Fly.io private WireGuard network. This eliminates CPU contention between load generator and servers.
 
 ### Results publication
 - Top-line summary table added to README.md with a link to full results
