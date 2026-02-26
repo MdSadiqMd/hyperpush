@@ -10827,10 +10827,23 @@ fn apply_heredoc_content(text: String, is_first: bool, trim_level: usize) -> Str
     let stripped_lines: Vec<String> = lines
         .iter()
         .map(|line| {
-            if line.len() >= trim_level {
+            // Count actual leading whitespace on this line
+            let leading_ws: usize = line
+                .chars()
+                .take_while(|c| *c == ' ' || *c == '\t')
+                .count();
+            // Only strip up to trim_level if the line actually starts with whitespace.
+            // If a line has no leading whitespace (e.g. a middle-of-line segment after
+            // an interpolation), leave it untouched.
+            if leading_ws >= trim_level {
                 line[trim_level..].to_string()
+            } else if leading_ws > 0 {
+                // Partially indented line — strip what we can (no negative indent)
+                line[leading_ws..].to_string()
             } else {
-                line.trim_start_matches(|c: char| c == ' ' || c == '\t').to_string()
+                // No leading whitespace — this is mid-line content after an interpolation;
+                // leave it as-is.
+                line.to_string()
             }
         })
         .collect();

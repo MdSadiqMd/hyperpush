@@ -169,6 +169,30 @@ fn e2e_string_interp_hash() {
     );
 }
 
+/// STRG-02: Triple-quoted heredoc strings with trimIndent.
+#[test]
+fn e2e_heredoc_basic() {
+    let source = read_fixture("heredoc_basic.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(
+        output,
+        "Hello,\nWorld!\n{\"key\": \"value\"}\n",
+        "Heredoc must strip common leading indentation and trailing whitespace line"
+    );
+}
+
+/// STRG-03: Triple-quoted heredoc with #{{}} interpolation.
+#[test]
+fn e2e_heredoc_interp() {
+    let source = read_fixture("heredoc_interp.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(
+        output,
+        "{\"id\": 42, \"name\": \"Alice\"}\n",
+        "Heredoc interpolation must evaluate #{{expr}} and trim indentation"
+    );
+}
+
 /// SC2: ADT sum type construction.
 #[test]
 fn e2e_adts() {
