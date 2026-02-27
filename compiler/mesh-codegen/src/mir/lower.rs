@@ -362,6 +362,8 @@ impl<'a> Lowerer<'a> {
             "mesh_", "Ord__", "Eq__", "Display__", "Debug__", "Hash__",
             "Default__", "Add__", "Sub__", "Mul__", "Div__", "Rem__", "Neg__",
             "FromRow__", "FromJson__", "ToJson__",
+            "From_", "From__", "Into_", "Into__",
+            "TryFrom_", "TryFrom__", "TryInto_", "TryInto__", // Phase 128
         ];
         for prefix in BUILTIN_PREFIXES {
             if name.starts_with(prefix) {
@@ -5917,6 +5919,18 @@ impl<'a> Lowerer<'a> {
                     "From_Bool__from__String" => "mesh_bool_to_string".to_string(),
                     _ => mangled,
                 };
+                // Phase 128: TryInto.try_into() dispatch -- redirect to underlying TryFrom function.
+                // The synthetic TryInto impl is NOT in known_functions; the user's TryFrom impl IS.
+                // resolved looks like "TryInto__try_into__Int" (source type = Int).
+                // We find TryFrom_Int__try_from__<TargetType> in known_functions.
+                if resolved.starts_with("TryInto__try_into__") {
+                    let source_prefix = format!("TryFrom_{}__try_from__", type_name);
+                    for (fn_name, fn_ty) in self.known_functions.iter() {
+                        if fn_name.starts_with(&source_prefix) {
+                            return MirExpr::Var(fn_name.clone(), fn_ty.clone());
+                        }
+                    }
+                }
                 return MirExpr::Var(resolved, var_ty.clone());
             }
 
@@ -6646,6 +6660,21 @@ impl<'a> Lowerer<'a> {
                             }
                             // Fallback: try unparameterized name.
                             let unparameterized = format!("From__from__{}", base_name);
+                            if let Some(fn_ty) = self.known_functions.get(&unparameterized).cloned() {
+                                return MirExpr::Var(unparameterized, fn_ty);
+                            }
+                        }
+                        // Phase 128: StructName.try_from() dispatch (TryFrom trait).
+                        // Mirrors the From.from() pattern above.
+                        if field == "try_from" {
+                            let suffix = format!("__try_from__{}", base_name);
+                            for (fn_name, fn_ty) in self.known_functions.iter() {
+                                if fn_name.starts_with("TryFrom_") && fn_name.ends_with(&suffix) {
+                                    return MirExpr::Var(fn_name.clone(), fn_ty.clone());
+                                }
+                            }
+                            // Fallback: unparameterized name.
+                            let unparameterized = format!("TryFrom__try_from__{}", base_name);
                             if let Some(fn_ty) = self.known_functions.get(&unparameterized).cloned() {
                                 return MirExpr::Var(unparameterized, fn_ty);
                             }
