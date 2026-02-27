@@ -371,7 +371,7 @@ impl<'src> Parser<'src> {
     // ── Newline significance ───────────────────────────────────────────
 
     /// Whether newlines are currently insignificant (inside delimiters).
-    fn is_newline_insignificant(&self) -> bool {
+    pub(crate) fn is_newline_insignificant(&self) -> bool {
         self.paren_depth > 0 || self.bracket_depth > 0 || self.brace_depth > 0
     }
 

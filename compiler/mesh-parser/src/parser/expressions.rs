@@ -163,6 +163,16 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<MarkClosed> {
             let m = p.open_before(lhs);
             p.advance(); // operator
 
+            // ── Trailing-pipe newline skip ──
+            // If the operator just consumed is |> or |N> and we are outside
+            // delimiters (newlines are significant), skip any newlines before
+            // parsing the RHS. This allows: `x |>\n  f()`.
+            if matches!(current, SyntaxKind::PIPE | SyntaxKind::SLOT_PIPE)
+                && !p.is_newline_insignificant()
+            {
+                p.skip_newlines_for_continuation();
+            }
+
             expr_bp(p, r_bp);
 
             let kind = match current {
