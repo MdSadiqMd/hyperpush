@@ -144,6 +144,99 @@ fn main() do
 end
 ```
 
+## Services (Stateful OTP-style Processes)
+
+Rules:
+1. `service Name do init ... call ... cast ... end` defines a stateful, message-handling process (gen_server pattern).
+2. `fn init(params...) -> State do ... end` — initializes state; return type defines the state type.
+3. `call OpName(params) :: ReturnType do |state| ... end` — synchronous handler; body returns `(new_state, return_value)`.
+4. `cast OpName(params) do |state| ... end` — asynchronous handler (fire-and-forget); body returns just `new_state`.
+5. `Name.start(init_args...)` — spawns the service actor and returns its Pid.
+6. `Name.op_name(pid, args...)` — calls an operation synchronously (snake_case of the defined OpName).
+7. `Name.cast_op_name(pid, args...)` — fires a cast operation asynchronously (no return value captured).
+8. State is private — external code only interacts through call/cast operations.
+
+Code example (from tests/e2e/service_counter.mpl):
+```mesh
+service Counter do
+  fn init(start_val :: Int) -> Int do
+    start_val
+  end
+
+  call GetCount() :: Int do |count|
+    (count, count)
+  end
+
+  call Increment(amount :: Int) :: Int do |count|
+    (count + amount, count + amount)
+  end
+
+  cast Reset() do |_count|
+    0
+  end
+end
+
+fn main() do
+  let pid = Counter.start(10)
+  let c1 = Counter.get_count(pid)    # sync call, returns Int
+  println("${c1}")                   # 10
+  let c2 = Counter.increment(pid, 5) # sync call, returns Int
+  println("${c2}")                   # 15
+  Counter.reset(pid)                 # async cast, no return
+  let c3 = Counter.get_count(pid)    # 0
+  println("${c3}")
+end
+```
+
+Code example with struct state (from tests/e2e/service_bool_return.mpl):
+```mesh
+struct LimitState do
+  count :: Int
+  max :: Int
+end
+
+service Limiter do
+  fn init(max :: Int) -> LimitState do
+    LimitState { count: 0, max: max }
+  end
+
+  call Check() :: Bool do |state|
+    if state.count >= state.max do
+      (state, false)
+    else
+      let new_state = LimitState { count: state.count + 1, max: state.max }
+      (new_state, true)
+    end
+  end
+end
+
+fn main() do
+  let pid = Limiter.start(2)
+  let ok = Limiter.check(pid)   # true (first call)
+  println("${ok}")
+end
+```
+
+## Job Module (Async Tasks)
+
+Rules:
+1. `Job.async(fn() -> expr end)` — spawns a function on the actor runtime and returns a Job handle immediately.
+2. `Job.await(job) -> Result<T, String>` — blocks until the job completes and returns `Ok(result)` or `Err(message)` on panic.
+3. Use for fire-and-collect concurrency: submit multiple jobs, then await each.
+4. The closure passed to `Job.async` must take no arguments: `fn() -> ... end`.
+
+Code example (from tests/e2e/job_async_await.mpl):
+```mesh
+fn main() do
+  let job = Job.async(fn() -> 42 end)
+  let result = Job.await(job)
+  case result do
+    Ok(val) -> println("${val}")   # 42
+    Err(msg) -> println(msg)
+  end
+end
+```
+
 ## See Also
 
 - `skills/supervisors` — supervisors manage and restart crashed actors
