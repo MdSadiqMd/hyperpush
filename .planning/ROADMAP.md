@@ -86,7 +86,7 @@ See milestones/v1.6-ROADMAP.md for full phase details.
 <details>
 <summary>v1.7 Loops & Iteration (Phases 33-36) - SHIPPED 2026-02-09</summary>
 
-See milestones/v1.7-ROADMAP.md for full phase details.
+See milestones/v1.9-ROADMAP.md for full phase details.
 8 plans across 4 phases. 70,501 lines of Rust (+2,955). 34 commits.
 
 </details>
@@ -320,8 +320,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 122-01-PLAN.md — Execute all file moves and reference updates (crates→compiler/, frontend→mesher/frontend/, tools/, CI/README updates)
-- [ ] 122-02-PLAN.md — Build verification, Mesher E2E, atomic git commit, human checkpoint
+- [x] 122-01-PLAN.md — Execute all file moves and reference updates (crates→compiler/, frontend→mesher/frontend/, tools/, CI/README updates)
+- [x] 122-02-PLAN.md — Build verification, Mesher E2E, atomic git commit, human checkpoint
 
 ### Phase 123: Performance Benchmarks
 **Goal**: Published benchmark results demonstrate Mesh HTTP performance compared to Rust, Go, and Elixir
@@ -335,9 +335,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 123-01-PLAN.md — Mesh and Go benchmark servers (bench.mpl port 3000, Go net/http port 3001)
-- [ ] 123-02-PLAN.md — Rust axum and Elixir Plug+Cowboy benchmark servers (ports 3002, 3003)
-- [ ] 123-03-PLAN.md — Runner script, execute benchmarks, document results, README update, human checkpoint
+- [x] 123-01-PLAN.md — Mesh and Go benchmark servers (bench.mpl port 3000, Go net/http port 3001)
+- [x] 123-02-PLAN.md — Rust axum and Elixir Plug+Cowboy benchmark servers (ports 3002, 3003)
+- [x] 123-03-PLAN.md — Runner script, execute benchmarks, document results, README update, human checkpoint
 
 ## Progress
 
@@ -381,10 +381,10 @@ Note: Phase 119 (Regex) depends only on Phase 115 and may proceed in parallel wi
 
 ### Phase 124: Fix POST /api/v1/events 401 seed data issue
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** After running `meshc migrate up`, developers can immediately test POST /api/v1/events with a known API key without any manual database setup
+**Requirements**: SEED-01
 **Depends on:** Phase 123
-**Plans:** 3/3 plans complete
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 124 to break down)
+- [ ] 124-01-PLAN.md — Seed migration: default org, project, and API key (mshr_devdefaultapikey000000000000000000000000000)
