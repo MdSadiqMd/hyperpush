@@ -97,7 +97,7 @@ This prints `Hello, Mesh!`. Here's what's new:
 - `let` creates a variable binding -- variables in Mesh are immutable by default
 - `::` provides a type annotation -- `name :: String` means the parameter `name` has type `String`
 - `->` declares the return type -- `-> String` means the function returns a `String`
-- `"${name}"` is string interpolation -- expressions inside `${}` are evaluated and inserted into the string
+- `"#{name}"` is string interpolation -- expressions inside `#{}` are evaluated and inserted into the string. The older `${}` syntax also works: both are valid.
 - The last expression in a function is its return value -- no explicit `return` keyword needed
 
 ### Adding More Functions

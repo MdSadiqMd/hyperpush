@@ -55,17 +55,34 @@ Mesh has the following built-in types:
 
 ### String Interpolation
 
-Strings support interpolation with `${}`. Any expression inside the braces is evaluated and converted to a string:
+Strings support two interpolation syntaxes -- `#{}` (preferred, v12.0) and `${}` (also valid). Any expression inside the braces is evaluated and converted to a string:
 
 ```mesh
 fn main() do
   let name = "Mesh"
   let val = 42
-  println("Hello, ${name}!")
-  println("The answer is ${val}")
-  println("Double: ${val * 2}")
+  println("Hello, #{name}!")
+  println("The answer is #{val}")
+  println("Double: #{val * 2}")
 end
 ```
+
+### Heredoc Strings
+
+Use triple-quote `"""..."""` for multiline strings. Heredocs support interpolation and do not require escape sequences for special characters:
+
+```mesh
+fn main() do
+  let id = 42
+  let name = "Alice"
+  let body = """
+    {"id": #{id}, "name": "#{name}"}
+    """
+  println(body)
+end
+```
+
+Heredocs are useful for JSON templates, SQL queries, and any multiline content where backslash escaping would be cumbersome.
 
 ### Type Inference
 
@@ -442,6 +459,28 @@ fn main() do
   println("${sum}")
 end
 ```
+
+### Slot Pipe Operator
+
+The slot pipe `|N>` routes the left-hand value to a specific argument position (N) instead of the first position:
+
+```mesh
+fn add(a :: Int, b :: Int) -> Int do
+  a + b
+end
+
+fn main() do
+  # Slot pipe: 10 |2> add(1) = add(1, 10) = 11
+  let result = 10 |2> add(1)
+  println("#{result}")
+
+  # Chain slot pipe and regular pipe
+  let chained = 5 |2> add(10) |> add(1)
+  println("#{chained}")
+end
+```
+
+Use `|2>` to insert the piped value as the second argument, `|3>` for the third, and so on. Slot pipes can be chained with regular pipes.
 
 ## Error Handling
 
