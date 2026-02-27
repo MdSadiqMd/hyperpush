@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Language Ergonomics & Open Source Readiness
 status: unknown
-last_updated: "2026-02-27T17:55:56.375Z"
+last_updated: "2026-02-27T18:17:30.423Z"
 progress:
   total_phases: 132
   completed_phases: 132
@@ -15,19 +15,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-25)
+See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** Phase 116 — Slot Pipe Operator (first phase of v12.0)
+**Current focus:** Planning next milestone — use `/gsd:new-milestone` to define v13.0
 
 ## Current Position
 
-Phase: 123 of 123 (Phase 123: Performance Benchmarks — COMPLETE)
-Plan: 03 of 03 COMPLETE (all 5 tasks done)
-Status: Phase 123 fully complete — RESULTS.md, METHODOLOGY.md, throughput.svg, README.md Performance section committed. Machines destroyed.
-Last activity: 2026-02-26 - Completed quick task 6: write an article about the benchmarks in MD format
+Milestone v12.0 COMPLETE (2026-02-27). 22 milestones shipped across 125 phases and 343 plans.
+Last activity: 2026-02-27 - Completed v12.0 milestone (Language Ergonomics & Open Source Readiness)
 
-Progress: [█░░░░░░░░░] 5% (v12.0)
+Progress: [██████████] 100% (v12.0 — SHIPPED)
 
 ## Performance Metrics
 
@@ -149,7 +147,7 @@ None.
 
 ### Blockers/Concerns
 
-None. v11.0 fully shipped and verified. Zero known compiler correctness issues.
+None. v12.0 fully shipped and verified. Zero known compiler correctness issues.
 
 ### Quick Tasks Completed
 

@@ -2,13 +2,13 @@
 
 ## What This Is
 
-Mesh is a programming language that combines Elixir/Ruby-style expressive syntax with static Hindley-Milner type inference and BEAM-style concurrency (actors, supervision trees, fault tolerance), compiled via LLVM to native single-binary executables. The compiler is written in Rust. v1.0-v1.9 built a complete language: compiler pipeline, actor runtime, trait system, module system, loops, stdlib, and developer tooling. v2.0 added database drivers and JSON serde. v3.0 made Mesh production-ready: TLS encryption for PostgreSQL and HTTPS, connection pooling with health checks, panic-safe database transactions, and automatic struct-to-row mapping via `deriving(Row)`. v4.0 added WebSocket support with RFC 6455 protocol, actor-per-connection model, TLS (wss://), heartbeat, fragmentation, and rooms/channels. v5.0 added distributed actors: location-transparent PIDs, TLS-encrypted inter-node connections with cookie auth and mesh formation, transparent remote send, remote process/node monitoring with fault propagation, remote spawn via function name registry, global process registry, and cross-node WebSocket rooms and supervision trees -- all with zero new crate dependencies. v6.0 added a documentation website with VitePress, custom syntax highlighting, 9 documentation guides, landing page, and production-quality site features. v7.0 added associated types to the trait system and built a comprehensive trait-based protocol ecosystem: lazy iterators with pipe-style composition, From/Into conversion, numeric traits for user-extensible arithmetic, and Collect for iterator materialization. v8.0 made Mesh installable and editable: one-command install scripts with prebuilt binaries, complete TextMate grammar and Shiki themes, LSP code completion/signature help/formatting/document symbols, VS Code Marketplace publishing, and documentation corrections. v9.0 shipped Mesher, a production error-monitoring backend (~4,020 lines of Mesh). v10.0 added a full ORM: schema DSL, pipe-chain query builder, repo pattern, changesets, relationships, preloading, and migrations. v11.0 expanded the ORM with comprehensive query builder capabilities (JOINs, aggregations, upserts, advanced WHERE, raw SQL fragments, RETURNING, subqueries) and rewrote all 68+ Mesher raw SQL data queries to use the ORM, verified end-to-end. ~168,500 LOC Rust + ~7,700 LOC Mesh across 21 milestones. Zero known compiler correctness issues.
+Mesh is a programming language that combines Elixir/Ruby-style expressive syntax with static Hindley-Milner type inference and BEAM-style concurrency (actors, supervision trees, fault tolerance), compiled via LLVM to native single-binary executables. The compiler is written in Rust. v1.0-v1.9 built a complete language: compiler pipeline, actor runtime, trait system, module system, loops, stdlib, and developer tooling. v2.0 added database drivers and JSON serde. v3.0 made Mesh production-ready: TLS, connection pooling, transactions, deriving(Row). v4.0 added WebSocket support with actor-per-connection model. v5.0 added distributed actors with location-transparent PIDs and TLS-encrypted node clustering. v6.0 added a documentation website. v7.0 added a comprehensive trait ecosystem (iterators, From/Into, numeric traits, Collect). v8.0 made Mesh installable with one-command install scripts, VS Code extension, and LSP. v9.0 shipped Mesher, a production error-monitoring backend (~4,020 lines of Mesh). v10.0 added a full ORM. v11.0 expanded the ORM with comprehensive query builder capabilities and rewrote all Mesher data queries. v12.0 added language ergonomics: slot pipe operator (`|N>`), string interpolation (`#{expr}`), heredoc strings, regex literals, typed env var stdlib, Mesh agent skill, repository reorganization, and published performance benchmarks (29,108 req/s — within 4% of Go). ~114,524 LOC Rust + ~4,441 LOC Mesh across 22 milestones. Zero known compiler correctness issues.
 
 ## Current State
 
-Shipped v11.0 Query Builder (2026-02-25). 21 milestones complete, 115 phases (+ inserted phases), 319 plans. v11.0 completed the ORM query builder and rewrote all Mesher data queries. EventProcessor SIGSEGV resolved. Mesher verified end-to-end: all 8 HTTP API domains return 2xx, WebSocket 101 confirmed.
+Shipped v12.0 Language Ergonomics & Open Source Readiness (2026-02-27). 22 milestones complete, 125 phases, 343 plans. v12.0 added slot pipe operator, string interpolation, heredocs, regex, typed env stdlib, Mesh agent skill, repo reorganization, performance benchmarks, and updated all documentation.
 
-**Latest milestone (v11.0):** Full ORM query builder (JOINs, aggregations, upserts, fragments, RETURNING, subqueries) + complete Mesher ORM rewrite. Zero raw SQL data queries remain in Mesher. 32/32 requirements satisfied.
+**Latest milestone (v12.0):** Slot pipe `|N>`, `#{expr}` interpolation, `"""heredocs"""`, `~r/regex/flags` literals, `Env.get_int`, Mesh agent skill (10 sub-skills), compiler/mesher/website/tools/ repo structure, performance benchmarks (Mesh 29,108 req/s isolated), developer seed migration, v12.0 docs update. 34/34 requirements satisfied.
 
 ## Core Value
 
@@ -176,28 +176,32 @@ Expressive, readable concurrency -- writing concurrent programs should feel as n
 - ✓ Query builder: Subquery support in WHERE IN via Query.where_sub -- v11.0
 - ✓ Mesher rewrite: zero Repo.query_raw/execute_raw for data queries (49+ rewrites, 18 documented boundaries) -- v11.0
 - ✓ Mesher verification: all 8 HTTP API domains return 2xx, WebSocket 101, EventProcessor SIGSEGV resolved -- v11.0
+- ✓ Slot pipe operator (`|N>`) with type-checked argument routing to any position — v12.0
+- ✓ String interpolation (`#{expr}`) and heredoc strings (`"""..."""`) with full expression support — v12.0
+- ✓ Regular expression literals (`~r/pattern/flags`) and runtime `Regex.compile` with full API — v12.0
+- ✓ Typed env var stdlib: `Env.get("KEY", "default")` and `Env.get_int("PORT", 8080)` — v12.0
+- ✓ Mesh agent skill with 10 progressive-disclosure sub-skills for AI-assisted development — v12.0
+- ✓ Repository reorganized for open source: compiler/, mesher/, website/, tools/ top-level structure — v12.0
+- ✓ Performance benchmarks published: Mesh 29,108 req/s (within 4% of Go, 2.3× faster than Elixir) — v12.0
+- ✓ Developer seed migration: default org/project/API key created by `meshc migrate up` — v12.0
+- ✓ Public documentation updated to v12.0 (README, landing page, cheatsheet, guides) — v12.0
 
-## Current Milestone: v12.0 Language Ergonomics & Open Source Readiness
+## Next Milestone
 
-**Goal:** Make Mesh more ergonomic for real programs and ready for open source with slot pipe operator, string interpolation, heredocs, regex, env var stdlib, Mesher dogfooding, a Mesh agent skill, repo reorganization, and performance benchmarks.
+No next milestone defined yet. Use `/gsd:new-milestone` to plan the next version.
 
-**Target features:**
-- Slot pipe operator (`|2>`, `|3>`) for argument-position routing
-- String interpolation (`#{expr}`) and heredoc strings (`"""..."""`)
-- Regular expression support with literal and runtime compile
-- Env var stdlib with typed defaults (`Env.get`, `Env.get_int`)
-- Mesh agent skill with progressive disclosure
-- Repository reorganization for open source (compiler/, mesher/, website/, tools/)
-- Performance benchmarks vs Rust, Go, Elixir
+Potential directions:
+- Multi-line pipe continuation (parser support for `|>` at start of next line)
+- Tree-sitter grammar for better editor integration
+- Homebrew packaging for easier installation
+- Inlay hints in LSP
+- TryFrom/TryInto traits (fallible conversion)
+- Type aliases
+- Semantic tokens for LSP
 
 ### Active
 
-- [ ] PIPE: Slot pipe operator (`|N>`) with type-checked argument routing
-- [ ] REGEX: Regex literals, Regex.compile, match/captures/replace/split
-- [ ] STRG: String interpolation, heredocs, Env.get/get_int stdlib
-- [ ] SKILL: Mesh agent skill with progressive disclosure
-- [ ] REPO: Monorepo reorganization under compiler/mesher/website/tools/
-- [ ] BENCH: HTTP server benchmarks vs Rust/Go/Elixir
+(None — v12.0 complete. Start next milestone with `/gsd:new-milestone`)
 
 ### Out of Scope
 
@@ -225,14 +229,16 @@ Expressive, readable concurrency -- writing concurrent programs should feel as n
 
 ## Context
 
-Shipped v11.0 with ~168,500 lines of Rust + ~7,700 lines of Mesh (.mpl) + ~5,500 lines of website source (Vue/TypeScript/CSS/Markdown).
+Shipped v12.0 with ~114,524 lines of Rust + ~4,441 lines of Mesh (.mpl) + ~5,500 lines of website source (Vue/TypeScript/CSS/Markdown).
 Tech stack: Rust compiler, LLVM 21 (Inkwell 0.8), corosensei coroutines, rowan CST, ariadne diagnostics.
 ORM/DB: mesh-orm crate (schema DSL, repo, query builder, changesets, relationships, migrations), libsqlite3-sys (bundled), PostgreSQL pure wire protocol.
 Website: VitePress, Vue 3, Tailwind CSS v4, shadcn-vue, Shiki syntax highlighting.
-Crates: mesh-lexer, mesh-parser, mesh-typeck, mesh-mir, mesh-codegen, mesh-rt, mesh-fmt, mesh-repl, mesh-pkg, mesh-lsp, mesh-orm, meshc.
-Deps: libsqlite3-sys (bundled), sha2/hmac/md-5/base64ct (PG auth), rustls 0.23/webpki-roots/ring (TLS + certs + SHA-1 for WS handshake).
+Crates (under compiler/): mesh-lexer, mesh-parser, mesh-typeck, mesh-mir, mesh-codegen, mesh-rt, mesh-fmt, mesh-repl, mesh-pkg, mesh-lsp, mesh-orm, meshc.
+Deps: libsqlite3-sys (bundled), sha2/hmac/md-5/base64ct (PG auth), rustls 0.23/webpki-roots/ring (TLS + certs + SHA-1 for WS handshake), regex (Rust crate for Mesh regex runtime).
 Distribution: GitHub Actions CI (6 targets), install scripts (POSIX + PowerShell), VS Code Marketplace + Open VSX.
-Mesher (~7,700 lines of Mesh): production error-monitoring backend fully rewritten to ORM; 18 intentional raw SQL ORM boundaries documented.
+Repository structure: compiler/ (Rust crates), mesher/ (production app + frontend), website/ (docs site), tools/ (install scripts, CI helpers), skill/ (AI agent skills), benchmarks/ (perf comparison servers).
+Mesher (~4,441 lines of Mesh): production error-monitoring backend fully rewritten to ORM; 18 intentional raw SQL ORM boundaries documented. Developer seed migration adds default org/project/API key.
+Benchmarks: Mesh 29,108 req/s (isolated /text), Go 30,306, Rust 46,244, Elixir 12,441. Methodology in benchmarks/.
 
 Zero known critical bugs. Zero known compiler correctness issues. All 21 milestones shipped.
 
@@ -408,6 +414,14 @@ Tech debt (minor, pre-existing):
 | ORM boundary documentation (18 intentional raw SQL sites) | Not all SQL is ORM-expressible (arithmetic SET, JSONB build, nested subqueries, DDL); document boundaries rather than force-fit | ✓ Good -- v11.0, honest about ORM scope |
 | Decimal phase insertion (109.1) for mid-milestone bug fixes | Preserves numeric ordering without renumbering; INSERTED marker in roadmap | ✓ Good -- v11.0, unambiguous insertion semantics |
 | Type-aware service loop arg dispatch (Bool trunc, Float bitcast, Struct alloca) | i1/float/struct LLVM types need explicit casts; i64 passthrough insufficient | ✓ Good -- v11.0, correct codegen for all handler param types |
+| SlotPipe insertion semantics (x |2> f(a,b,c) = f(a,x,b,c)) | Standard argument insertion; conflict check removed, arity unification handles mismatches | ✓ Good -- v12.0, intuitive slot routing |
+| Both ${ and #{ emit identical InterpolationStart tokens | Zero parser changes needed; backward compat with ${} users | ✓ Good -- v12.0, clean migration path |
+| env_get_int silently returns default on parse failure (no stderr warning) | Simpler UX; dev configures correct env vars, no noise from startups | ✓ Good -- v12.0, pragmatic default |
+| Regex.is_match not Regex.match ('match' is a Mesh keyword) | Avoids keyword collision without special-case parser rules | ✓ Good -- v12.0, clean API naming |
+| Ty::Con(Regex) maps to MirType::Ptr (opaque heap pointer) | Prevents LLVM opaque struct failures; consistent with other opaque handles | ✓ Good -- v12.0, zero struct type errors |
+| crates/ flattened directly to compiler/ with no intermediate directory | 11 crates are direct children; simpler navigation than crates/mesh-*/src | ✓ Good -- v12.0, clean open source layout |
+| Isolated benchmark (single server per VM) vs co-located | Eliminates CPU sharing artifacts; Mesh improved +47% isolated vs co-located | ✓ Good -- v12.0, fair comparison methodology |
+| projects.slug ON CONFLICT requires WHERE slug IS NOT NULL predicate | Partial index requires predicate match to avoid PostgreSQL runtime error | ✓ Good -- v12.0, correct partial index semantics |
 
 ---
-*Last updated: 2026-02-25 after v12.0 Language Ergonomics & Open Source Readiness milestone start*
+*Last updated: 2026-02-27 after v12.0 milestone*

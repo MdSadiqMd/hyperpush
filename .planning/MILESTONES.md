@@ -486,3 +486,31 @@
 
 ---
 
+
+## v12.0 Language Ergonomics & Open Source Readiness (Shipped: 2026-02-27)
+
+**Delivered:** Made Mesh more ergonomic for real programs and ready for open source: slot pipe operator, string interpolation, heredocs, regex, env var stdlib, Mesh agent skill, repository reorganization, performance benchmarks (29,108 req/s — within 4% of Go), seed migration, and updated public documentation.
+
+**Phases completed:** 10 phases (116-125), 24 plans, ~48 tasks
+
+**Key accomplishments:**
+- Slot pipe operator (`|N>`) with full type checking — pipes expressions to any argument position with clear arity errors
+- String interpolation (`#{expr}`) and heredoc strings (`"""..."""`) — ergonomic string construction verified in Mesher dogfooding
+- Full regex support — `~r/pattern/flags` literals, `Regex.compile`, and match/captures/replace/split API (6 requirements satisfied)
+- Env var stdlib with typed defaults — `Env.get("KEY", "default")` and `Env.get_int("PORT", 8080)` eliminate manual Option unwrapping
+- Mesh agent skill with progressive disclosure — 10 sub-skills covering syntax, types, actors, ORM, HTTP/WS, stdlib, distributed actors, and more
+- Repository reorganization for open source — compiler/, mesher/, website/, tools/ top-level structure; all CI/CD updated
+- Performance benchmarks vs Go/Rust/Elixir — Mesh achieves 29,108 req/s (isolated), within 4% of Go, 63% of Rust, 2.3× faster than Elixir
+- Developer seed migration — `meshc migrate up` now seeds default org/project/API key for immediate testing
+
+**Stats:**
+- ~114,524 lines of Rust | ~4,441 lines of Mesh | ~5,500 lines of website source
+- 10 phases, 24 plans
+- 3 days (2026-02-25 → 2026-02-27)
+- ~146 commits
+- 34/34 requirements satisfied
+
+**Git range:** `docs(116)` → `docs(125-03)`
+
+---
+
