@@ -71,29 +71,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PIPE-01 | — | Pending |
-| PIPE-02 | — | Pending |
-| ALIAS-01 | — | Pending |
-| ALIAS-02 | — | Pending |
-| ALIAS-03 | — | Pending |
-| ALIAS-04 | — | Pending |
-| TRYFROM-01 | — | Pending |
-| TRYFROM-02 | — | Pending |
-| TRYFROM-03 | — | Pending |
-| MAPCOL-01 | — | Pending |
-| QUAL-01 | — | Pending |
-| QUAL-02 | — | Pending |
-| DOGFOOD-01 | — | Pending |
-| DOGFOOD-02 | — | Pending |
-| DOCS-01 | — | Pending |
-| DOCS-02 | — | Pending |
-| DOCS-03 | — | Pending |
+| PIPE-01 | Phase 126 | Pending |
+| PIPE-02 | Phase 126 | Pending |
+| ALIAS-01 | Phase 127 | Pending |
+| ALIAS-02 | Phase 127 | Pending |
+| ALIAS-03 | Phase 127 | Pending |
+| ALIAS-04 | Phase 127 | Pending |
+| TRYFROM-01 | Phase 128 | Pending |
+| TRYFROM-02 | Phase 128 | Pending |
+| TRYFROM-03 | Phase 128 | Pending |
+| MAPCOL-01 | Phase 129 | Pending |
+| QUAL-01 | Phase 129 | Pending |
+| QUAL-02 | Phase 129 | Pending |
+| DOGFOOD-01 | Phase 130 | Pending |
+| DOGFOOD-02 | Phase 130 | Pending |
+| DOCS-01 | Phase 131 | Pending |
+| DOCS-02 | Phase 131 | Pending |
+| DOCS-03 | Phase 131 | Pending |
 
 **Coverage:**
 - v13.0 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️
+- Mapped to phases: 17
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-27*
-*Last updated: 2026-02-27 after initial definition*
+*Last updated: 2026-02-27 after roadmap creation*

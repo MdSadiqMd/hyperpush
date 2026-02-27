@@ -24,6 +24,7 @@
 - [x] **v10.1 Stabilization** - Phases 104-105.1 (shipped 2026-02-17)
 - [x] **v11.0 Query Builder** - Phases 106-115 (shipped 2026-02-25)
 - [x] **v12.0 Language Ergonomics & Open Source Readiness** - Phases 116-125 (shipped 2026-02-27)
+- [ ] **v13.0 Language Completeness** - Phases 126-131 (in progress)
 
 ## Phases
 
@@ -224,13 +225,107 @@ See milestones/v12.0-ROADMAP.md for full phase details.
 
 </details>
 
+### v13.0 Language Completeness (In Progress)
+
+**Milestone Goal:** Round out the language with multi-line pipes, type aliases, TryFrom/TryInto, Map.collect string keys, and fix pre-existing compiler/inference tech debt — completing the ergonomics and type-system expressiveness required for production Mesh programs.
+
+#### Phase Details
+
+### Phase 126: Multi-line Pipe Continuation
+**Goal**: Users can format pipe chains across multiple lines for readability
+**Depends on**: Nothing (first phase of milestone)
+**Requirements**: PIPE-01, PIPE-02
+**Success Criteria** (what must be TRUE):
+  1. User can place `|>` or `|N>` at the end of a line and continue the pipe chain on the next line
+  2. User can place `|>` or `|N>` at the start of a continuation line and the parser accepts it as a continuation
+  3. A multi-line pipe chain produces exactly the same compiled output as its single-line equivalent
+  4. All existing single-line pipe chains continue to compile and run without change
+**Plans**: TBD
+
+Plans:
+- [ ] 126-01: Parser support for multi-line pipe continuation
+- [ ] 126-02: Semantic verification and regression tests
+
+### Phase 127: Type Aliases
+**Goal**: Users can declare named aliases for existing types to improve code readability
+**Depends on**: Nothing (independent of Phase 126)
+**Requirements**: ALIAS-01, ALIAS-02, ALIAS-03, ALIAS-04
+**Success Criteria** (what must be TRUE):
+  1. User can write `type Url = String` and use `Url` anywhere `String` is valid (function signatures, struct fields, let bindings)
+  2. User can write `pub type UserId = Int` to export a type alias for use in other modules
+  3. Compiler emits a clear error when a type alias references a type name that does not exist
+  4. Type aliases are transparent to the type checker — values of the alias type unify with the aliased type without explicit conversion
+**Plans**: TBD
+
+Plans:
+- [ ] 127-01: Parser and AST for type alias declarations
+- [ ] 127-02: Type checker resolution and cross-module export
+
+### Phase 128: TryFrom/TryInto Traits
+**Goal**: Users can implement fallible conversions between types using the TryFrom/TryInto trait protocol
+**Depends on**: Phase 127 (type aliases may be used in TryFrom signatures; also builds on From/Into pattern from v7.0)
+**Requirements**: TRYFROM-01, TRYFROM-02, TRYFROM-03
+**Success Criteria** (what must be TRUE):
+  1. User can implement `TryFrom<F>` for a type with `fn try_from(value: F) -> Result<Self, E>` and it type-checks correctly
+  2. `TryInto<T>` is automatically available on any type that implements `TryFrom<F>`, mirroring the From/Into auto-derivation from v7.0
+  3. The `?` operator works on `try_from`/`try_into` call results inside `Result`-returning functions without extra unwrapping
+**Plans**: TBD
+
+Plans:
+- [ ] 128-01: TryFrom trait definition, impl resolution, and TryInto auto-derivation
+- [ ] 128-02: ? operator integration and end-to-end tests
+
+### Phase 129: Map.collect String Keys and Code Quality
+**Goal**: Users can collect string-keyed iterators into maps, and the compiler builds without warnings
+**Depends on**: Phase 128 (consolidates remaining small compiler fixes alongside an iterator fix)
+**Requirements**: MAPCOL-01, QUAL-01, QUAL-02
+**Success Criteria** (what must be TRUE):
+  1. User can call `.collect()` on an iterator of `{String, V}` pairs and receive a `Map<String, V>` with all entries present
+  2. `cargo build --all` on the compiler workspace produces zero warnings
+  3. A middleware handler function compiles without requiring an explicit `:: Request` type annotation on its parameter
+**Plans**: TBD
+
+Plans:
+- [ ] 129-01: Map.collect string key support
+- [ ] 129-02: Compiler warnings cleanup and middleware type inference fix
+
+### Phase 130: Mesher Dogfooding
+**Goal**: Mesher source updated to demonstrate and validate the new v13.0 language features in production code
+**Depends on**: Phase 129 (all compiler features complete before dogfooding)
+**Requirements**: DOGFOOD-01, DOGFOOD-02
+**Success Criteria** (what must be TRUE):
+  1. At least one multi-line pipe chain exists in Mesher source where a long single-line chain previously existed, and Mesher compiles and passes E2E tests
+  2. At least one type alias exists in Mesher source replacing a repeated concrete type pattern, and the type checker accepts it throughout all use sites
+**Plans**: TBD
+
+Plans:
+- [ ] 130-01: Apply multi-line pipes and type aliases in Mesher source
+
+### Phase 131: Documentation Site Update
+**Goal**: The public documentation site reflects all v13.0 language additions
+**Depends on**: Phase 130 (dogfooding confirms final syntax and examples before docs are written)
+**Requirements**: DOCS-01, DOCS-02, DOCS-03
+**Success Criteria** (what must be TRUE):
+  1. The cheatsheet and at least one guide page show multi-line pipe syntax with a working example
+  2. The type system documentation explains `type Alias = ExistingType` declaration and usage with cross-module export
+  3. The documentation includes a TryFrom/TryInto section covering impl syntax, auto-TryInto derivation, and `?` operator ergonomics
+**Plans**: TBD
+
+Plans:
+- [ ] 131-01: Update cheatsheet and guides for multi-line pipes and type aliases
+- [ ] 131-02: Add TryFrom/TryInto documentation
+
 ## Progress
 
-**Total: 22 milestones shipped, 125 phases, 343 plans across all milestones.**
+**Total: 22 milestones shipped, 125 phases, 343 plans across completed milestones.**
 
-| Milestone | Phases | Plans | Status | Shipped |
-|-----------|--------|-------|--------|---------|
-| v1.0 MVP | 1-10 | 55/55 | Complete | 2026-02-07 |
-| v1.1–v1.9 | 11-48 | 84/84 | Complete | 2026-02-10 |
-| v2.0–v11.0 | 49-115 | 180/180 | Complete | 2026-02-25 |
-| v12.0 | 116-125 | 24/24 | Complete | 2026-02-27 |
+**Execution Order:** 126 → 127 → 128 → 129 → 130 → 131
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 126. Multi-line Pipe Continuation | v13.0 | 0/2 | Not started | - |
+| 127. Type Aliases | v13.0 | 0/2 | Not started | - |
+| 128. TryFrom/TryInto Traits | v13.0 | 0/2 | Not started | - |
+| 129. Map.collect + Code Quality | v13.0 | 0/2 | Not started | - |
+| 130. Mesher Dogfooding | v13.0 | 0/1 | Not started | - |
+| 131. Documentation Site Update | v13.0 | 0/2 | Not started | - |
