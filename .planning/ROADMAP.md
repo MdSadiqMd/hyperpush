@@ -310,11 +310,11 @@ Plans:
   1. The cheatsheet and at least one guide page show multi-line pipe syntax with a working example
   2. The type system documentation explains `type Alias = ExistingType` declaration and usage with cross-module export
   3. The documentation includes a TryFrom/TryInto section covering impl syntax, auto-TryInto derivation, and `?` operator ergonomics
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 131-01: Update cheatsheet and guides for multi-line pipes and type aliases
-- [ ] 131-02: Add TryFrom/TryInto documentation
+- [ ] 131-01-PLAN.md — Cheatsheet and language-basics: multi-line pipe syntax and type alias docs (DOCS-01, DOCS-02)
+- [ ] 131-02-PLAN.md — Type-system guide: type alias section and TryFrom/TryInto section (DOCS-02, DOCS-03)
 
 ## Progress
 
