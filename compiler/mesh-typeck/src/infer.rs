@@ -500,6 +500,15 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
 
     modules.insert("Http".to_string(), http_client_mod);
 
+    // ── Test module (Phase 138) ──────────────────────────────────────
+    // assert/assert_eq/assert_ne/assert_raises are test-mode DSL builtins lowered
+    // in lower.rs, not module-qualified functions. Only Test.mock_actor is a module
+    // function, and it is wired in Plan 03. Register the module now so the name
+    // is recognised as a stdlib module (prevents "unknown module" errors).
+    let test_mod: HashMap<String, Scheme> = HashMap::new();
+    // mock_actor signature is added in Phase 138 Plan 03.
+    modules.insert("Test".to_string(), test_mod);
+
     // ── File module ─────────────────────────────────────────────────
     let mut file_mod = HashMap::new();
     file_mod.insert(
@@ -1654,6 +1663,7 @@ const STDLIB_MODULE_NAMES: &[&str] = &[
     "Hex",     // Phase 135
     "DateTime",  // Phase 136
     "Http",      // Phase 137
+    "Test",      // Phase 138
 ];
 
 /// Check if a name is a known stdlib module.

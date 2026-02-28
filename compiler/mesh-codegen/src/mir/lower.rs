@@ -928,6 +928,34 @@ impl<'a> Lowerer<'a> {
         // mesh_http_client_close(client: i64) -> unit
         self.known_functions.insert("mesh_http_client_close".to_string(),
             MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
+        // ── Test runtime functions (Phase 138) ─────────────────────────
+        // mesh_test_begin(name: ptr) -> void
+        self.known_functions.insert("mesh_test_begin".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Unit)));
+        // mesh_test_pass() -> void
+        self.known_functions.insert("mesh_test_pass".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Unit)));
+        // mesh_test_fail_msg(msg: ptr) -> void
+        self.known_functions.insert("mesh_test_fail_msg".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Unit)));
+        // mesh_test_assert(cond: i8, expr_src: ptr, file: ptr, file_len: i64, line: i64) -> void
+        self.known_functions.insert("mesh_test_assert".to_string(),
+            MirType::FnPtr(vec![MirType::Bool, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        // mesh_test_assert_eq(lhs: ptr, rhs: ptr, expr_src: ptr, file: ptr, file_len: i64, line: i64) -> void
+        self.known_functions.insert("mesh_test_assert_eq".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        // mesh_test_assert_ne — same signature as assert_eq
+        self.known_functions.insert("mesh_test_assert_ne".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        // mesh_test_assert_raises(fn_ptr: ptr, env_ptr: ptr, file: ptr, file_len: i64, line: i64) -> void
+        self.known_functions.insert("mesh_test_assert_raises".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        // mesh_test_summary(passed: i64, failed: i64, elapsed_ms: i64) -> void
+        self.known_functions.insert("mesh_test_summary".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        // mesh_test_cleanup_actors() -> void
+        self.known_functions.insert("mesh_test_cleanup_actors".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Unit)));
         // ── Collection functions (Phase 8 Plan 02) ─────────────────────
         // List
         self.known_functions.insert("mesh_list_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
@@ -10876,6 +10904,7 @@ const STDLIB_MODULES: &[&str] = &[
     "Hex",     // Phase 135
     "DateTime",  // Phase 136
     "Http",      // Phase 137
+    "Test",      // Phase 138
 ];
 
 /// Map Mesh builtin function names to their runtime equivalents.
@@ -10966,6 +10995,16 @@ fn map_builtin_name(name: &str) -> String {
         "http_client"       => "mesh_http_client".to_string(),
         "http_send_with"    => "mesh_http_send_with".to_string(),
         "http_client_close" => "mesh_http_client_close".to_string(),
+        // Test DSL assertion builtins (Phase 138) — lowercase with test_ prefix
+        "test_assert"         => "mesh_test_assert".to_string(),
+        "test_assert_eq"      => "mesh_test_assert_eq".to_string(),
+        "test_assert_ne"      => "mesh_test_assert_ne".to_string(),
+        "test_assert_raises"  => "mesh_test_assert_raises".to_string(),
+        "test_begin"          => "mesh_test_begin".to_string(),
+        "test_pass"           => "mesh_test_pass".to_string(),
+        "test_fail_msg"       => "mesh_test_fail_msg".to_string(),
+        "test_summary"        => "mesh_test_summary".to_string(),
+        "test_cleanup_actors" => "mesh_test_cleanup_actors".to_string(),
         // Bare name for compile (from Regex import compile)
         "compile" => "mesh_regex_compile".to_string(),
         // Names that have already been resolved via from-import and lowered

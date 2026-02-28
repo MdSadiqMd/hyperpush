@@ -257,9 +257,7 @@ pub extern "C" fn mesh_test_cleanup_actors() {
     let pids: Vec<i64> = MOCK_ACTOR_PIDS.with(|p| std::mem::take(&mut *p.borrow_mut()));
     for pid in pids {
         // Reason tag 0 = normal exit (same convention as actor/mod.rs).
-        unsafe {
-            crate::actor::mesh_actor_exit(pid as u64, 0);
-        }
+        crate::actor::mesh_actor_exit(pid as u64, 0);
     }
 }
 

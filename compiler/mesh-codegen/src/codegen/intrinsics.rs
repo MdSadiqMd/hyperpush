@@ -431,6 +431,55 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     let close_ty = void_type.fn_type(&[i64_type.into()], false);
     module.add_function("mesh_http_client_close", close_ty, Some(inkwell::module::Linkage::External));
 
+    // ── Test runtime functions (Phase 138) ────────────────────────────────
+
+    // mesh_test_begin(name: ptr) -> void
+    let test_begin_ty = void_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_test_begin", test_begin_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_pass() -> void
+    let test_pass_ty = void_type.fn_type(&[], false);
+    module.add_function("mesh_test_pass", test_pass_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_fail_msg(msg: ptr) -> void
+    let test_fail_msg_ty = void_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_test_fail_msg", test_fail_msg_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_assert(cond: i8, expr_src: ptr, file: ptr, file_len: i64, line: i64) -> void
+    let test_assert_ty = void_type.fn_type(
+        &[i8_type.into(), ptr_type.into(), ptr_type.into(), i64_type.into(), i64_type.into()],
+        false,
+    );
+    module.add_function("mesh_test_assert", test_assert_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_assert_eq(lhs: ptr, rhs: ptr, expr_src: ptr, file: ptr, file_len: i64, line: i64) -> void
+    let test_assert_eq_ty = void_type.fn_type(
+        &[ptr_type.into(), ptr_type.into(), ptr_type.into(), ptr_type.into(), i64_type.into(), i64_type.into()],
+        false,
+    );
+    module.add_function("mesh_test_assert_eq", test_assert_eq_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_assert_ne — same signature as assert_eq
+    module.add_function("mesh_test_assert_ne", test_assert_eq_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_assert_raises(fn_ptr: ptr, env_ptr: ptr, file: ptr, file_len: i64, line: i64) -> void
+    let test_assert_raises_ty = void_type.fn_type(
+        &[ptr_type.into(), ptr_type.into(), ptr_type.into(), i64_type.into(), i64_type.into()],
+        false,
+    );
+    module.add_function("mesh_test_assert_raises", test_assert_raises_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_summary(passed: i64, failed: i64, elapsed_ms: i64) -> void
+    let test_summary_ty = void_type.fn_type(
+        &[i64_type.into(), i64_type.into(), i64_type.into()],
+        false,
+    );
+    module.add_function("mesh_test_summary", test_summary_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_cleanup_actors() -> void
+    let test_cleanup_ty = void_type.fn_type(&[], false);
+    module.add_function("mesh_test_cleanup_actors", test_cleanup_ty, Some(inkwell::module::Linkage::External));
+
     // ── Standard library: Collection functions (Phase 8 Plan 02) ──────────
 
     // List functions
