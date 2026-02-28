@@ -304,6 +304,32 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     let uuid4_ty = ptr_type.fn_type(&[], false);
     module.add_function("mesh_crypto_uuid4", uuid4_ty, Some(inkwell::module::Linkage::External));
 
+    // ── Standard library: Base64/Hex functions (Phase 135) ──────────────────
+
+    // mesh_base64_encode(s: ptr) -> ptr
+    let b64enc_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_base64_encode", b64enc_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_base64_decode(s: ptr) -> ptr (MeshResult)
+    let b64dec_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_base64_decode", b64dec_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_base64_encode_url(s: ptr) -> ptr
+    let b64url_enc_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_base64_encode_url", b64url_enc_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_base64_decode_url(s: ptr) -> ptr (MeshResult)
+    let b64url_dec_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_base64_decode_url", b64url_dec_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_hex_encode(s: ptr) -> ptr
+    let hex_enc_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_hex_encode", hex_enc_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_hex_decode(s: ptr) -> ptr (MeshResult)
+    let hex_dec_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_hex_decode", hex_dec_ty, Some(inkwell::module::Linkage::External));
+
     // ── Standard library: Collection functions (Phase 8 Plan 02) ──────────
 
     // List functions

@@ -314,6 +314,24 @@ pub fn register_builtins(
     env.insert("crypto_uuid4".into(),
         Scheme::mono(Ty::fun(vec![], Ty::string())));
 
+    // ── Standard library: Base64 functions (Phase 135) ─────────────────────
+
+    env.insert("base64_encode".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
+    env.insert("base64_decode".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))));
+    env.insert("base64_encode_url".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
+    env.insert("base64_decode_url".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))));
+
+    // ── Standard library: Hex functions (Phase 135) ─────────────────────────
+
+    env.insert("hex_encode".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
+    env.insert("hex_decode".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))));
+
     // ── Standard library: Collection types (Phase 8) ─────────────────
 
     // Type constructors for collection types (bare names).

@@ -844,6 +844,22 @@ impl<'a> Lowerer<'a> {
             "mesh_crypto_uuid4".to_string(),
             MirType::FnPtr(vec![], Box::new(MirType::String)),
         );
+        // Base64: String -> String (encode functions)
+        self.known_functions.insert("mesh_base64_encode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)));
+        self.known_functions.insert("mesh_base64_encode_url".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)));
+        // Base64: String -> Ptr/Result (decode functions)
+        self.known_functions.insert("mesh_base64_decode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert("mesh_base64_decode_url".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
+        // Hex: String -> String (encode)
+        self.known_functions.insert("mesh_hex_encode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)));
+        // Hex: String -> Ptr/Result (decode)
+        self.known_functions.insert("mesh_hex_decode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
         // ── Collection functions (Phase 8 Plan 02) ─────────────────────
         // List
         self.known_functions.insert("mesh_list_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
@@ -10788,6 +10804,8 @@ const STDLIB_MODULES: &[&str] = &[
     "Migration",  // Phase 101
     "Regex",  // Phase 119
     "Crypto",  // Phase 135
+    "Base64",  // Phase 135
+    "Hex",     // Phase 135
 ];
 
 /// Map Mesh builtin function names to their runtime equivalents.
@@ -10843,6 +10861,14 @@ fn map_builtin_name(name: &str) -> String {
         "crypto_hmac_sha512"    => "mesh_crypto_hmac_sha512".to_string(),
         "crypto_secure_compare" => "mesh_crypto_secure_compare".to_string(),
         "crypto_uuid4"          => "mesh_crypto_uuid4".to_string(),
+        // Base64 functions (Phase 135)
+        "base64_encode"         => "mesh_base64_encode".to_string(),
+        "base64_decode"         => "mesh_base64_decode".to_string(),
+        "base64_encode_url"     => "mesh_base64_encode_url".to_string(),
+        "base64_decode_url"     => "mesh_base64_decode_url".to_string(),
+        // Hex functions (Phase 135)
+        "hex_encode"            => "mesh_hex_encode".to_string(),
+        "hex_decode"            => "mesh_hex_decode".to_string(),
         // Bare name for compile (from Regex import compile)
         "compile" => "mesh_regex_compile".to_string(),
         // Names that have already been resolved via from-import and lowered

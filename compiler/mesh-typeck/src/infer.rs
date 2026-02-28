@@ -377,6 +377,44 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     );
     modules.insert("Crypto".to_string(), crypto_mod);
 
+    // ── Base64 module (Phase 135) ─────────────────────────────────────
+    let mut base64_mod = HashMap::new();
+    // Base64.encode(s) -> String
+    base64_mod.insert(
+        "encode".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    // Base64.decode(s) -> Result<String, String>
+    base64_mod.insert(
+        "decode".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+    );
+    // Base64.encode_url(s) -> String
+    base64_mod.insert(
+        "encode_url".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    // Base64.decode_url(s) -> Result<String, String>
+    base64_mod.insert(
+        "decode_url".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+    );
+    modules.insert("Base64".to_string(), base64_mod);
+
+    // ── Hex module (Phase 135) ────────────────────────────────────────
+    let mut hex_mod = HashMap::new();
+    // Hex.encode(s) -> String
+    hex_mod.insert(
+        "encode".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    // Hex.decode(s) -> Result<String, String>
+    hex_mod.insert(
+        "decode".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+    );
+    modules.insert("Hex".to_string(), hex_mod);
+
     // ── File module ─────────────────────────────────────────────────
     let mut file_mod = HashMap::new();
     file_mod.insert(
@@ -1527,6 +1565,8 @@ const STDLIB_MODULE_NAMES: &[&str] = &[
     "Migration",  // Phase 101
     "Regex",  // Phase 119
     "Crypto",  // Phase 135
+    "Base64",  // Phase 135
+    "Hex",     // Phase 135
 ];
 
 /// Check if a name is a known stdlib module.
