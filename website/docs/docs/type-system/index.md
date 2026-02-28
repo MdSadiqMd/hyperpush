@@ -85,6 +85,57 @@ end
 
 Function types are written as `Fun(ParamTypes) -> ReturnType`. A zero-argument function type is `Fun() -> ReturnType`.
 
+## Type Aliases
+
+Type aliases give descriptive names to existing types without creating a new type. The `type Alias = ExistingType` syntax declares an alias that is completely transparent -- the compiler treats the alias and the aliased type as identical, so no conversion is ever needed.
+
+```mesh
+# Type aliases give descriptive names to existing types
+type Url = String
+type Count = Int
+
+fn fetch_page(url :: Url) -> Int do
+  String.length(url)   # Url is String -- no conversion needed
+end
+
+fn main() do
+  let u :: Url = "https://example.com"
+  println("${fetch_page(u)}")
+end
+```
+
+### Pub Aliases for Cross-Module Use
+
+Mark an alias `pub type` to export it so other modules can import it by name with `from Module import AliasName`. This lets you define a canonical name in one place and share it across the codebase without repeating the definition:
+
+```mesh
+# types/ids.mpl
+pub type UserId = Int
+pub type Email = String
+
+# main.mpl
+from Types.Ids import UserId, Email
+
+fn create_profile(id :: UserId, email :: Email) -> String do
+  "user-#{id}: #{email}"
+end
+
+fn main() do
+  let result = create_profile(42, "alice@example.com")
+  println(result)
+end
+```
+
+### When to Use Type Aliases
+
+Type aliases are useful when you want to:
+
+- Add semantic meaning to primitive types (e.g., `UserId` vs `Int`, `Fingerprint` vs `String`)
+- Document the intended use of a parameter without creating a new distinct type
+- Share a type name across modules without repeating the underlying type definition
+
+Type aliases in v13.0 are non-generic -- `type Pair<T> = {T, T}` is not yet supported. Use structs for parameterized types.
+
 ## Structs
 
 Structs are product types -- they group multiple fields together. Define them with the `struct` keyword:
