@@ -12,15 +12,23 @@ from Api.Helpers import query_or_default, to_json_array, require_param, get_regi
 # Serialize {bucket, count} row to JSON. count is numeric (no quotes).
 fn bucket_to_json(row) -> String do
   let bucket = Map.get(row, "bucket")
-  let count = Map.get(row, "count")
-  "{\"bucket\":\"" <> bucket <> "\",\"count\":" <> count <> "}"
+  let count_opt = String.to_int(Map.get(row, "count"))
+  let count = case count_opt do
+    Some(n) -> n
+    None -> 0
+  end
+  json { bucket: bucket, count: count }
 end
 
 # Serialize {level, count} row to JSON. count is numeric (no quotes).
 fn level_to_json(row) -> String do
   let level = Map.get(row, "level")
-  let count = Map.get(row, "count")
-  "{\"level\":\"" <> level <> "\",\"count\":" <> count <> "}"
+  let count_opt = String.to_int(Map.get(row, "count"))
+  let count = case count_opt do
+    Some(n) -> n
+    None -> 0
+  end
+  json { level: level, count: count }
 end
 
 # Serialize top issue row to JSON. event_count is numeric.
@@ -29,9 +37,13 @@ fn top_issue_to_json(row) -> String do
   let title = Map.get(row, "title")
   let level = Map.get(row, "level")
   let status = Map.get(row, "status")
-  let event_count = Map.get(row, "event_count")
+  let event_count_opt = String.to_int(Map.get(row, "event_count"))
+  let event_count = case event_count_opt do
+    Some(n) -> n
+    None -> 0
+  end
   let last_seen = Map.get(row, "last_seen")
-  "{\"id\":\"" <> id <> "\",\"title\":\"" <> title <> "\",\"level\":\"" <> level <> "\",\"status\":\"" <> status <> "\",\"event_count\":" <> event_count <> ",\"last_seen\":\"" <> last_seen <> "\"}"
+  json { id: id, title: title, level: level, status: status, event_count: event_count, last_seen: last_seen }
 end
 
 # Serialize {tag_value, count} row to JSON. count is numeric.
@@ -49,7 +61,7 @@ fn timeline_event_to_json(row) -> String do
   let level = Map.get(row, "level")
   let message = Map.get(row, "message")
   let received_at = Map.get(row, "received_at")
-  "{\"id\":\"" <> id <> "\",\"level\":\"" <> level <> "\",\"message\":\"" <> message <> "\",\"received_at\":\"" <> received_at <> "\"}"
+  json { id: id, level: level, message: message, received_at: received_at }
 end
 
 
@@ -174,7 +186,22 @@ fn respond_health(rows) do
     let unresolved = Map.get(row, "unresolved_count")
     let events_24h = Map.get(row, "events_24h")
     let new_today = Map.get(row, "new_today")
-    HTTP.response(200, "{\"unresolved_count\":" <> unresolved <> ",\"events_24h\":" <> events_24h <> ",\"new_today\":" <> new_today <> "}")
+    let unresolved_opt = String.to_int(unresolved)
+    let unresolved_n = case unresolved_opt do
+      Some(n) -> n
+      None -> 0
+    end
+    let events_24h_opt = String.to_int(events_24h)
+    let events_24h_n = case events_24h_opt do
+      Some(n) -> n
+      None -> 0
+    end
+    let new_today_opt = String.to_int(new_today)
+    let new_today_n = case new_today_opt do
+      Some(n) -> n
+      None -> 0
+    end
+    HTTP.response(200, json { unresolved_count: unresolved_n, events_24h: events_24h_n, new_today: new_today_n })
   else
     HTTP.response(404, json { error: "project not found" })
   end

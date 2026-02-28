@@ -12,7 +12,17 @@ from Api.Helpers import require_param, get_registry, resolve_project_id
 fn settings_row_to_json(rows) do
   if List.length(rows) > 0 do
     let row = List.head(rows)
-    HTTP.response(200, "{\"retention_days\":" <> Map.get(row, "retention_days") <> ",\"sample_rate\":" <> Map.get(row, "sample_rate") <> "}")
+    let retention_days_opt = String.to_int(Map.get(row, "retention_days"))
+    let retention_days = case retention_days_opt do
+      Some(n) -> n
+      None -> 0
+    end
+    let sample_rate_opt = String.to_float(Map.get(row, "sample_rate"))
+    let sample_rate = case sample_rate_opt do
+      Some(f) -> f
+      None -> 1.0
+    end
+    HTTP.response(200, json { retention_days: retention_days, sample_rate: sample_rate })
   else
     HTTP.response(404, json { error: "project not found" })
   end
@@ -22,7 +32,17 @@ end
 fn storage_row_to_json(rows) do
   if List.length(rows) > 0 do
     let row = List.head(rows)
-    HTTP.response(200, "{\"event_count\":" <> Map.get(row, "event_count") <> ",\"estimated_bytes\":" <> Map.get(row, "estimated_bytes") <> "}")
+    let event_count_opt = String.to_int(Map.get(row, "event_count"))
+    let event_count = case event_count_opt do
+      Some(n) -> n
+      None -> 0
+    end
+    let estimated_bytes_opt = String.to_int(Map.get(row, "estimated_bytes"))
+    let estimated_bytes = case estimated_bytes_opt do
+      Some(n) -> n
+      None -> 0
+    end
+    HTTP.response(200, json { event_count: event_count, estimated_bytes: estimated_bytes })
   else
     HTTP.response(404, json { error: "project not found" })
   end

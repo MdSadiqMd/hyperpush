@@ -41,17 +41,21 @@ fn get_limit(request) -> String do
 end
 
 # Convert an issue row (Map<String, String>) to a JSON string.
-# All fields are strings from SQL; event_count is numeric so no quoting.
+# All fields are strings from SQL; event_count is numeric so parse to Int.
 fn row_to_issue_json(row) -> String do
   let id = Map.get(row, "id")
   let title = Map.get(row, "title")
   let level = Map.get(row, "level")
   let status = Map.get(row, "status")
-  let event_count = Map.get(row, "event_count")
+  let event_count_opt = String.to_int(Map.get(row, "event_count"))
+  let event_count = case event_count_opt do
+    Some(n) -> n
+    None -> 0
+  end
   let first_seen = Map.get(row, "first_seen")
   let last_seen = Map.get(row, "last_seen")
   let assigned_to = Map.get(row, "assigned_to")
-  "{\"id\":\"" <> id <> "\",\"title\":\"" <> title <> "\",\"level\":\"" <> level <> "\",\"status\":\"" <> status <> "\",\"event_count\":" <> event_count <> ",\"first_seen\":\"" <> first_seen <> "\",\"last_seen\":\"" <> last_seen <> "\",\"assigned_to\":\"" <> assigned_to <> "\"}"
+  json { id: id, title: title, level: level, status: status, event_count: event_count, first_seen: first_seen, last_seen: last_seen, assigned_to: assigned_to }
 end
 
 # Convert an event search result row to JSON.
@@ -61,7 +65,7 @@ fn row_to_event_json(row) -> String do
   let level = Map.get(row, "level")
   let message = Map.get(row, "message")
   let received_at = Map.get(row, "received_at")
-  "{\"id\":\"" <> id <> "\",\"issue_id\":\"" <> issue_id <> "\",\"level\":\"" <> level <> "\",\"message\":\"" <> message <> "\",\"received_at\":\"" <> received_at <> "\"}"
+  json { id: id, issue_id: issue_id, level: level, message: message, received_at: received_at }
 end
 
 # Convert a tag filter result row to JSON.
@@ -82,7 +86,7 @@ fn row_to_issue_event_json(row) -> String do
   let level = Map.get(row, "level")
   let message = Map.get(row, "message")
   let received_at = Map.get(row, "received_at")
-  "{\"id\":\"" <> id <> "\",\"level\":\"" <> level <> "\",\"message\":\"" <> message <> "\",\"received_at\":\"" <> received_at <> "\"}"
+  json { id: id, level: level, message: message, received_at: received_at }
 end
 
 

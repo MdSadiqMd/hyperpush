@@ -19,7 +19,7 @@ fn member_to_json(row) -> String do
   let display_name = Map.get(row, "display_name")
   let role = Map.get(row, "role")
   let joined_at = Map.get(row, "joined_at")
-  "{\"id\":\"" <> id <> "\",\"user_id\":\"" <> user_id <> "\",\"email\":\"" <> email <> "\",\"display_name\":\"" <> display_name <> "\",\"role\":\"" <> role <> "\",\"joined_at\":\"" <> joined_at <> "\"}"
+  json { id: id, user_id: user_id, email: email, display_name: display_name, role: role, joined_at: joined_at }
 end
 
 # Serialize an API key row to JSON.
