@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 132 of 132 (Improve Language JSON Handling) — In Progress
-Plan: 01 complete — Wave 1 done; proceeding to Wave 2 (codegen)
+Plan: 02 complete — Wave 2 done; json { } codegen + E2E tests complete
 Status: In Progress
-Last activity: 2026-02-27 — 132-01 complete: json keyword, JsonExpr AST, parser, Ty::json() newtype, Json→String unify coercion
+Last activity: 2026-02-28 — 132-02 complete: lower_json_expr, mesh_json_parse_raw, 5 E2E tests all passing
 
-Progress: [░░░░░░░░░░] 33% (1/3 plans)
+Progress: [██████░░░░] 67% (2/3 plans)
 
 ## Performance Metrics
 
@@ -97,6 +97,10 @@ Recent decisions affecting current work:
 - [Phase 131]: Type Aliases section placed after Generics and before Structs to match conceptual progression
 - [Phase 131]: TryFrom/TryInto section placed immediately after From/Into as natural fallible extension
 - [Phase 131]: Language Basics Multi-Line Pipes placed as H3 under Pipe Operator, Type Aliases as H2 before What's Next; cheatsheet entries added inline in existing blocks
+- [Phase 132-02]: Two-level json lowering: lower_json_expr_inner returns Ptr (raw object), lower_json_expr wraps with mesh_json_encode for String output
+- [Phase 132-02]: Json-typed variable nesting uses mesh_json_parse_raw to decode String back to raw *mut MeshJson pointer (avoids double-encoding)
+- [Phase 132-02]: nil in json { } fields emits mesh_json_null() — detected via MirType::Unit check in lower_json_expr_inner
+- [Phase 132-02]: mesh_json_parse_raw added to mesh-rt (extern C, no_mangle); panics on invalid JSON since codegen-produced strings are always valid
 
 ### Roadmap Evolution
 
@@ -113,5 +117,5 @@ None. v12.0 fully shipped. v13.0 roadmap created with 100% requirement coverage 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 131-02-PLAN.md — DOCS-02 Type Aliases section, DOCS-03 TryFrom/TryInto section in type-system guide; v13.0 fully complete
+Stopped at: Completed 132-02-PLAN.md — MIR lowering for json { }, mesh_json_parse_raw runtime function, 5 E2E tests all passing
 Resume file: None

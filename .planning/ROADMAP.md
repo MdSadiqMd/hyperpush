@@ -336,7 +336,7 @@ Plans:
 **Goal:** Native `json { }` object literal syntax that produces JSON strings without manual escaping or heredoc interpolation — replaces `"{\"k\":\"" <> v <> "\""` and `"""{"k":"#{v}"}"""` patterns throughout Mesher
 **Requirements**: JSON-01
 **Depends on:** Phase 131
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 132-01-PLAN.md — Lexer keyword + parser grammar + AST node + type inference (JsonExpr as String)
