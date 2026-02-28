@@ -683,116 +683,86 @@ fn token_to_str(tok: &TToken) -> String {
 /// Emit non-test top-level definitions from the source (fn, struct, type, impl, etc.).
 ///
 /// This preserves user-defined helper functions used in test bodies.
+///
+/// Uses `tokenize_test_source` for token-level depth tracking, which correctly handles
+/// `describe` blocks containing `setup do...end` or `teardown do...end` sub-blocks.
+/// The old line-by-line `count_do_in_line`/`count_end_in_line` approach failed because
+/// each `setup do` and `teardown do` sub-block inside a describe block would confuse
+/// the depth counter, causing the describe's closing `end` to be missed.
 fn emit_non_test_items(source: &str, out: &mut String) {
-    // Tokenize and find blocks that start with fn/struct/type/impl/interface/actor.
-    // We skip lines that start with test/describe at depth 0.
-    let chars: Vec<char> = source.chars().collect();
+    let tokens = tokenize_test_source(source);
     let mut i = 0;
-    let mut depth = 0usize;
-    let mut in_skip_block = false;
-    let mut pending_line = String::new();
+    // Depth of non-test blocks we are currently emitting (0 = top level).
+    let mut emit_depth: usize = 0;
+    // True when we are suppressing a test/describe block at top level.
+    let mut skipping: bool = false;
+    // Block depth inside the skipped test/describe block.
+    // When this reaches 0, we exit skip mode.
+    let mut skip_depth: usize = 0;
 
-    while i < chars.len() {
-        let ch = chars[i];
+    while i < tokens.len() {
+        let tok = &tokens[i];
 
-        if ch == '\n' {
-            // Check if this line should be emitted.
-            let trimmed = pending_line.trim();
-
-            if depth == 0 {
-                // Check for block-opening keywords that we want to skip (test/describe).
-                let is_test_block = trimmed.starts_with("test(") || trimmed.starts_with("test (")
-                    || trimmed.starts_with("describe(") || trimmed.starts_with("describe (");
-                if is_test_block {
-                    in_skip_block = true;
-                    // Count 'do' on this line to increase depth
-                    let do_count = count_do_in_line(trimmed);
-                    let end_count = count_end_in_line(trimmed);
-                    depth = (depth + do_count).saturating_sub(end_count);
-                } else if in_skip_block {
-                    // Track depth
-                    let do_count = count_do_in_line(trimmed);
-                    let end_count = count_end_in_line(trimmed);
-                    depth = (depth + do_count).saturating_sub(end_count);
-                    if depth == 0 {
-                        in_skip_block = false;
+        if skip_depth > 0 {
+            // Inside a test/describe block body — skip everything and track nesting.
+            // Only `do`, `if`, `while`, `case`, `for`, `receive` open new blocks.
+            // `fn` does NOT — the `do` that follows it does.
+            match tok {
+                TToken::Do | TToken::If | TToken::While
+                | TToken::Case | TToken::For | TToken::Receive => {
+                    skip_depth += 1;
+                }
+                TToken::End => {
+                    skip_depth -= 1;
+                    if skip_depth == 0 {
+                        skipping = false;
                     }
-                } else {
-                    out.push_str(&pending_line);
-                    out.push('\n');
                 }
-            } else {
-                // Inside a skip block
-                let do_count = count_do_in_line(trimmed);
-                let end_count = count_end_in_line(trimmed);
-                depth = (depth + do_count).saturating_sub(end_count);
-                if depth == 0 {
-                    in_skip_block = false;
-                }
+                _ => {}
             }
-
-            pending_line.clear();
             i += 1;
             continue;
         }
 
-        pending_line.push(ch);
-        i += 1;
-    }
+        if skipping {
+            // Between TestKw/DescribeKw and the opening Do (skipping label, parens, etc.).
+            // Once we see the Do keyword, start depth tracking.
+            if matches!(tok, TToken::Do) {
+                skip_depth = 1;
+            }
+            // Do not emit anything while skipping.
+            i += 1;
+            continue;
+        }
 
-    // Emit any trailing content
-    if !pending_line.is_empty() && !in_skip_block {
-        out.push_str(&pending_line);
-        out.push('\n');
+        // Not skipping. emit_depth tracks depth of user-defined blocks being emitted.
+        match tok {
+            TToken::TestKw | TToken::DescribeKw if emit_depth == 0 => {
+                // Start of a test/describe block at top level — suppress it entirely.
+                skipping = true;
+                // Do not emit the keyword.
+            }
+            TToken::Do | TToken::If | TToken::While
+            | TToken::Case | TToken::For | TToken::Receive => {
+                emit_depth += 1;
+                out.push_str(&token_to_str(tok));
+            }
+            TToken::End => {
+                if emit_depth > 0 {
+                    emit_depth -= 1;
+                }
+                out.push_str(&token_to_str(tok));
+            }
+            _ => {
+                out.push_str(&token_to_str(tok));
+            }
+        }
+        i += 1;
     }
 
     if !out.trim().is_empty() {
         out.push('\n');
     }
-}
-
-/// Count `do` keyword occurrences in a line (for depth tracking).
-fn count_do_in_line(line: &str) -> usize {
-    // Simple counting: don't bother with strings for now.
-    // Keywords: "do" surrounded by non-alphanumeric chars.
-    let mut count = 0;
-    let chars: Vec<char> = line.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        if chars[i] == '#' { break; } // line comment
-        if i + 2 <= chars.len()
-            && &line[i..i+2] == "do"
-            && (i == 0 || !chars[i-1].is_alphanumeric() && chars[i-1] != '_')
-            && (i + 2 == chars.len() || !chars[i+2].is_alphanumeric() && chars[i+2] != '_')
-        {
-            count += 1;
-            i += 2;
-        } else {
-            i += 1;
-        }
-    }
-    count
-}
-
-/// Count `end` keyword occurrences in a line (for depth tracking).
-fn count_end_in_line(line: &str) -> usize {
-    let mut count = 0;
-    let chars: Vec<char> = line.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        if chars[i] == '#' { break; }
-        if i + 3 <= chars.len()
-            && &line[i..i+3] == "end"
-            && (i == 0 || !chars[i-1].is_alphanumeric() && chars[i-1] != '_')
-            && (i + 3 == chars.len() || !chars[i+3].is_alphanumeric() && chars[i+3] != '_')
-        {
-            count += 1;
-            i += 3;
-        } else {
-            i += 1;
-        }
-    }
-    count
 }
 
 // ── Recursively discover all *.test.mpl files in a directory ─────────────
