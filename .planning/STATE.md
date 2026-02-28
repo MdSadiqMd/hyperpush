@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Language Completeness
 status: unknown
-last_updated: "2026-02-28T02:00:24.986Z"
+last_updated: "2026-02-28T03:52:08.676Z"
 progress:
-  total_phases: 128
-  completed_phases: 128
-  total_plans: 331
-  completed_plans: 331
+  total_phases: 129
+  completed_phases: 129
+  total_plans: 334
+  completed_plans: 334
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 132 of 132 (Improve Language JSON Handling) — In Progress
-Plan: 02 complete — Wave 2 done; json { } codegen + E2E tests complete
-Status: In Progress
-Last activity: 2026-02-28 — 132-02 complete: lower_json_expr, mesh_json_parse_raw, 5 E2E tests all passing
+Phase: 132 of 132 (Improve Language JSON Handling) — Complete
+Plan: 03 complete — Wave 3 done; mesher migration (70 usages) + JSON Literals docs
+Status: Complete
+Last activity: 2026-02-28 — 132-03 complete: 70 json { } usages in mesher, JSON Literals docs section
 
-Progress: [██████░░░░] 67% (2/3 plans)
+Progress: [██████████] 100% (3/3 plans)
 
 ## Performance Metrics
 
@@ -63,6 +63,9 @@ Progress: [██████░░░░] 67% (2/3 plans)
 | 130 | P01 | 7m | 2 | 5 |
 | 131 | P01 | 2m | 2 | 2 |
 | 131 | P02 | 1m 2s | 2 | 1 |
+| 132 | P01 | 2m | 2 | 3 |
+| 132 | P02 | 9m 22s | 2 | 13 |
+| 132 | P03 | 10m 25s | 3 | 10 |
 
 ## Accumulated Context
 
@@ -101,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 132-02]: Json-typed variable nesting uses mesh_json_parse_raw to decode String back to raw *mut MeshJson pointer (avoids double-encoding)
 - [Phase 132-02]: nil in json { } fields emits mesh_json_null() — detected via MirType::Unit check in lower_json_expr_inner
 - [Phase 132-02]: mesh_json_parse_raw added to mesh-rt (extern C, no_mangle); panics on invalid JSON since codegen-produced strings are always valid
+- [Phase 132-03]: Skip 'type' as json { } key: Mesh reserved keyword (TYPE_KW token), not IDENT; parser requires bare IDENT for json literal keys
+- [Phase 132-03]: Skip pre-encoded JSONB field values in json { }: exception/stacktrace/condition_json etc. would double-encode as JSON strings
 
 ### Roadmap Evolution
 
@@ -117,5 +122,5 @@ None. v12.0 fully shipped. v13.0 roadmap created with 100% requirement coverage 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 132-02-PLAN.md — MIR lowering for json { }, mesh_json_parse_raw runtime function, 5 E2E tests all passing
+Stopped at: Completed 132-03-PLAN.md — mesher migration (70 json { } usages), JSON Literals docs section. Phase 132 fully complete.
 Resume file: None
