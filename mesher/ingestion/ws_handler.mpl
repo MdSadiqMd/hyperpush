@@ -29,12 +29,12 @@ end
 
 # Helper: send accepted response over WS
 fn ws_send_accepted(conn) do
-  ws_write(conn, "{\"status\":\"accepted\"}")
+  ws_write(conn, json { status: "accepted" })
 end
 
 # Helper: send error response over WS
 fn ws_send_error(conn, reason :: String) do
-  let msg = "{\"error\":\"" <> reason <> "\"}"
+  let msg = json { error: reason }
   ws_write(conn, msg)
 end
 

@@ -15,22 +15,22 @@ from Api.Helpers import require_param, get_registry
 
 # Helper: build 401 response
 fn unauthorized_response() do
-  HTTP.response(401, "{\"error\":\"unauthorized\"}")
+  HTTP.response(401, json { error: "unauthorized" })
 end
 
 # Helper: build 400 response with reason
 fn bad_request_response(reason :: String) do
-  HTTP.response(400, """{"error":"#{reason}"}""")
+  HTTP.response(400, json { error: reason })
 end
 
 # Helper: build 429 rate-limited response with Retry-After header
 fn rate_limited_response() do
-  HTTP.response(429, "{\"error\":\"rate limited\"}")
+  HTTP.response(429, json { error: "rate limited" })
 end
 
 # Helper: build 202 accepted response
 fn accepted_response() do
-  HTTP.response(202, "{\"status\":\"accepted\"}")
+  HTTP.response(202, json { status: "accepted" })
 end
 
 # --- Event broadcasting helpers (STREAM-01, STREAM-04) ---
@@ -283,25 +283,25 @@ end
 # Helper: broadcast resolve notification then return success response
 fn resolve_success(pool, issue_id :: String, n :: Int) do
   let _ = broadcast_issue_update(pool, issue_id, "resolved")
-  HTTP.response(200, """{"status":"ok","affected":#{n}}""")
+  HTTP.response(200, json { status: "ok", affected: n })
 end
 
 # Helper: broadcast archive notification then return success response
 fn archive_success(pool, issue_id :: String, n :: Int) do
   let _ = broadcast_issue_update(pool, issue_id, "archived")
-  HTTP.response(200, """{"status":"ok","affected":#{n}}""")
+  HTTP.response(200, json { status: "ok", affected: n })
 end
 
 # Helper: broadcast unresolve notification then return success response
 fn unresolve_success(pool, issue_id :: String, n :: Int) do
   let _ = broadcast_issue_update(pool, issue_id, "unresolved")
-  HTTP.response(200, """{"status":"ok","affected":#{n}}""")
+  HTTP.response(200, json { status: "ok", affected: n })
 end
 
 # Helper: broadcast discard notification then return success response
 fn discard_success(pool, issue_id :: String, n :: Int) do
   let _ = broadcast_issue_update(pool, issue_id, "discarded")
-  HTTP.response(200, """{"status":"ok","affected":#{n}}""")
+  HTTP.response(200, json { status: "ok", affected: n })
 end
 
 # --- Issue management route handlers (Phase 89 Plan 02) ---
@@ -327,7 +327,7 @@ pub fn handle_list_issues(request) do
   let result = list_issues_by_status(pool, project_id, "unresolved")
   case result do
     Ok(issues) -> HTTP.response(200, issues_to_json(issues))
-    Err(e) -> HTTP.response(500, """{"error":"#{e}"}""")
+    Err(e) -> HTTP.response(500, json { error: e })
   end
 end
 
@@ -339,7 +339,7 @@ pub fn handle_resolve_issue(request) do
   let result = resolve_issue(pool, issue_id)
   case result do
     Ok(n) -> resolve_success(pool, issue_id, n)
-    Err(e) -> HTTP.response(500, """{"error":"#{e}"}""")
+    Err(e) -> HTTP.response(500, json { error: e })
   end
 end
 
@@ -351,7 +351,7 @@ pub fn handle_archive_issue(request) do
   let result = archive_issue(pool, issue_id)
   case result do
     Ok(n) -> archive_success(pool, issue_id, n)
-    Err(e) -> HTTP.response(500, """{"error":"#{e}"}""")
+    Err(e) -> HTTP.response(500, json { error: e })
   end
 end
 
@@ -363,7 +363,7 @@ pub fn handle_unresolve_issue(request) do
   let result = unresolve_issue(pool, issue_id)
   case result do
     Ok(n) -> unresolve_success(pool, issue_id, n)
-    Err(e) -> HTTP.response(500, """{"error":"#{e}"}""")
+    Err(e) -> HTTP.response(500, json { error: e })
   end
 end
 
@@ -371,8 +371,8 @@ end
 fn assign_with_user_id(pool :: PoolHandle, issue_id :: String, user_id :: String) do
   let result = assign_issue(pool, issue_id, user_id)
   case result do
-    Ok(n) -> HTTP.response(200, "{\"status\":\"ok\"}")
-    Err(e) -> HTTP.response(500, """{"error":"#{e}"}""")
+    Ok(n) -> HTTP.response(200, json { status: "ok" })
+    Err(e) -> HTTP.response(500, json { error: e })
   end
 end
 
@@ -395,7 +395,7 @@ pub fn handle_discard_issue(request) do
   let result = discard_issue(pool, issue_id)
   case result do
     Ok(n) -> discard_success(pool, issue_id, n)
-    Err(e) -> HTTP.response(500, """{"error":"#{e}"}""")
+    Err(e) -> HTTP.response(500, json { error: e })
   end
 end
 
@@ -406,7 +406,7 @@ pub fn handle_delete_issue(request) do
   let issue_id = require_param(request, "id")
   let result = delete_issue(pool, issue_id)
   case result do
-    Ok(n) -> HTTP.response(200, """{"status":"ok","affected":#{n}}""")
-    Err(e) -> HTTP.response(500, """{"error":"#{e}"}""")
+    Ok(n) -> HTTP.response(200, json { status: "ok", affected: n })
+    Err(e) -> HTTP.response(500, json { error: e })
   end
 end
