@@ -5500,3 +5500,48 @@ end
         "Expected compilation error when using private type alias from another module"
     );
 }
+
+// ── Phase 135: Crypto stdlib tests ──────────────────────────────────────
+
+/// Phase 135: Crypto.sha256(s) returns correct NIST lowercase hex digest (CRYPTO-01).
+#[test]
+fn e2e_crypto_sha256() {
+    let source = read_fixture("crypto_sha256.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\n");
+}
+
+/// Phase 135: Crypto.sha512(s) returns correct SHA-512 lowercase hex digest (CRYPTO-02).
+#[test]
+fn e2e_crypto_sha512() {
+    let source = read_fixture("crypto_sha512.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043\n");
+}
+
+/// Phase 135: Crypto.hmac_sha256 and Crypto.hmac_sha512 return correct RFC 2202 digests (CRYPTO-03, CRYPTO-04).
+/// HMAC-SHA256("Jefe", "what do ya want for nothing?") verified via openssl dgst -sha256 -hmac.
+#[test]
+fn e2e_crypto_hmac() {
+    let source = read_fixture("crypto_hmac.mpl");
+    let output = compile_and_run(&source);
+    let lines: Vec<&str> = output.lines().collect();
+    assert_eq!(lines[0], "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
+    assert_eq!(lines[1], "164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737");
+}
+
+/// Phase 135: Crypto.secure_compare returns true for equal strings, false otherwise (CRYPTO-05).
+#[test]
+fn e2e_crypto_secure_compare() {
+    let source = read_fixture("crypto_secure_compare.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "true\nfalse\nfalse\n");
+}
+
+/// Phase 135: Crypto.uuid4() returns a well-formed 36-character UUID v4 string (CRYPTO-06).
+#[test]
+fn e2e_crypto_uuid4() {
+    let source = read_fixture("crypto_uuid4.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "36\n");
+}

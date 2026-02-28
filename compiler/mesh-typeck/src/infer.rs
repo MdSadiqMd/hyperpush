@@ -343,6 +343,40 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     );
     modules.insert("Regex".to_string(), regex_mod);
 
+    // ── Crypto module (Phase 135) ────────────────────────────────────
+    let mut crypto_mod = HashMap::new();
+    // Crypto.sha256(s) -> String
+    crypto_mod.insert(
+        "sha256".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    // Crypto.sha512(s) -> String
+    crypto_mod.insert(
+        "sha512".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    // Crypto.hmac_sha256(key, msg) -> String
+    crypto_mod.insert(
+        "hmac_sha256".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())),
+    );
+    // Crypto.hmac_sha512(key, msg) -> String
+    crypto_mod.insert(
+        "hmac_sha512".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())),
+    );
+    // Crypto.secure_compare(a, b) -> Bool
+    crypto_mod.insert(
+        "secure_compare".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::bool())),
+    );
+    // Crypto.uuid4() -> String
+    crypto_mod.insert(
+        "uuid4".to_string(),
+        Scheme::mono(Ty::fun(vec![], Ty::string())),
+    );
+    modules.insert("Crypto".to_string(), crypto_mod);
+
     // ── File module ─────────────────────────────────────────────────
     let mut file_mod = HashMap::new();
     file_mod.insert(
@@ -1492,6 +1526,7 @@ const STDLIB_MODULE_NAMES: &[&str] = &[
     "Changeset",  // Phase 99
     "Migration",  // Phase 101
     "Regex",  // Phase 119
+    "Crypto",  // Phase 135
 ];
 
 /// Check if a name is a known stdlib module.
