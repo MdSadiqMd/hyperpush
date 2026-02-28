@@ -466,13 +466,15 @@ fn extract_blocks_at(
                 // Now parse the describe body: find setup, teardown, and test blocks.
                 let (inner_setup, inner_teardown, inner_end) =
                     peek_describe_body(tokens, *i);
-                // Recurse into describe body.
-                let mut j = *i;
-                // Find and skip setup/teardown inline; collect tests.
-                extract_blocks_at(
+                // Recurse into describe body using peek_describe_body's position info.
+                // We do NOT call extract_blocks_at here because it would encounter
+                // setup/teardown sub-block End tokens and return prematurely.
+                // Instead, we walk only the test tokens between setup/teardown sub-blocks.
+                extract_tests_from_describe(
                     tokens,
-                    &mut j,
-                    Some(&group_name),
+                    *i,
+                    inner_end,
+                    &group_name,
                     inner_setup.as_deref(),
                     inner_teardown.as_deref(),
                     blocks,
@@ -490,6 +492,96 @@ fn extract_blocks_at(
             }
         }
     }
+}
+
+/// Extract test blocks from within a describe body, skipping setup/teardown sub-blocks.
+///
+/// `start`: token index at the start of the describe body (just after the opening `do`).
+/// `end_idx`: token index just after the closing `end` of the describe (from peek_describe_body).
+fn extract_tests_from_describe(
+    tokens: &[TToken],
+    start: usize,
+    end_idx: usize,
+    group_name: &str,
+    setup_body: Option<&str>,
+    teardown_body: Option<&str>,
+    blocks: &mut Vec<TestBlock>,
+) {
+    let mut i = start;
+    // end_idx points AFTER the describe's closing `end`, so we stop before it.
+    // The last token we should process is at end_idx - 2 (the closing `end` is at end_idx - 1,
+    // but peek_describe_body already consumed it). Actually end_idx is after the end, so we
+    // process tokens[start..end_idx-1] (exclusive of the closing `end`).
+    // We use a depth counter to skip setup/teardown sub-blocks.
+    let mut skip_depth: usize = 0;
+    let mut in_setup_teardown: bool = false;
+
+    while i < tokens.len() {
+        // Stop when we've passed the describe's closing token range.
+        // peek_describe_body positions end_idx after the closing `end`, so
+        // the closing `end` is at end_idx - 1. We stop at end_idx - 1.
+        if i >= end_idx.saturating_sub(1) {
+            break;
+        }
+
+        if skip_depth > 0 {
+            // Inside a setup/teardown block body — skip everything and track nesting.
+            match &tokens[i] {
+                TToken::Do | TToken::If | TToken::While
+                | TToken::Case | TToken::For | TToken::Receive => {
+                    skip_depth += 1;
+                }
+                TToken::End => {
+                    skip_depth -= 1;
+                    if skip_depth == 0 {
+                        in_setup_teardown = false;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+            continue;
+        }
+
+        match &tokens[i] {
+            TToken::SetupKw | TToken::TeardownKw => {
+                // Skip this setup/teardown sub-block entirely.
+                // Skip past the keyword, then find and consume the opening Do.
+                i += 1;
+                in_setup_teardown = true;
+                // Skip to the opening `do` of setup/teardown.
+                while i < tokens.len() {
+                    if matches!(tokens[i], TToken::Do) {
+                        skip_depth = 1;
+                        i += 1; // consume 'do', now inside the block
+                        break;
+                    }
+                    i += 1;
+                }
+            }
+            TToken::TestKw => {
+                i += 1;
+                let label = extract_string_arg(tokens, &mut i)
+                    .unwrap_or_else(|| "unnamed".to_string());
+                let full_label = format!("{} > {}", group_name, label);
+                skip_to_do(tokens, &mut i);
+                if i < tokens.len() {
+                    i += 1; // consume 'do'
+                }
+                let body = extract_block_body(tokens, &mut i);
+                blocks.push(TestBlock {
+                    label: full_label,
+                    body,
+                    setup_body: setup_body.map(|s| s.to_string()),
+                    teardown_body: teardown_body.map(|s| s.to_string()),
+                });
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    let _ = in_setup_teardown; // suppress unused variable warning
 }
 
 /// Parse the describe body to extract optional `setup()` and `teardown()` bodies.
