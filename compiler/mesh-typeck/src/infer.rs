@@ -2691,6 +2691,14 @@ fn infer_item(
                                         service_info.methods.clone(),
                                     );
                                 }
+                                // Check type aliases (ALIAS-03: importing a pub type alias
+                                // by name is valid; the alias is already pre-registered in
+                                // type_registry from the earlier import pre-registration pass,
+                                // so no additional action is needed here beyond accepting it).
+                                else if mod_exports.type_aliases.contains_key(&name) {
+                                    // Type alias already pre-registered in type_registry;
+                                    // silently accept the import name.
+                                }
                                 else {
                                     // Check if item exists but is private (VIS-03)
                                     if mod_exports.private_names.contains(&name) {
@@ -2706,6 +2714,7 @@ fn infer_item(
                                             .chain(mod_exports.sum_type_defs.keys())
                                             .chain(mod_exports.service_defs.keys())
                                             .chain(mod_exports.actor_defs.keys())
+                                            .chain(mod_exports.type_aliases.keys())
                                             .cloned()
                                             .collect();
                                         ctx.errors.push(TypeError::ImportNameNotFound {

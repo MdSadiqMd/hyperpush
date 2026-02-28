@@ -8,12 +8,12 @@
 # Line numbers are intentionally excluded from frame fingerprints because
 # they change with unrelated code edits (per Rollbar/Sentry best practices).
 
-from Types.Event import EventPayload, StackFrame, ExceptionInfo
+from Types.Event import EventPayload, StackFrame, ExceptionInfo, Fingerprint
 
 # Normalize an error message for stable fingerprinting.
 # Lowercases and strips hex address prefixes (0x). Full regex not available
 # in Mesh; this covers the most common source of fingerprint instability.
-fn normalize_message(msg :: String) -> String do
+fn normalize_message(msg :: String) -> Fingerprint do
   # Slot pipe: |2> inserts the piped value as the second argument
   msg
     |> String.to_lower()
@@ -29,7 +29,7 @@ end
 
 # Build fingerprint from stack trace frames and message (GROUP-01).
 # Format: "file|func;file|func;...:normalized_message"
-fn fingerprint_from_frames(frames, msg :: String) -> String do
+fn fingerprint_from_frames(frames, msg :: String) -> Fingerprint do
   let suffix = ":" <> normalize_message(msg)
   let joined = frames |> List.map(fn(frame) do fingerprint_frame(frame) end) |> String.join(";")
   joined <> suffix
@@ -67,7 +67,7 @@ end
 #   2. Stack trace frames (file + function + normalized message)
 #   3. Exception type + normalized value
 #   4. "msg:" + normalized message
-pub fn compute_fingerprint(payload :: EventPayload) -> String do
+pub fn compute_fingerprint(payload :: EventPayload) -> Fingerprint do
   if String.length(payload.fingerprint) > 0 do
     payload.fingerprint
   else

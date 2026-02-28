@@ -2,6 +2,10 @@
 # Defines the core event model: severity levels, stack frames,
 # exception info, breadcrumbs, and the event/payload structs.
 
+# Fingerprint string type alias -- fingerprints are stable string identifiers
+# computed from event payload fields for deduplication grouping.
+pub type Fingerprint = String
+
 # Severity levels following Sentry convention (5 levels).
 pub type Severity do
   Fatal
