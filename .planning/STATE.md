@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Ecosystem & Standard Library
 status: unknown
-last_updated: "2026-02-28T21:21:35.925Z"
+last_updated: "2026-02-28T22:12:54Z"
 progress:
   total_phases: 126
   completed_phases: 125
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 138 of 140 (Testing Framework) — IN PROGRESS
-Plan: 2 of 3 in current phase — COMPLETE
-Status: Plan 02 complete, ready for Plan 03
-Last activity: 2026-02-28 — Phase 138 Plan 02 complete: 9 mesh_test_* extern C runtime functions (begin, pass, fail_msg, assert, assert_eq, assert_ne, assert_raises, summary, cleanup_actors) with FAIL_MESSAGES accumulation, Failures: reprint section, catch_unwind assert_raises — wired through all 5 compiler registration points
+Phase: 138 of 140 (Testing Framework) — COMPLETE
+Plan: 3 of 3 in current phase — COMPLETE
+Status: Phase 138 complete, ready for Phase 139
+Last activity: 2026-02-28 — Phase 138 Plan 03 complete: source preprocessing DSL (.test.mpl → fn __test_body_N + fn main), test mode detection in MIR lowerer, flag-based assert_raises, mesh_test_run_body/mock_actor/pass_count/fail_count, 5 e2e fixtures all passing
 
-Progress: [███████░░░] 54%  (7/13 plans)
+Progress: [████████░░] 62%  (8/13 plans)
 
 ## Performance Metrics
 
@@ -43,7 +43,7 @@ Progress: [███████░░░] 54%  (7/13 plans)
 | 135. Encoding & Crypto Stdlib | 2 | Complete |
 | 136. DateTime Stdlib | 2 | Complete |
 | 137. HTTP Client Improvements | 2 | Complete |
-| 138. Testing Framework | 3 | In progress (2/3) |
+| 138. Testing Framework | 3 | Complete |
 | 139. Package Manifest & meshpkg CLI | 2 | Not started |
 | 140. Package Registry Backend & Website | 2 | Not started |
 

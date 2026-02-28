@@ -253,7 +253,7 @@ See milestones/v13.0-ROADMAP.md for full phase details.
 - [x] **Phase 135: Encoding & Crypto Stdlib** - SHA-256/512, HMAC, UUID, Base64, Hex as extern "C" wrappers over already-present crates (complete)
 - [x] **Phase 136: DateTime Stdlib** - Full DateTime API (parse, format, arithmetic, compare) backed by chrono 0.4 (completed 2026-02-28)
 - [x] **Phase 137: HTTP Client Improvements** - Fluent builder API, streaming via OS-thread-per-stream, keep-alive agent handle (completed 2026-02-28)
-- [ ] **Phase 138: Testing Framework** - `meshc test` runner, assertion helpers, describe/setup/teardown, mock actors, assert_receive
+- [x] **Phase 138: Testing Framework** - `meshc test` runner, assertion helpers, describe/setup/teardown, mock actors, assert_receive (completed 2026-02-28)
 - [ ] **Phase 139: Package Manifest & meshpkg CLI** - mesh.toml format, mesh.lock lockfile, meshpkg publish/install/search/login binary
 - [ ] **Phase 140: Package Registry Backend & Website** - Axum+PostgreSQL registry server, SHA-256 content addressing, VitePress packages site
 
@@ -364,6 +364,6 @@ Plans:
 | 135. Encoding & Crypto Stdlib | 1/2 | Complete    | 2026-02-28 |
 | 136. DateTime Stdlib | 2/2 | Complete    | 2026-02-28 |
 | 137. HTTP Client Improvements | 2/2 | Complete    | 2026-02-28 |
-| 138. Testing Framework | 2/3 | In Progress|  |
+| 138. Testing Framework | 3/3 | Complete   | 2026-02-28 |
 | 139. Package Manifest & meshpkg CLI | 0/2 | Not started | - |
 | 140. Package Registry Backend & Website | 0/2 | Not started | - |

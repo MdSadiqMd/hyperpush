@@ -52,10 +52,10 @@
 - [x] **TEST-03**: User can assert equality in a test via `assert_eq a, b` with expected vs actual output on failure
 - [x] **TEST-04**: User can assert inequality in a test via `assert_ne a, b` with a descriptive failure message
 - [x] **TEST-05**: User can assert that a function raises an error via `assert_raises fn`
-- [ ] **TEST-06**: User can group related tests via `describe "..." do ... end` blocks with the group name shown in failure output
-- [ ] **TEST-07**: User can define shared setup and teardown for a describe block via `setup do ... end` and `teardown do ... end`
-- [ ] **TEST-08**: User can spawn a mock actor in a test via `Test.mock_actor(fn msg -> ... end)` returning a Pid for concurrency testing
-- [ ] **TEST-09**: User can assert the test actor receives a message matching a pattern via `assert_receive pattern, timeout`
+- [x] **TEST-06**: User can group related tests via `describe "..." do ... end` blocks with the group name shown in failure output
+- [x] **TEST-07**: User can define shared setup and teardown for a describe block via `setup do ... end` and `teardown do ... end`
+- [x] **TEST-08**: User can spawn a mock actor in a test via `Test.mock_actor(fn msg -> ... end)` returning a Pid for concurrency testing
+- [x] **TEST-09**: User can assert the test actor receives a message matching a pattern via `assert_receive pattern, timeout`
 - [x] **TEST-10**: User can generate a test coverage report via `meshc test --coverage`
 
 ### Package Manifest & CLI (PKG)
@@ -146,10 +146,10 @@ Which phases cover which requirements.
 | TEST-03 | Phase 138 | Complete |
 | TEST-04 | Phase 138 | Complete |
 | TEST-05 | Phase 138 | Complete |
-| TEST-06 | Phase 138 | Pending |
-| TEST-07 | Phase 138 | Pending |
-| TEST-08 | Phase 138 | Pending |
-| TEST-09 | Phase 138 | Pending |
+| TEST-06 | Phase 138 | Complete |
+| TEST-07 | Phase 138 | Complete |
+| TEST-08 | Phase 138 | Complete |
+| TEST-09 | Phase 138 | Complete |
 | TEST-10 | Phase 138 | Complete |
 | PKG-01 | Phase 139 | Pending |
 | PKG-02 | Phase 139 | Pending |
