@@ -266,7 +266,7 @@ unsafe fn execute_with_agent(agent: &Agent, data: &MeshRequestData) -> *mut u8 {
     };
 
     let method = data.method.as_str();
-    let is_body_method = matches!(method, "post" | "put" | "patch" | "delete");
+    let is_body_method = matches!(method, "post" | "put" | "patch");
 
     let result: Result<ureq::http::Response<ureq::Body>, ureq::Error> =
         if is_body_method || data.body.is_some() {
@@ -391,7 +391,7 @@ pub extern "C" fn mesh_http_stream(
         };
 
         let method = req_data.method.as_str();
-        let is_body_method = matches!(method, "post" | "put" | "patch" | "delete");
+        let is_body_method = matches!(method, "post" | "put" | "patch");
 
         let response = if is_body_method || req_data.body.is_some() {
             let req = match method {
