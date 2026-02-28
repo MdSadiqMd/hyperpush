@@ -26,14 +26,14 @@
 
 ### DateTime (DTIME)
 
-- [ ] **DTIME-01**: User can get the current UTC datetime via `DateTime.utc_now()` returning a DateTime value
-- [ ] **DTIME-02**: User can parse an ISO 8601 string into a DateTime via `DateTime.from_iso8601(s)` returning Result<DateTime, String>
-- [ ] **DTIME-03**: User can format a DateTime as an ISO 8601 string via `DateTime.to_iso8601(dt)` returning String
-- [ ] **DTIME-04**: User can convert a Unix timestamp Int to DateTime via `DateTime.from_unix(n)`
-- [ ] **DTIME-05**: User can convert a DateTime to a Unix timestamp Int via `DateTime.to_unix(dt)`
-- [ ] **DTIME-06**: User can add a duration to a DateTime via `DateTime.add(dt, n, unit)` with units :second/:minute/:hour/:day
-- [ ] **DTIME-07**: User can compute the signed difference between two DateTimes via `DateTime.diff(dt1, dt2, unit)` returning Int
-- [ ] **DTIME-08**: User can compare two DateTimes via `DateTime.before?(dt1, dt2)` and `DateTime.after?(dt1, dt2)` returning Bool
+- [x] **DTIME-01**: User can get the current UTC datetime via `DateTime.utc_now()` returning a DateTime value
+- [x] **DTIME-02**: User can parse an ISO 8601 string into a DateTime via `DateTime.from_iso8601(s)` returning Result<DateTime, String>
+- [x] **DTIME-03**: User can format a DateTime as an ISO 8601 string via `DateTime.to_iso8601(dt)` returning String
+- [x] **DTIME-04**: User can convert a Unix timestamp Int to DateTime via `DateTime.from_unix(n)`
+- [x] **DTIME-05**: User can convert a DateTime to a Unix timestamp Int via `DateTime.to_unix(dt)`
+- [x] **DTIME-06**: User can add a duration to a DateTime via `DateTime.add(dt, n, unit)` with units :second/:minute/:hour/:day
+- [x] **DTIME-07**: User can compute the signed difference between two DateTimes via `DateTime.diff(dt1, dt2, unit)` returning Int
+- [x] **DTIME-08**: User can compare two DateTimes via `DateTime.before?(dt1, dt2)` and `DateTime.after?(dt1, dt2)` returning Bool
 
 ### HTTP Client (HTTP)
 
@@ -126,14 +126,14 @@ Which phases cover which requirements.
 | ENCODE-04 | Phase 135 | Complete |
 | ENCODE-05 | Phase 135 | Complete |
 | ENCODE-06 | Phase 135 | Complete |
-| DTIME-01 | Phase 136 | Pending |
-| DTIME-02 | Phase 136 | Pending |
-| DTIME-03 | Phase 136 | Pending |
-| DTIME-04 | Phase 136 | Pending |
-| DTIME-05 | Phase 136 | Pending |
-| DTIME-06 | Phase 136 | Pending |
-| DTIME-07 | Phase 136 | Pending |
-| DTIME-08 | Phase 136 | Pending |
+| DTIME-01 | Phase 136 | Complete |
+| DTIME-02 | Phase 136 | Complete |
+| DTIME-03 | Phase 136 | Complete |
+| DTIME-04 | Phase 136 | Complete |
+| DTIME-05 | Phase 136 | Complete |
+| DTIME-06 | Phase 136 | Complete |
+| DTIME-07 | Phase 136 | Complete |
+| DTIME-08 | Phase 136 | Complete |
 | HTTP-01 | Phase 137 | Pending |
 | HTTP-02 | Phase 137 | Pending |
 | HTTP-03 | Phase 137 | Pending |

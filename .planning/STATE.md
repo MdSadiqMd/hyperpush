@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 136 of 140 (DateTime Stdlib)
-Plan: 1 of 2 in current phase
+Plan: 2 of 2 in current phase
 Status: In progress
-Last activity: 2026-02-28 — Phase 135 Plan 02 complete: Base64 and Hex encoding stdlib modules
+Last activity: 2026-02-28 — Phase 136 Plan 01 complete: DateTime stdlib runtime + compiler wiring (chrono 0.4, 11 extern C functions, 5-point compiler registration)
 
-Progress: [██░░░░░░░░] 15%  (2/13 plans)
+Progress: [███░░░░░░░] 23%  (3/13 plans)
 
 ## Performance Metrics
 
@@ -67,6 +67,10 @@ Recent decisions affecting current work:
 - [Phase 135 Plan 01]: HMAC-SHA256 RFC 2202 test vector for ("Jefe", "what do ya want for nothing?") = 5bdcc146...ec3843 (not a72840 as in plan)
 - [Phase 135 Plan 02]: Base64.decode lenient order: try STANDARD (padded) first, then STANDARD_NO_PAD — if unpadded first, padded input gets bytes incorrectly stripped
 - [Phase 135 Plan 02]: Hex.decode is case-insensitive via to_lowercase() before parsing — accepts both lowercase and uppercase hex digits
+- [Phase 136 Plan 01]: DateTime ABI is i64 Unix milliseconds throughout — avoids new type machinery in typeck/codegen
+- [Phase 136 Plan 01]: diff() return type is MirType::Float (f64) not MirType::Int — fractional precision for sub-second computations
+- [Phase 136 Plan 01]: before?/after? retain ? in Mesh source names but drop ? in C symbol names (C cannot contain ?)
+- [Phase 136 Plan 01]: alloc_result Ok i64 payload boxed via Box::into_raw(Box::new(ms)) as *mut u8 — same pattern as SqliteConn
 
 ### Pending Todos
 
@@ -81,5 +85,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Phase 135 Plan 02 complete — Base64 and Hex stdlib modules implemented, all 5 e2e tests passing, Phase 135 complete
+Stopped at: Phase 136 Plan 01 complete — DateTime stdlib runtime (datetime.rs with 11 extern C functions, chrono 0.4) and full compiler wiring implemented, cargo build --workspace succeeds
 Resume file: None
