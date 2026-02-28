@@ -122,7 +122,7 @@ end
 
 # WebSocket on_close callback.
 # Cleans up StreamManager state; Ws.join auto-cleanup handles room removal.
-pub fn ws_on_close(conn, code, reason) do
+pub fn ws_on_close(conn, code :: Int, reason :: String) do
   let stream_mgr_pid = Process.whereis("stream_manager")
   StreamManager.remove_client(stream_mgr_pid, conn)
   println("[WS] Connection closed: " <> String.from(code))

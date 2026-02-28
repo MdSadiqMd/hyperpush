@@ -77,7 +77,7 @@ fn on_ws_message(conn, msg) do
   ws_on_message(conn, msg)
 end
 
-fn on_ws_close(conn, code, reason) do
+fn on_ws_close(conn, code :: Int, reason :: String) do
   ws_on_close(conn, code, reason)
 end
 
@@ -117,7 +117,7 @@ fn start_services(pool :: PoolHandle) do
 
   # Set up HTTP routes and start server (ingestion, search, dashboard, detail, issues, team, API keys)
   println("[Mesher] HTTP server starting on :#{http_port}")
-  HTTP.serve((HTTP.router()
+  let router = HTTP.router()
     |> HTTP.on_post("/api/v1/events", handle_event)
     |> HTTP.on_post("/api/v1/events/bulk", handle_bulk)
     |> HTTP.on_get("/api/v1/projects/:project_id/issues", handle_search_issues)
@@ -153,7 +153,8 @@ fn start_services(pool :: PoolHandle) do
     |> HTTP.on_post("/api/v1/alerts/:id/resolve", handle_resolve_alert)
     |> HTTP.on_get("/api/v1/projects/:project_id/settings", handle_get_project_settings)
     |> HTTP.on_post("/api/v1/projects/:project_id/settings", handle_update_project_settings)
-    |> HTTP.on_get("/api/v1/projects/:project_id/storage", handle_get_project_storage)), http_port)
+    |> HTTP.on_get("/api/v1/projects/:project_id/storage", handle_get_project_storage)
+  HTTP.serve(router, http_port)
 end
 
 fn main() do
