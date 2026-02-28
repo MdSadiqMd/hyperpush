@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** v14.0 Phase 136 — DateTime Stdlib (Phase 135 complete)
+**Current focus:** v14.0 Phase 137 — HTTP Client Improvements (Phase 136 complete)
 
 ## Current Position
 
-Phase: 136 of 140 (DateTime Stdlib)
-Plan: 2 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-28 — Phase 136 Plan 01 complete: DateTime stdlib runtime + compiler wiring (chrono 0.4, 11 extern C functions, 5-point compiler registration)
+Phase: 137 of 140 (HTTP Client Improvements)
+Plan: 0 of 2 in current phase
+Status: Not started
+Last activity: 2026-02-28 — Phase 136 Plan 02 complete: 6 DateTime e2e tests pass; 10 compiler bug fixes (MirType::Int registration, boxed scalar deref, atom unit params, is_before/is_after naming)
 
 Progress: [███░░░░░░░] 23%  (3/13 plans)
 
@@ -41,7 +41,7 @@ Progress: [███░░░░░░░] 23%  (3/13 plans)
 | Phase | Plans | Status |
 |-------|-------|--------|
 | 135. Encoding & Crypto Stdlib | 2 | Complete |
-| 136. DateTime Stdlib | 2 | Not started |
+| 136. DateTime Stdlib | 2 | Complete |
 | 137. HTTP Client Improvements | 2 | Not started |
 | 138. Testing Framework | 3 | Not started |
 | 139. Package Manifest & meshpkg CLI | 2 | Not started |
@@ -71,6 +71,10 @@ Recent decisions affecting current work:
 - [Phase 136 Plan 01]: diff() return type is MirType::Float (f64) not MirType::Int — fractional precision for sub-second computations
 - [Phase 136 Plan 01]: before?/after? retain ? in Mesh source names but drop ? in C symbol names (C cannot contain ?)
 - [Phase 136 Plan 01]: alloc_result Ok i64 payload boxed via Box::into_raw(Box::new(ms)) as *mut u8 — same pattern as SqliteConn
+- [Phase 136 Plan 02]: Opaque named types backed by scalar ABI must be registered as MirType::Int in resolve_con (not MirType::Struct)
+- [Phase 136 Plan 02]: should_deref_boxed_payload must cover MirType::Int/Float/Bool — any scalar type returned via Box::into_raw needs deref in Ok pattern binding
+- [Phase 136 Plan 02]: Atom literals lower to bare names without colon — atom_text() strips leading ':'; runtime match arms use "day" not ":day"
+- [Phase 136 Plan 02]: is_before/is_after preferred over before?/after? — '?' is Mesh try-operator and 'after' is AFTER_KW (receive-timeout); both block parsing
 
 ### Pending Todos
 
@@ -85,5 +89,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Phase 136 Plan 01 complete — DateTime stdlib runtime (datetime.rs with 11 extern C functions, chrono 0.4) and full compiler wiring implemented, cargo build --workspace succeeds
+Stopped at: Phase 136 Plan 02 complete — all 6 e2e_datetime_* tests pass; Phase 136 (DateTime Stdlib) fully complete; ready for Phase 137 (HTTP Client Improvements)
 Resume file: None

@@ -251,7 +251,7 @@ See milestones/v13.0-ROADMAP.md for full phase details.
 #### Phase Summary
 
 - [x] **Phase 135: Encoding & Crypto Stdlib** - SHA-256/512, HMAC, UUID, Base64, Hex as extern "C" wrappers over already-present crates (complete)
-- [ ] **Phase 136: DateTime Stdlib** - Full DateTime API (parse, format, arithmetic, compare) backed by chrono 0.4
+- [x] **Phase 136: DateTime Stdlib** - Full DateTime API (parse, format, arithmetic, compare) backed by chrono 0.4 (completed 2026-02-28)
 - [ ] **Phase 137: HTTP Client Improvements** - Fluent builder API, streaming via OS-thread-per-stream, keep-alive agent handle
 - [ ] **Phase 138: Testing Framework** - `meshc test` runner, assertion helpers, describe/setup/teardown, mock actors, assert_receive
 - [ ] **Phase 139: Package Manifest & meshpkg CLI** - mesh.toml format, mesh.lock lockfile, meshpkg publish/install/search/login binary
@@ -288,7 +288,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 136-01-PLAN.md — DateTime runtime (chrono 0.4 dep, datetime.rs with 11 functions) + all 4 compiler registration points (builtins.rs, infer.rs, lower.rs, intrinsics.rs)
+- [x] 136-01-PLAN.md — DateTime runtime (chrono 0.4 dep, datetime.rs with 11 functions) + all 4 compiler registration points (builtins.rs, infer.rs, lower.rs, intrinsics.rs)
 - [ ] 136-02-PLAN.md — DateTime e2e test fixtures (6 .mpl files) + Rust test functions in e2e.rs
 
 ### Phase 137: HTTP Client Improvements
@@ -362,7 +362,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 135. Encoding & Crypto Stdlib | 1/2 | Complete    | 2026-02-28 |
-| 136. DateTime Stdlib | 1/2 | In Progress|  |
+| 136. DateTime Stdlib | 2/2 | Complete   | 2026-02-28 |
 | 137. HTTP Client Improvements | 0/2 | Not started | - |
 | 138. Testing Framework | 0/3 | Not started | - |
 | 139. Package Manifest & meshpkg CLI | 0/2 | Not started | - |
