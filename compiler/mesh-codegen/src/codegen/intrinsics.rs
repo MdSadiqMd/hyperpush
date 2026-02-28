@@ -278,6 +278,32 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     let regex_split_ty = ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false);
     module.add_function("mesh_regex_split", regex_split_ty, Some(inkwell::module::Linkage::External));
 
+    // ── Standard library: Crypto functions (Phase 135) ──────────────────────
+
+    // mesh_crypto_sha256(s: ptr) -> ptr
+    let sha256_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_crypto_sha256", sha256_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_crypto_sha512(s: ptr) -> ptr
+    let sha512_ty = ptr_type.fn_type(&[ptr_type.into()], false);
+    module.add_function("mesh_crypto_sha512", sha512_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_crypto_hmac_sha256(key: ptr, msg: ptr) -> ptr
+    let hmac256_ty = ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false);
+    module.add_function("mesh_crypto_hmac_sha256", hmac256_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_crypto_hmac_sha512(key: ptr, msg: ptr) -> ptr
+    let hmac512_ty = ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false);
+    module.add_function("mesh_crypto_hmac_sha512", hmac512_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_crypto_secure_compare(a: ptr, b: ptr) -> i8 (Bool — NOT ptr_type!)
+    let secure_cmp_ty = i8_type.fn_type(&[ptr_type.into(), ptr_type.into()], false);
+    module.add_function("mesh_crypto_secure_compare", secure_cmp_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_crypto_uuid4() -> ptr
+    let uuid4_ty = ptr_type.fn_type(&[], false);
+    module.add_function("mesh_crypto_uuid4", uuid4_ty, Some(inkwell::module::Linkage::External));
+
     // ── Standard library: Collection functions (Phase 8 Plan 02) ──────────
 
     // List functions

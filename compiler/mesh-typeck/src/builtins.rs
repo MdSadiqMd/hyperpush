@@ -299,6 +299,21 @@ pub fn register_builtins(
         Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::list(Ty::string()))),
     );
 
+    // ── Standard library: Crypto functions (Phase 135) ─────────────────────
+
+    env.insert("crypto_sha256".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
+    env.insert("crypto_sha512".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
+    env.insert("crypto_hmac_sha256".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())));
+    env.insert("crypto_hmac_sha512".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())));
+    env.insert("crypto_secure_compare".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::bool())));
+    env.insert("crypto_uuid4".into(),
+        Scheme::mono(Ty::fun(vec![], Ty::string())));
+
     // ── Standard library: Collection types (Phase 8) ─────────────────
 
     // Type constructors for collection types (bare names).

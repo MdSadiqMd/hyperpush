@@ -815,6 +815,35 @@ impl<'a> Lowerer<'a> {
             "mesh_regex_split".to_string(),
             MirType::FnPtr(vec![MirType::Ptr, MirType::String], Box::new(MirType::Ptr)),
         );
+        // Crypto runtime functions (Phase 135)
+        // Crypto: String -> String
+        self.known_functions.insert(
+            "mesh_crypto_sha256".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_crypto_sha512".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)),
+        );
+        // Crypto: (String, String) -> String (HMAC)
+        self.known_functions.insert(
+            "mesh_crypto_hmac_sha256".to_string(),
+            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_crypto_hmac_sha512".to_string(),
+            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::String)),
+        );
+        // Crypto: (String, String) -> Bool
+        self.known_functions.insert(
+            "mesh_crypto_secure_compare".to_string(),
+            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool)),
+        );
+        // Crypto: () -> String (uuid4 — zero args)
+        self.known_functions.insert(
+            "mesh_crypto_uuid4".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::String)),
+        );
         // ── Collection functions (Phase 8 Plan 02) ─────────────────────
         // List
         self.known_functions.insert("mesh_list_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
@@ -10758,6 +10787,7 @@ const STDLIB_MODULES: &[&str] = &[
     "Changeset",  // Phase 99
     "Migration",  // Phase 101
     "Regex",  // Phase 119
+    "Crypto",  // Phase 135
 ];
 
 /// Map Mesh builtin function names to their runtime equivalents.
@@ -10806,6 +10836,13 @@ fn map_builtin_name(name: &str) -> String {
         "regex_captures" => "mesh_regex_captures".to_string(),
         "regex_replace" => "mesh_regex_replace".to_string(),
         "regex_split" => "mesh_regex_split".to_string(),
+        // Crypto functions (Phase 135)
+        "crypto_sha256"         => "mesh_crypto_sha256".to_string(),
+        "crypto_sha512"         => "mesh_crypto_sha512".to_string(),
+        "crypto_hmac_sha256"    => "mesh_crypto_hmac_sha256".to_string(),
+        "crypto_hmac_sha512"    => "mesh_crypto_hmac_sha512".to_string(),
+        "crypto_secure_compare" => "mesh_crypto_secure_compare".to_string(),
+        "crypto_uuid4"          => "mesh_crypto_uuid4".to_string(),
         // Bare name for compile (from Regex import compile)
         "compile" => "mesh_regex_compile".to_string(),
         // Names that have already been resolved via from-import and lowered
