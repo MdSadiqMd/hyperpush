@@ -1128,6 +1128,16 @@ pub fn register_builtins(
         "test_fail_count".into(),
         Scheme::mono(Ty::fun(vec![], Ty::int())),
     );
+
+    // assert_receive(timeout_ms: Int) -> Unit
+    // Note: from typeck's perspective, assert_receive takes only a timeout argument.
+    // The pattern argument is handled by the preprocessor in test_runner.rs.
+    // This registration is defensive — the preprocessor transforms assert_receive
+    // BEFORE typeck runs, so typeck sees a receive block, not assert_receive.
+    env.insert(
+        "assert_receive".into(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], unit_t.clone())),
+    );
 }
 
 /// Register compiler-known traits and their built-in implementations.

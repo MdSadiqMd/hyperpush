@@ -222,20 +222,20 @@ pub fn preprocess_test_source(source: &str) -> String {
         out.push_str(&format!("fn __test_body_{}() do\n", i));
         if let Some(ref setup) = block.setup_body {
             out.push_str("  # setup\n");
-            for line in setup.lines() {
+            for line in transform_assert_receive(setup).lines() {
                 out.push_str("  ");
                 out.push_str(line);
                 out.push('\n');
             }
         }
-        for line in block.body.lines() {
+        for line in transform_assert_receive(&block.body).lines() {
             out.push_str("  ");
             out.push_str(line);
             out.push('\n');
         }
         if let Some(ref teardown) = block.teardown_body {
             out.push_str("  # teardown\n");
-            for line in teardown.lines() {
+            for line in transform_assert_receive(teardown).lines() {
                 out.push_str("  ");
                 out.push_str(line);
                 out.push('\n');
@@ -854,6 +854,94 @@ fn emit_non_test_items(source: &str, out: &mut String) {
 
     if !out.trim().is_empty() {
         out.push('\n');
+    }
+}
+
+// ── assert_receive preprocessor ───────────────────────────────────────────
+
+/// Transform `assert_receive PATTERN, TIMEOUT` lines in a test body into
+/// equivalent Mesh `receive` blocks with a timeout arm.
+///
+/// Handles:
+///   assert_receive PATTERN, TIMEOUT_MS
+///   assert_receive PATTERN              (default timeout: 100ms)
+///
+/// Output (for each matching line):
+///   receive
+///     PATTERN -> ()
+///     after TIMEOUT_MS -> test_fail_msg("assert_receive PATTERN timed out after TIMEOUT_MSms")
+///   end
+///
+/// LOCKED DECISION: The failure message includes BOTH the pattern and the elapsed time.
+/// Format: "assert_receive {pattern} timed out after {timeout_ms}ms"
+///
+/// Lines that do not start with `assert_receive ` are passed through unchanged.
+fn transform_assert_receive(body: &str) -> String {
+    let mut out = String::new();
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("assert_receive ") {
+            // Strip "assert_receive " prefix
+            let rest = trimmed["assert_receive ".len()..].trim();
+            // Split on the last top-level comma to find optional timeout.
+            // The pattern may contain commas (e.g., {:ping, "data"}), so split on
+            // the last comma that is NOT inside brackets/parens.
+            let (pattern, timeout_ms) = split_assert_receive_args(rest);
+            let indent = &line[..line.len() - line.trim_start().len()];
+            out.push_str(&format!(
+                "{indent}receive\n\
+                 {indent}  {pattern} -> ()\n\
+                 {indent}  after {timeout_ms} -> test_fail_msg(\"assert_receive {pattern} timed out after {timeout_ms}ms\")\n\
+                 {indent}end\n"
+            ));
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// Split `assert_receive` arguments into (pattern, timeout_ms).
+///
+/// Splits on the LAST top-level comma (not inside {} or () brackets).
+/// If no comma found, returns (rest, "100") — default 100ms timeout.
+fn split_assert_receive_args(rest: &str) -> (String, String) {
+    // Find the last comma at depth 0 (not inside brackets).
+    let chars: Vec<char> = rest.chars().collect();
+    let mut depth = 0i32;
+    let mut last_comma: Option<usize> = None;
+    let mut char_pos = 0usize;
+
+    for (i, &ch) in chars.iter().enumerate() {
+        match ch {
+            '{' | '(' | '[' => depth += 1,
+            '}' | ')' | ']' => depth -= 1,
+            ',' if depth == 0 => last_comma = Some(i),
+            _ => {}
+        }
+        char_pos = i;
+    }
+    let _ = char_pos; // suppress unused warning
+
+    match last_comma {
+        Some(pos) => {
+            // Reconstruct the string slices from char positions.
+            // Since we collected chars, we need byte offsets.
+            let byte_pos = rest
+                .char_indices()
+                .nth(pos)
+                .map(|(b, _)| b)
+                .unwrap_or(0);
+            let pattern = rest[..byte_pos].trim().to_string();
+            let timeout = rest[byte_pos + 1..].trim().to_string();
+            let timeout_ms = if timeout.is_empty() { "100".to_string() } else { timeout };
+            (pattern, timeout_ms)
+        }
+        None => {
+            // No comma — entire rest is the pattern; use default timeout.
+            (rest.trim().to_string(), "100".to_string())
+        }
     }
 }
 
