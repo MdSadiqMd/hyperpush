@@ -2,7 +2,7 @@
   "name": "mesh-lang",
   "displayName": "Mesh Language",
   "description": "Mesh language support — syntax highlighting, diagnostics, hover, go-to-definition, completions, and signature help",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "OpenWorthTechnologies",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -79,7 +79,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package --no-dependencies",
-    "install-local": "vsce package --no-dependencies && code --install-extension mesh-lang-0.2.0.vsix"
+    "install-local": "vsce package --no-dependencies && code --install-extension mesh-lang-0.3.0.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
