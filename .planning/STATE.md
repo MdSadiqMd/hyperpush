@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Ecosystem & Standard Library
-status: unknown
-last_updated: "2026-03-01T19:45:00.000Z"
+status: complete
+last_updated: "2026-03-01T20:50:00.000Z"
 progress:
   total_phases: 131
-  completed_phases: 130
+  completed_phases: 131
   total_plans: 346
   completed_plans: 346
 ---
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** v14.0 Phase 143 — Deploy everything including new stuff from v14 (4/4 plans complete — ready for Plan 04 fly deploy)
+**Current focus:** v14.0 COMPLETE — all phases shipped; registry + packages-website + docs + GitHub Release v14.0.0 live in production
 
 ## Current Position
 
-Phase: 143 of 143 (Deploy everything including new stuff from v14) — 4 of 4 plans complete (Plan 04 remaining: actual fly deploy)
-Plan: 4 of 4 in current phase — Next
-Status: Phase 143 Plan 01 complete — registry Docker image (ubuntu:24.04, cargo-chef), Fly.io provisioned, Postgres attached, Cloudflare R2, GitHub OAuth, all 10 secrets set, api.packages.meshlang.dev live returning 200
-Last activity: 2026-03-01 — Phase 143 Plan 01 complete: infrastructure fully provisioned; ubuntu:24.04 runtime fix for GLIBC 2.38; registry returns 200 at api.packages.meshlang.dev
+Phase: 143 of 143 (Deploy everything including new stuff from v14) — 4 of 4 plans COMPLETE
+Plan: 4 of 4 — DONE
+Status: Phase 143 Plan 04 complete — all v14.0 services live: registry API at api.packages.meshlang.dev, packages website at packages.meshlang.dev, docs at meshlang.dev, GitHub Release v14.0.0 with 10 binary artifacts
+Last activity: 2026-03-01 — Phase 143 Plan 04 complete: all services deployed; smoke tests pass; packages-website on Fly.io (adapter-node); v14.0 milestone SHIPPED
 
-Progress: [██████████] 99%  (13/13 plans)
+Progress: [██████████] 100%  (13/13 plans)
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [██████████] 99%  (13/13 plans)
 | Phase 143 P03 | 2 | 2 tasks | 2 files |
 | Phase 143-deploy-everything-including-new-stuff-from-v14 P01 | 1 | 2 tasks | 5 files |
 | Phase 143 P03 | 2 | 2 tasks | 2 files |
+| Phase 143 P04 | 25 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,7 @@ Recent decisions affecting current work:
 - [Phase 143]: install_binary() helper in install.sh centralizes download/verify/install logic for any mesh toolchain binary by name
 - [Phase 143 Plan 01]: ubuntu:24.04 required as Dockerfile runtime base — cargo-chef rust:1 builder produces GLIBC 2.38 binary; debian:bookworm-slim only provides GLIBC 2.35 causing startup linker error
 - [Phase 143 Plan 01]: auto_stop_machines must be string 'off' not boolean false in fly.toml — fly launch generates canonical string format; boolean causes fly deploy parse error
+- [Phase 143 Plan 04]: packages-website deployed to Fly.io (mesh-packages, iad) instead of Cloudflare Pages — user preference; adapter-node + Dockerfile pattern used; consistent with registry platform
 
 ### Roadmap Evolution
 
@@ -163,5 +165,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 143-01-PLAN.md — registry infrastructure provisioned; api.packages.meshlang.dev live; all 10 secrets set; ubuntu:24.04 GLIBC fix applied
+Stopped at: Completed 143-04-PLAN.md — all v14.0 services live in production; packages-website on Fly.io; GitHub Release v14.0.0 published with 10 binary artifacts; v14.0 milestone COMPLETE
 Resume file: None
