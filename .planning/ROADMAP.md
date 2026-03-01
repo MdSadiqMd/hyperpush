@@ -392,9 +392,9 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 142-01-PLAN.md — VitePress config (sidebar + meshVersion 14.0) + new stdlib doc page + new testing doc page
-- [ ] 142-02-PLAN.md — Update tooling page (meshc test + meshpkg) + web page (HTTP Client v14) + cheatsheet (testing + stdlib)
-- [ ] 142-03-PLAN.md — Update Mesh top-level SKILL.md + HTTP skill with v14 client builder
+- [x] 142-01-PLAN.md — VitePress config (sidebar + meshVersion 14.0) + new stdlib doc page + new testing doc page
+- [x] 142-02-PLAN.md — Update tooling page (meshc test + meshpkg) + web page (HTTP Client v14) + cheatsheet (testing + stdlib)
+- [x] 142-03-PLAN.md — Update Mesh top-level SKILL.md + HTTP skill with v14 client builder
 
 ### Phase 143: Deploy everything including new stuff from v14
 

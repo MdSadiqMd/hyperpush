@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Ecosystem & Standard Library
 status: unknown
-last_updated: "2026-03-01T07:33:13.322Z"
+last_updated: "2026-03-01T07:33:58.883Z"
 progress:
   total_phases: 131
   completed_phases: 130
@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** v14.0 Phase 141 — Dogfeed v14 Changes to Mesher (all 3 plans complete)
+**Current focus:** v14.0 Phase 142 — Update Docs Page with Changes/Additions from v14 (all 3 plans complete)
 
 ## Current Position
 
-Phase: 141 of 143 (Dogfeed v14 Changes to Mesher) — All 3 plans complete
+Phase: 142 of 143 (Update Docs Page with Changes/Additions from v14) — All 3 plans complete
 Plan: 3 of 3 in current phase — Complete
-Status: Phase 141 complete — Crypto.uuid4() token generation, mesh.toml manifest, fingerprint/validation unit tests, build + test verification all passing (18/18 tests)
-Last activity: 2026-03-01 — Phase 141 Plan 03 complete: meshc build mesher/ exits 0; 18/18 tests passing; meshc test project_dir bug fixed
+Status: Phase 142 complete — Mesh agent skill files updated for v14; SKILL.md ecosystem overview expanded to 8 items; Http v14 builder API section added to http SKILL.md
+Last activity: 2026-03-01 — Phase 142 Plan 03 complete: Http.build/send/stream/client/send_with documented with 4 code examples; skills/testing entry correctly omitted
 
 Progress: [██████████] 99%  (13/13 plans)
 
@@ -53,6 +53,7 @@ Progress: [██████████] 99%  (13/13 plans)
 | Phase 141 P03 | 3 | 2 tasks | 1 file |
 | Phase 142 P01 | 109 | 3 tasks | 3 files |
 | Phase 142 P02 | 2 | 3 tasks | 3 files |
+| Phase 142 P03 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,8 @@ Recent decisions affecting current work:
 - [Phase 142]: meshpkg section placed as its own H2 alongside Test Runner rather than under Package Manager — separate binary warrants top-level section
 - [Phase 142]: Combined Crypto, Base64, Hex, DateTime into single Standard Library page per research recommendation
 - [Phase 142]: All doc code examples sourced exclusively from passing e2e tests (no invented syntax)
+- [Phase 142]: Testing knowledge captured only in Ecosystem Overview prose — no skills/testing sub-skill file exists or was created in this phase
+- [Phase 142]: Http.* (lowercase) = HTTP CLIENT vs HTTP.* (uppercase) = HTTP SERVER distinction documented explicitly in skill files as rule 10 of v14 section
 
 ### Roadmap Evolution
 
