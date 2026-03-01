@@ -143,6 +143,26 @@ enum MigrateAction {
     },
 }
 
+/// Walk up from a test file path to find the nearest ancestor directory containing `main.mpl`.
+/// Returns None if no such directory is found.
+fn find_project_dir_for_test(test_path: &Path) -> Option<PathBuf> {
+    let abs = if test_path.is_absolute() {
+        test_path.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(test_path)
+    };
+    let mut dir = if abs.is_dir() { abs.clone() } else { abs.parent()?.to_path_buf() };
+    loop {
+        if dir.join("main.mpl").exists() {
+            return Some(dir);
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent.to_path_buf(),
+            None => return None,
+        }
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -236,8 +256,15 @@ fn main() {
             rt.block_on(mesh_lsp::run_server());
         }
         Commands::Test { path, quiet, coverage } => {
-            let project_dir = std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."));
+            // Derive the project root from the test file path (walk up to find main.mpl),
+            // falling back to CWD. This prevents copy_project_sources_to_tmp from
+            // copying the entire repo when running from a multi-project workspace.
+            let project_dir = if let Some(ref p) = path {
+                find_project_dir_for_test(p)
+                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+            } else {
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+            };
             let filter_file = path.as_deref();
             match test_runner::run_tests(&project_dir, filter_file, quiet, coverage) {
                 Ok(summary) => {
