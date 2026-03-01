@@ -337,8 +337,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 139-01-PLAN.md — mesh-pkg extension: Dependency::Registry variants, license field, sha256 in LockedPackage, re-exports
-- [ ] 139-02-PLAN.md — meshpkg binary crate: login/publish/install/search subcommands, tar+gz tarball, SHA-256 verification, spinner + colored output
+- [x] 139-01-PLAN.md — mesh-pkg extension: Dependency::Registry variants, license field, sha256 in LockedPackage, re-exports
+- [x] 139-02-PLAN.md — meshpkg binary crate: login/publish/install/search subcommands, tar+gz tarball, SHA-256 verification, spinner + colored output
 
 ### Phase 140: Package Registry Backend & Website
 **Goal**: A hosted package registry accepts authenticated package publications, stores tarballs with SHA-256 content addressing, exposes a search/download API, and presents a browsable website with per-package pages
@@ -349,11 +349,13 @@ Plans:
   2. User visiting the hosted packages site can browse all published packages sorted by recency and see package names, descriptions, and version counts
   3. User can search the hosted site by package name or keyword and see relevant matching results
   4. User can navigate to a per-package page showing the rendered README, full version history, and the exact `meshpkg install` command for the latest version
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 140-01: mesh-registry workspace member (Axum 0.8 + sqlx 0.8 + PostgreSQL schema, publish/download/search API, SHA-256 content addressing, auth tokens)
-- [ ] 140-02: Registry packages website (VitePress browse/search/per-package pages, Vue components fetching registry API, publish stdlib packages as seed content)
+- [ ] 140-01-PLAN.md — Registry backend foundation: mesh-registry workspace crate, PostgreSQL migrations (users/tokens/packages/versions + tsvector FTS), AppState, AppConfig, AppError, R2Client storage abstraction, DB query layer
+- [ ] 140-02-PLAN.md — Core API routes: publish (POST with SHA-256 dedup + namespace enforcement), download (streaming from R2), search (FTS), metadata (package + version info); wired Axum 0.8 router
+- [ ] 140-03-PLAN.md — GitHub OAuth flow (login/callback), tower-sessions PostgreSQL store, token creation dashboard (argon2 hashed), .env.example
+- [ ] 140-04-PLAN.md — VitePress packages section: PackageBrowse (featured cards + search), PackagePage (metadata card + README + version history), nav integration
 
 ## Progress
 
@@ -368,4 +370,4 @@ Plans:
 | 137. HTTP Client Improvements | 2/2 | Complete    | 2026-02-28 |
 | 138. Testing Framework | 5/5 | Complete    | 2026-02-28 |
 | 139. Package Manifest & meshpkg CLI | 2/2 | Complete    | 2026-03-01 |
-| 140. Package Registry Backend & Website | 0/2 | Not started | - |
+| 140. Package Registry Backend & Website | 0/4 | Not started | - |
