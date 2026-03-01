@@ -1,0 +1,66 @@
+name: Deploy Services to Fly.io
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-fly-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-registry:
+    name: Deploy mesh-registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy registry to Fly.io
+        run: flyctl deploy --remote-only
+        working-directory: registry
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-packages-website:
+    name: Deploy mesh-packages website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy packages website to Fly.io
+        run: flyctl deploy --remote-only
+        working-directory: packages-website
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  health-check:
+    name: Post-deploy health checks
+    needs: [deploy-registry, deploy-packages-website]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check registry API
+        run: |
+          curl -sf --retry 5 --retry-delay 10 --retry-connrefused \
+            https://api.packages.meshlang.dev/api/v1/packages > /dev/null && \
+            echo "Registry API: OK"
+
+      - name: Check packages website
+        run: |
+          curl -sf --retry 5 --retry-delay 10 --retry-connrefused \
+            https://packages.meshlang.dev > /dev/null && \
+            echo "Packages website: OK"
+
+      - name: Check docs site
+        run: |
+          curl -sf --retry 3 --retry-delay 5 \
+            https://meshlang.dev > /dev/null && \
+            echo "Docs site: OK"
