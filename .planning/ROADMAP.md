@@ -321,6 +321,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 146. Slug Library | 0/2 | In planning | - |
+| 146. Slug Library | 1/2 | In Progress|  |
 | 147. Publish and Verify | 0/TBD | Not started | - |
 | 148. Mesher Integration | 0/TBD | Not started | - |

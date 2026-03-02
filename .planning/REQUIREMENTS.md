@@ -10,11 +10,11 @@ Build, publish, and consume a real Mesh package (mesh-slug) to validate the end-
 
 ### Slug Library
 
-- [ ] **SLUG-01**: User can call `Slug.slugify(str)` to convert any string to a URL-safe slug (lowercase, non-alphanumeric chars replaced with separator, consecutive separators collapsed, leading/trailing separators stripped)
-- [ ] **SLUG-02**: User can call `Slug.slugify(str, sep)` with a custom separator string
-- [ ] **SLUG-03**: User can call `Slug.truncate(slug, max)` to truncate a slug to at most max characters, cutting at the last separator boundary
-- [ ] **SLUG-04**: User can call `Slug.is_valid(slug)` to check if a string is already a valid slug (returns Bool)
-- [ ] **SLUG-05**: mesh-slug has unit tests via `meshc test` covering normal cases and edge cases (empty string, all-special-char input, long strings)
+- [x] **SLUG-01**: User can call `Slug.slugify(str)` to convert any string to a URL-safe slug (lowercase, non-alphanumeric chars replaced with separator, consecutive separators collapsed, leading/trailing separators stripped)
+- [x] **SLUG-02**: User can call `Slug.slugify(str, sep)` with a custom separator string
+- [x] **SLUG-03**: User can call `Slug.truncate(slug, max)` to truncate a slug to at most max characters, cutting at the last separator boundary
+- [x] **SLUG-04**: User can call `Slug.is_valid(slug)` to check if a string is already a valid slug (returns Bool)
+- [x] **SLUG-05**: mesh-slug has unit tests via `meshc test` covering normal cases and edge cases (empty string, all-special-char input, long strings)
 
 ### Distribution
 
@@ -48,11 +48,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SLUG-01 | Phase 146 | Pending |
-| SLUG-02 | Phase 146 | Pending |
-| SLUG-03 | Phase 146 | Pending |
-| SLUG-04 | Phase 146 | Pending |
-| SLUG-05 | Phase 146 | Pending |
+| SLUG-01 | Phase 146 | Complete |
+| SLUG-02 | Phase 146 | Complete |
+| SLUG-03 | Phase 146 | Complete |
+| SLUG-04 | Phase 146 | Complete |
+| SLUG-05 | Phase 146 | Complete |
 | DIST-01 | Phase 147 | Pending |
 | DIST-02 | Phase 147 | Pending |
 | DIST-03 | Phase 147 | Pending |
