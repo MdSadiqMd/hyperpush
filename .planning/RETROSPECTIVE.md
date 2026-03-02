@@ -4,6 +4,60 @@
 
 ---
 
+## Milestone: v14.0 — Ecosystem & Standard Library
+
+**Shipped:** 2026-03-01
+**Phases:** 11 (135-145) | **Plans:** 32 | **Duration:** 2 days (2026-02-28 → 2026-03-01)
+
+### What Was Built
+
+- Crypto & Encoding stdlib: SHA-256/512, HMAC-SHA256/512, UUID v4, Base64 (standard + URL-safe), Hex encode/decode — five-registration-point stdlib pattern applied; zero new Rust dependencies
+- DateTime stdlib: 11 functions backed by chrono 0.4; i64 Unix-ms ABI throughout; is_before/is_after naming to avoid keyword conflicts
+- HTTP client fluent builder API with ureq 3 upgrade, MeshRequest opaque handle, OS-thread-per-stream for Http.stream, Http.client keep-alive agent
+- Testing framework: `meshc test` runner, assert/assert_eq/assert_ne/assert_raises, describe/setup/teardown, Test.mock_actor, assert_receive with timeout
+- meshpkg CLI: login/publish/install/search with tar+gz tarballs, SHA-256 verification, argon2 token hashing
+- Package Registry: Axum 0.8 + SQLx + Postgres + Cloudflare R2; GitHub OAuth; tsvector FTS; standalone registry/ workspace
+- Mesher dogfooded: Crypto.uuid4() replaces pgcrypto DB round-trips; mesh.toml package manifest; unit tests for pure utility functions via meshc test
+- Full CI/CD automation: tag push auto-deploys registry + packages + docs with post-deploy health checks
+- packages.meshlang.dev redesigned with Tailwind CSS v4 + OKLCH design system + Inter/JetBrains Mono fonts + dark mode toggle + hero + responsive grid
+
+### What Worked
+
+- **Five-registration-point stdlib pattern** (builtins.rs, infer.rs stdlib_modules, infer.rs STDLIB_MODULE_NAMES, lower.rs STDLIB_MODULES + map_builtin_name + known_functions, intrinsics.rs) — established in Phase 119 (Regex), applied uniformly across Phase 135, 136, 137; new stdlib modules had clear mechanical steps
+- **Dogfooding as integration test** — Phase 141 using Crypto.uuid4() in Mesher immediately caught the 53→41 char token format change (pgcrypto UUID format differs from stdlib UUID v4); discovered before any external users
+- **OS-thread-per-stream reuse** — Http.stream reused the exact WS reader pattern from v4.0; the pattern was already understood and tested; zero scheduler issues
+- **registry/ as standalone workspace** — excluding from main Cargo workspace avoided the libsqlite3-sys links conflict elegantly; no wrestling with Cargo.toml feature flags
+- **Phase 138 gap closure phases** — Phases 138-04 and 138-05 were inserted mid-milestone to close testing gaps found during execution; the roadmap flexed cleanly
+- **Packages site Fly.io deployment** — adapter-node + Dockerfile consistent with registry; single platform simplifies operational runbooks
+
+### What Was Inefficient
+
+- Phase 138 required 5 plans instead of the planned 3 — the emit_non_test_items depth bug (setup/teardown in describe) and assert_receive preprocessing weren't caught until plan execution; a standalone test of describe+setup DSL lowering in plan-check would have surfaced these
+- Phase 143 went through multiple rounds of SvelteKit build debugging (ESM-only, vite.config.js missing, adapter-node switching); VitePress-to-SvelteKit was an underplanned transition
+- The gsd-tools milestone complete command computed cumulative phase/plan counts (133 phases, 351 plans) instead of milestone-scoped counts (11 phases, 32 plans) — required manual correction
+
+### Patterns Established
+
+- **Keyword conflict check for stdlib naming** — is_before/is_after instead of before?/after? (? is Mesh try-operator); :continue is reserved (closures return "ok"/"stop" instead); check reserved words before API design
+- **meshc test project detection** — walk upward from test file to find nearest main.mpl (not CWD); established as the correct pattern for multi-project repos
+- **Registry standalone workspace** — infra components that conflict with bundled C deps should be their own Cargo workspace root
+
+### Key Lessons
+
+1. Test DSL lowering (describe/setup/teardown) was the hardest part of the testing framework — syntactic sugar that emits test harness code needs thorough plan-time specification of edge cases
+2. Fly.io deployments benefit from knowing the ubuntu:24.04 vs debian:bookworm-slim GLIBC version difference upfront — GLIBC 2.38 (ubuntu) vs 2.35 (debian) caused a startup linker error in Phase 143
+3. cancel-in-progress: false for CI deploy jobs is a critical default — a mid-flight Fly.io deploy cancellation leaves the app in a broken state
+4. SvelteKit requires type:module in package.json and vite.config.js — these are not optional; document as required scaffolding for future SvelteKit phases
+
+### Cost Observations
+
+- 11 phases, 32 plans in 2 days
+- Largest phase by plan count: Phase 138 (Testing Framework, 5 plans including 2 gap closures)
+- Fastest phases: Phase 141-03 (build verification checkpoint), Phase 144-01 (1 CI workflow plan)
+- Notable: ecosystem phases (registry backend, OAuth, R2 storage) take longer than stdlib phases; infrastructure has more unknowns
+
+---
+
 ## Milestone: v13.0 — Language Completeness
 
 **Shipped:** 2026-02-28

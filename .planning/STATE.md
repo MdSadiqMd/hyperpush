@@ -1,24 +1,24 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v14.0
 milestone_name: Ecosystem & Standard Library
-status: unknown
-last_updated: "2026-03-01T23:51:01.669Z"
+status: complete
+last_updated: "2026-03-01T00:00:00.000Z"
 progress:
-  total_phases: 133
-  completed_phases: 133
-  total_plans: 351
-  completed_plans: 351
+  total_phases: 145
+  completed_phases: 145
+  total_plans: 394
+  completed_plans: 394
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-28)
+See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** Phase 145 complete — packages-website redesign human-verified and production-approved
+**Current focus:** v14.0 milestone complete — planning v15.0 via /gsd:new-milestone
 
 ## Current Position
 
@@ -31,35 +31,10 @@ Progress: [██████████] 100%  (4/4 plans for phase 145) — P
 
 ## Performance Metrics
 
-**All-time Totals (through v13.0):**
-- Plans completed: 362
-- Phases completed: 134
-- Milestones shipped: 23 (v1.0-v13.0)
-
-**v14.0 plan (13 plans across 6 phases):**
-
-| Phase | Plans | Status |
-|-------|-------|--------|
-| 135. Encoding & Crypto Stdlib | 2 | Complete |
-| 136. DateTime Stdlib | 2 | Complete |
-| 137. HTTP Client Improvements | 2 | Complete |
-| 138. Testing Framework | 5 | Complete (incl. gap closure) |
-| 139. Package Manifest & meshpkg CLI | 2 | Complete |
-| 140. Package Registry Backend & Website | 4 | In Progress (1/4 summaries) |
-| Phase 140 P01 | 12 | 2 tasks | 19 files |
-| Phase 140 P02 | 3 | 2 tasks | 7 files |
-| Phase 141 P01 | 1 | 2 tasks | 2 files |
-| Phase 141 P02 | 5 | 2 tasks | 3 files |
-| Phase 141 P03 | 3 | 2 tasks | 1 file |
-| Phase 142 P01 | 109 | 3 tasks | 3 files |
-| Phase 142 P02 | 2 | 3 tasks | 3 files |
-| Phase 142 P03 | 2 | 2 tasks | 2 files |
-| Phase 143 P02 | 2 | 2 tasks | 12 files |
-| Phase 143 P03 | 2 | 2 tasks | 2 files |
-| Phase 143-deploy-everything-including-new-stuff-from-v14 P01 | 1 | 2 tasks | 5 files |
-| Phase 143 P03 | 2 | 2 tasks | 2 files |
-| Phase 143 P04 | 25 | 3 tasks | 6 files |
-| Phase 145 P02 | 1 | 2 tasks | 3 files |
+**All-time Totals (through v14.0):**
+- Plans completed: 394
+- Phases completed: 145
+- Milestones shipped: 24 (v1.0-v14.0)
 
 ## Accumulated Context
 

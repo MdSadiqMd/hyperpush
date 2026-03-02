@@ -2,23 +2,17 @@
 
 ## What This Is
 
-Mesh is a programming language that combines Elixir/Ruby-style expressive syntax with static Hindley-Milner type inference and BEAM-style concurrency (actors, supervision trees, fault tolerance), compiled via LLVM to native single-binary executables. The compiler is written in Rust. v1.0-v1.9 built a complete language: compiler pipeline, actor runtime, trait system, module system, loops, stdlib, and developer tooling. v2.0 added database drivers and JSON serde. v3.0 made Mesh production-ready: TLS, connection pooling, transactions, deriving(Row). v4.0 added WebSocket support with actor-per-connection model. v5.0 added distributed actors with location-transparent PIDs and TLS-encrypted node clustering. v6.0 added a documentation website. v7.0 added a comprehensive trait ecosystem (iterators, From/Into, numeric traits, Collect). v8.0 made Mesh installable with one-command install scripts, VS Code extension, and LSP. v9.0 shipped Mesher, a production error-monitoring backend (~4,020 lines of Mesh). v10.0 added a full ORM. v11.0 expanded the ORM with comprehensive query builder capabilities and rewrote all Mesher data queries. v12.0 added language ergonomics: slot pipe operator (`|N>`), string interpolation (`#{expr}`), heredoc strings, regex literals, typed env var stdlib, Mesh agent skill, repository reorganization, and published performance benchmarks (29,108 req/s — within 4% of Go). v13.0 completed the language's expressiveness: multi-line pipe continuation, type aliases (cross-module), TryFrom/TryInto traits, Map.collect string keys, native `json { }` object literals, VS Code extension v0.3.0, and full documentation. v14.0 is expanding the ecosystem: stdlib (crypto/date/encoding), HTTP client improvements, testing framework, and package registry. ~115,740 LOC Rust + ~4,441 LOC Mesh across 23 milestones. Zero known compiler correctness issues.
+Mesh is a programming language that combines Elixir/Ruby-style expressive syntax with static Hindley-Milner type inference and BEAM-style concurrency (actors, supervision trees, fault tolerance), compiled via LLVM to native single-binary executables. The compiler is written in Rust. v1.0-v1.9 built a complete language: compiler pipeline, actor runtime, trait system, module system, loops, stdlib, and developer tooling. v2.0 added database drivers and JSON serde. v3.0 made Mesh production-ready: TLS, connection pooling, transactions, deriving(Row). v4.0 added WebSocket support with actor-per-connection model. v5.0 added distributed actors with location-transparent PIDs and TLS-encrypted node clustering. v6.0 added a documentation website. v7.0 added a comprehensive trait ecosystem (iterators, From/Into, numeric traits, Collect). v8.0 made Mesh installable with one-command install scripts, VS Code extension, and LSP. v9.0 shipped Mesher, a production error-monitoring backend (~4,441 lines of Mesh). v10.0 added a full ORM. v11.0 expanded the ORM with comprehensive query builder capabilities and rewrote all Mesher data queries. v12.0 added language ergonomics: slot pipe operator (`|N>`), string interpolation (`#{expr}`), heredoc strings, regex literals, typed env var stdlib, Mesh agent skill, repository reorganization, and published performance benchmarks (29,108 req/s — within 4% of Go). v13.0 completed the language's expressiveness: multi-line pipe continuation, type aliases (cross-module), TryFrom/TryInto traits, Map.collect string keys, native `json { }` object literals, VS Code extension v0.3.0, and full documentation. v14.0 shipped a complete ecosystem: Crypto/Encoding/DateTime stdlib, HTTP client fluent builder API with streaming and keep-alive, `meshc test` testing framework with mock actors, meshpkg CLI + hosted package registry (Fly.io + Cloudflare R2), dogfooded in Mesher, automated CI/CD on tag push, and a production-grade redesign of packages.meshlang.dev with Tailwind CSS v4 + OKLCH. ~132,524 total LOC across 24 milestones. Zero known compiler correctness issues.
 
-## Current Milestone: v14.0 Ecosystem & Standard Library
+## Current Milestone: Planning v15.0
 
-**Goal:** Expand the Mesh ecosystem with production-ready stdlib modules, HTTP client improvements, a built-in testing framework, and a package registry with hosted site.
-
-**Target features:**
-- Stdlib expansion: crypto (SHA-256/512, HMAC, UUID), date/time, base64/hex encoding
-- HTTP client: streaming/chunked reads, connection keep-alive/reuse, fluent builder API
-- Testing framework: `meshc test` runner, `*.test.mpl` convention, assertions, mock actors/function stubs, coverage reporting
-- Package registry: `mesh.toml` manifest, `meshpkg` CLI (publish/install/search), hosted packages site with browse/search/package pages
+v14.0 shipped 2026-03-01. Next milestone to be determined via `/gsd:new-milestone`.
 
 ## Current State
 
-Shipped v13.0 Language Completeness (2026-02-28). 23 milestones complete, 134 phases, 362 plans. v13.0 added multi-line pipe continuation, type aliases (including cross-module), TryFrom/TryInto traits with automatic derivation, Map.collect for string keys, native `json { }` object literals, VS Code extension v0.3.0, and comprehensive documentation.
+Shipped v14.0 Ecosystem & Standard Library (2026-03-01). 24 milestones complete, 145 phases, 394 plans.
 
-**Latest milestone (v13.0):** Multi-line `|>` pipes, `type Url = String` / `pub type UserId = Int` cross-module aliases, TryFrom/TryInto with auto-derived TryInto and `?` operator support, Map.collect string key fix, native `json { }` compiler builtin (70 mesher usages migrated), VS Code v0.3.0 (m10-m13 grammar + json/type-alias snippets), cheatsheet/language-basics/type-system/web docs/AI skills all updated. 17/17 requirements satisfied.
+**Latest milestone (v14.0):** Crypto/Encoding/DateTime stdlib (SHA-256/512, HMAC, UUID v4, Base64, Hex, 11 DateTime functions), HTTP fluent builder API with OS-thread streaming + keep-alive, `meshc test` testing framework (assert/describe/mock actors/assert_receive), meshpkg CLI + Package Registry on Fly.io/Cloudflare R2 with GitHub OAuth, Mesher dogfooded (Crypto.uuid4 + mesh.toml + unit tests), automated CI/CD on tag push with post-deploy health checks, packages.meshlang.dev redesigned with Tailwind CSS v4 + OKLCH. 47/47 requirements satisfied. 219 files, +36,828 lines.
 
 ## Core Value
 
@@ -203,25 +197,27 @@ Expressive, readable concurrency -- writing concurrent programs should feel as n
 - ✓ Native `json { }` object literals: full compiler pipeline (lexer→parser→AST→typeck→MIR→codegen); replaces manual string escaping for JSON — v13.0
 - ✓ VS Code extension v0.3.0: updated grammar (m10-m13 syntax forms), LSP completions (49 keywords), type alias and json snippets, packaged VSIX — v13.0
 - ✓ Documentation fully current: cheatsheet, language-basics, type-system guide, web docs, and AI agent skills updated with all v13.0 features — v13.0
+- ✓ Crypto stdlib: SHA-256, SHA-512, HMAC-SHA256/SHA512, UUID v4, secure_compare — v14.0
+- ✓ Encoding stdlib: Base64 (standard + URL-safe), Hex encode/decode — v14.0
+- ✓ DateTime stdlib: utc_now, from/to iso8601, from/to unix, add, diff, is_before/is_after — v14.0
+- ✓ HTTP client fluent builder API: Http.build/header/body/timeout/query/json/send — v14.0
+- ✓ HTTP client streaming via OS-thread-per-stream (Http.stream) without buffering full body — v14.0
+- ✓ HTTP keep-alive client handle: Http.client() + Http.send_with(client, req) — v14.0
+- ✓ Testing framework: `meshc test` runner with `*.test.mpl` discovery, per-file compile+execute — v14.0
+- ✓ Testing: assert/assert_eq/assert_ne/assert_raises assertion helpers — v14.0
+- ✓ Testing: describe/setup/teardown blocks with group name in failure output — v14.0
+- ✓ Testing: Test.mock_actor for concurrency testing, assert_receive with timeout — v14.0
+- ✓ Testing: --coverage flag (stub; full MIR counter injection deferred to v14.1) — v14.0
+- ✓ Package manifest: mesh.toml format with [package] and [dependencies] sections, mesh.lock lockfile — v14.0
+- ✓ meshpkg CLI: login, publish, install, search subcommands with SHA-256 verification — v14.0
+- ✓ Package Registry: Axum+Postgres+Cloudflare R2, GitHub OAuth, argon2 token management, tsvector FTS — v14.0
+- ✓ Hosted packages site: browse, search, per-package README + version history; redesigned with Tailwind CSS v4 + OKLCH — v14.0
+- ✓ Mesher dogfooded: Crypto.uuid4() replaces pgcrypto, mesh.toml package manifest, unit tests via meshc test — v14.0
+- ✓ CI/CD: tag push auto-deploys registry + packages site to Fly.io + docs to GitHub Pages with health checks — v14.0
 
 ### Active
 
-<!-- v14.0 Ecosystem & Standard Library -->
-
-- [ ] Stdlib: SHA-256, SHA-512, HMAC-SHA256/SHA512 hashing
-- [ ] Stdlib: UUID v4 generation
-- [ ] Stdlib: Base64 encode/decode, hex encode/decode
-- [ ] Stdlib: Date/time — parse, format, duration arithmetic, timestamps
-- [ ] HTTP client: streaming / chunked response reading
-- [ ] HTTP client: connection keep-alive and reuse
-- [ ] HTTP client: fluent builder API (headers, timeouts, auth)
-- [ ] Testing: `meshc test` runner with `*.test.mpl` discovery convention
-- [ ] Testing: assertion helpers (assert, assert_eq, assert_raises)
-- [ ] Testing: mock actors and function-level stubs
-- [ ] Testing: coverage reporting
-- [ ] Package registry: `mesh.toml` manifest format
-- [ ] Package registry: `meshpkg` CLI (publish, install, search)
-- [ ] Package registry: hosted packages site (browse, search, per-package README + versions)
+<!-- v15.0 to be defined via /gsd:new-milestone -->
 
 ### Out of Scope
 
@@ -249,18 +245,20 @@ Expressive, readable concurrency -- writing concurrent programs should feel as n
 
 ## Context
 
-Shipped v13.0 with ~115,740 lines of Rust + ~4,441 lines of Mesh (.mpl) + ~5,500 lines of website source (Vue/TypeScript/CSS/Markdown).
+Shipped v14.0 with ~132,524 total LOC (Rust + Mesh + website source).
 Tech stack: Rust compiler, LLVM 21 (Inkwell 0.8), corosensei coroutines, rowan CST, ariadne diagnostics.
 ORM/DB: mesh-orm crate (schema DSL, repo, query builder, changesets, relationships, migrations), libsqlite3-sys (bundled), PostgreSQL pure wire protocol.
 Website: VitePress, Vue 3, Tailwind CSS v4, shadcn-vue, Shiki syntax highlighting.
+Packages site: SvelteKit + adapter-node + Tailwind CSS v4 + OKLCH design system, deployed to Fly.io.
+Registry: Axum 0.8, SQLx (runtime queries), Postgres, Cloudflare R2 (S3-compatible), GitHub OAuth, argon2 token hashing, tsvector FTS.
 Crates (under compiler/): mesh-lexer, mesh-parser, mesh-typeck, mesh-mir, mesh-codegen, mesh-rt, mesh-fmt, mesh-repl, mesh-pkg, mesh-lsp, mesh-orm, meshc.
-Deps: libsqlite3-sys (bundled), sha2/hmac/md-5/base64ct (PG auth), rustls 0.23/webpki-roots/ring (TLS + certs + SHA-1 for WS handshake), regex (Rust crate for Mesh regex runtime).
-Distribution: GitHub Actions CI (6 targets), install scripts (POSIX + PowerShell), VS Code Marketplace + Open VSX (v0.3.0).
-Repository structure: compiler/ (Rust crates), mesher/ (production app + frontend), website/ (docs site), tools/ (install scripts, CI helpers, VS Code extension), skill/ (AI agent skills), benchmarks/ (perf comparison servers).
-Mesher (~4,441 lines of Mesh): production error-monitoring backend; 18 intentional raw SQL ORM boundaries documented; 70 json { } usages (fully migrated from string escaping).
+New in v14.0: ureq 3 (HTTP client), chrono 0.4 (DateTime stdlib), uuid crate (UUID v4), registry/ (standalone workspace: axum, sqlx, tower-sessions, axum-login, flate2+tar, sha2).
+Distribution: GitHub Actions CI (6 targets), install scripts (POSIX + PowerShell), VS Code Marketplace + Open VSX (v0.3.0). Tag push auto-deploys all services.
+Repository structure: compiler/ (Rust crates), mesher/ (production app + frontend), website/ (docs site), packages-website/ (SvelteKit packages site), registry/ (Axum registry backend), tools/ (install scripts, CI helpers, VS Code extension), skill/ (AI agent skills), benchmarks/ (perf comparison servers).
+Mesher (~4,441 lines of Mesh): production error-monitoring backend; uses Crypto.uuid4() for token generation; declared as Mesh package via mesh.toml; has unit tests via meshc test.
 Benchmarks: Mesh 29,108 req/s (isolated /text), Go 30,306, Rust 46,244, Elixir 12,441. Methodology in benchmarks/.
 
-Zero known critical bugs. Zero known compiler correctness issues. All 23 milestones shipped.
+Zero known critical bugs. Zero known compiler correctness issues. All 24 milestones shipped.
 
 Known limitations: None.
 
@@ -269,10 +267,10 @@ Tech debt (minor, pre-existing):
 - Timer e2e tests flake under high parallelism (5s timeout too tight when CPU-contended; pass with --test-threads=1)
 - Pre-existing TODO in lower.rs:5947 for string comparison callback
 - Passthrough middleware (`next(request)` body only) still requires `:: Request` annotation — HM let-generalization prevents type variable resolution without accessor calls (QUAL-02 scope limitation, documented)
-- Misleading comment in tests/e2e/stdlib_http_middleware_inferred.mpl:3-4 (claims both patterns work; passthrough still requires annotation)
 - PostgreSQL E2E test requires external server, marked `#[ignore]`
 - send_dist_unlink marked dead_code since snow_actor_unlink not yet exposed as extern C
 - TyVar from Ptr->List<T> remains unresolved for .to_string() on collected collections (use string interpolation instead)
+- TEST-10 coverage: --coverage flag stub only; full MIR counter injection deferred to v14.1
 
 ## Constraints
 
@@ -448,6 +446,14 @@ Tech debt (minor, pre-existing):
 | Two-level json lowering: lower_json_expr_inner (Ptr) + lower_json_expr (String) | Enables json-typed variable nesting via mesh_json_parse_raw without double-encoding | ✓ Good -- v13.0, clean separation |
 | json { } keys as bare IDENT only (TYPE_KW 'type' excluded) | 'type' is a reserved keyword (TYPE_KW token, not IDENT); parser requires bare IDENT for json literal keys | ✓ Good -- v13.0, parser consistency |
 | json { } documented in strings sub-skill (not new sub-skill) | JSON literals are a string/serialization concern; adding new sub-skill would fragment discovery | ✓ Good -- v13.0, clean skill organization |
+| DateTime ABI as i64 Unix milliseconds throughout | Avoids new type machinery in typeck/codegen; all 11 functions share scalar ABI | ✓ Good -- v14.0, clean integration |
+| OS-thread-per-stream for Http.stream | Avoids blocking M:N scheduler; reuses WS reader pattern from v4.0 | ✓ Good -- v14.0, scheduler-safe streaming |
+| test runner copies *.test.mpl to temp dir as main.mpl | Reuses existing build() entry-point lookup without modification | ✓ Good -- v14.0, minimal code change |
+| registry/ excluded from main Cargo workspace | Avoids libsqlite3-sys links conflict with mesh-rt bundled sqlite3; registry has own workspace root | ✓ Good -- v14.0, clean isolation |
+| Packages site deployed to Fly.io (not Cloudflare Pages) | User preference; adapter-node + Dockerfile consistent with registry platform | ✓ Good -- v14.0, platform consistency |
+| cancel-in-progress: false on deploy-fly CI | Never cancel mid-flight Fly.io deploy (leaves app in broken state) | ✓ Good -- v14.0, safe CI |
+| meshc test project_dir walks upward to find nearest main.mpl | CWD-based approach copied entire workspace to temp build dir | ✓ Good -- v14.0, correct project detection |
+| meshpkg credentials stored as TOML at ~/.mesh/credentials | Consistent with ~/.mesh/bin install location from v8.0 | ✓ Good -- v14.0, familiar convention |
 
 ---
-*Last updated: 2026-02-28 after v14.0 milestone start*
+*Last updated: 2026-03-01 after v14.0 milestone*

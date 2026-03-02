@@ -541,3 +541,31 @@
 
 ---
 
+
+## v14.0 Ecosystem & Standard Library (Shipped: 2026-03-01)
+
+**Delivered:** Expanded the Mesh ecosystem with production-ready stdlib modules (Crypto/Encoding/DateTime), an upgraded HTTP client with fluent builder API and streaming, a full testing framework (`meshc test`), a hosted package registry with `meshpkg` CLI, dogfooded v14 in Mesher, automated CI/CD on tag push, and a production-grade redesign of packages.meshlang.dev.
+
+**Phases completed:** 135-145 (11 phases, 32 plans)
+
+**Key accomplishments:**
+- Crypto & Encoding stdlib: SHA-256/512, HMAC-SHA256/512, UUID v4, Base64 (standard + URL-safe), Hex encode/decode via Rust FFI + LLVM declarations — zero new Rust dependencies
+- DateTime stdlib: 11 functions (parse, format, arithmetic, compare) backed by chrono 0.4; i64 Unix-ms ABI throughout
+- HTTP client fluent builder API (Http.build/header/body/timeout/send/stream/client) with OS-thread-per-stream and keep-alive connections
+- Testing framework: `meshc test` runner, assert/assert_eq/assert_ne/assert_raises, describe/setup/teardown blocks, Test.mock_actor, assert_receive with timeout
+- meshpkg CLI + Package Registry (Axum/Postgres/Cloudflare R2): publish, install, search, login, SHA-256 content addressing, GitHub OAuth, token management
+- Deployed registry to Fly.io (api.packages.meshlang.dev) and packages site (packages.meshlang.dev); packages.meshlang.dev redesigned with Tailwind CSS v4 + OKLCH design system
+- Dogfed v14 in Mesher: replaced pgcrypto with `Crypto.uuid4()`, declared mesher as a Mesh package via mesh.toml, added unit tests for pure utility functions
+- Full CI/CD automation: tag push triggers parallel Fly.io deploys + docs redeploy + post-deploy health checks on all endpoints
+
+**Stats:**
+- 219 files changed, +36,828 / -323 lines
+- 132,524 total LOC (Rust + Mesh + website source)
+- 11 phases, 32 plans
+- 2 days (2026-02-28 → 2026-03-01)
+- 47/47 requirements satisfied
+
+**Git range:** `feat(135-01)` → `feat(quick-10)`
+
+---
+
