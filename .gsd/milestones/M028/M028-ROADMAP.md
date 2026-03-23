@@ -54,7 +54,7 @@ This milestone is complete only when all are true:
 - [x] **S01: Canonical Backend Golden Path** `risk:high` `depends:[]`
   > After this: Mesh has one concrete reference backend with API + DB + migrations + background jobs, so the milestone stops arguing in abstractions and has a real proof target.
 
-- [ ] **S02: Runtime Correctness on the Golden Path** `risk:high` `depends:[S01]`
+- [x] **S02: Runtime Correctness on the Golden Path** `risk:high` `depends:[S01]`
   > After this: the reference backend’s HTTP/DB/migration/job path is exercised by automated proof, and the most credibility-damaging blockers on that path are fixed.
 
 - [ ] **S03: Daily-Driver Tooling Trust** `risk:medium` `depends:[S01]`

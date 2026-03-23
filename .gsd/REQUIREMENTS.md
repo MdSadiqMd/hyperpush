@@ -4,17 +4,6 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Active
 
-### R003 — The runtime path behind the canonical backend flow is exercised by automated verification strongly enough that the path is not just “implemented,” but trusted.
-- Class: quality-attribute
-- Status: active
-- Description: The runtime path behind the canonical backend flow is exercised by automated verification strongly enough that the path is not just “implemented,” but trusted.
-- Why it matters: A backend language loses credibility quickly if its basic runtime surfaces only work in isolated or manual scenarios.
-- Source: inferred
-- Primary owning slice: M028/S02
-- Supporting slices: M028/S06
-- Validation: mapped
-- Notes: Ignored/manual proof paths should be reduced where they block trust on the golden path.
-
 ### R004 — Mesh concurrency and supervision are proven under crash, restart, and failure-reporting scenarios instead of only being advertised as features.
 - Class: quality-attribute
 - Status: active
@@ -160,6 +149,17 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: Validated by M028/S01 through live end-to-end verification of `reference-backend/`: compiler/runtime build, explicit missing-env failure, Postgres-backed startup, migration status and apply, `GET /health`, `POST /jobs`, `GET /jobs/:id`, timer-driven worker transition from `pending` to `processed`, package-local `reference-backend/scripts/smoke.sh`, and compiler-facing ignored smoke coverage in `e2e_reference_backend_postgres_smoke`.
 - Notes: S01 closed the first real backend proof path by wiring API, DB, migrations, and background jobs into one auditable package and by fixing Mesh runtime issues instead of leaving them as app-level workarounds.
 
+### R003 — The runtime path behind the canonical backend flow is exercised by automated verification strongly enough that the path is not just “implemented,” but trusted.
+- Class: quality-attribute
+- Status: validated
+- Description: The runtime path behind the canonical backend flow is exercised by automated verification strongly enough that the path is not just “implemented,” but trusted.
+- Why it matters: A backend language loses credibility quickly if its basic runtime surfaces only work in isolated or manual scenarios.
+- Source: inferred
+- Primary owning slice: M028/S02
+- Supporting slices: M028/S06
+- Validation: Validated by M028/S02 through live Postgres-backed compiler e2e coverage in `compiler/meshc/tests/e2e_reference_backend.rs`: `e2e_reference_backend_runtime_starts`, `e2e_reference_backend_migration_status_and_apply`, `e2e_reference_backend_job_flow_updates_health_and_db`, `e2e_reference_backend_claim_contention_is_not_failure`, and `e2e_reference_backend_multi_instance_claims_once` proving migration pending→applied truth, HTTP/DB/health agreement for job lifecycle state, and two-instance exact-once shared-DB processing without benign claim contention inflating `failed_jobs` or `last_error`.
+- Notes: S02 kept runtime-correctness proof on the canonical reference-backend harness and moved exact-once truth to direct `jobs` reads, cross-instance `/jobs/:id`, and per-instance processed-job logs while treating `/health.failed_jobs` + `/health.last_error` as the stable contention signal.
+
 ## Deferred
 
 ### R020 — Mesh eventually offers a stronger debugger/profiler/trace surface suitable for deeper production diagnostics.
@@ -247,7 +247,7 @@ This file is the explicit capability and coverage contract for the project.
 |---|---|---|---|---|---|
 | R001 | launchability | validated | M028/S01 | M028/S06 | Validated by M028/S01 through the shipped `reference-backend/` package, canonical startup contract (`DATABASE_URL`, `PORT`, `JOB_POLL_MS`), package README/.env example, compiler e2e proof (`e2e_reference_backend_builds`, `e2e_reference_backend_runtime_starts`, `e2e_reference_backend_postgres_smoke`), migration status/up commands, and the package-local smoke path proving the baseline with concrete commands instead of abstract claims. |
 | R002 | core-capability | validated | M028/S01 | M028/S02, M028/S04, M028/S05, M028/S06 | Validated by M028/S01 through live end-to-end verification of `reference-backend/`: compiler/runtime build, explicit missing-env failure, Postgres-backed startup, migration status and apply, `GET /health`, `POST /jobs`, `GET /jobs/:id`, timer-driven worker transition from `pending` to `processed`, package-local `reference-backend/scripts/smoke.sh`, and compiler-facing ignored smoke coverage in `e2e_reference_backend_postgres_smoke`. |
-| R003 | quality-attribute | active | M028/S02 | M028/S06 | mapped |
+| R003 | quality-attribute | validated | M028/S02 | M028/S06 | Validated by M028/S02 through live Postgres-backed compiler e2e coverage in `compiler/meshc/tests/e2e_reference_backend.rs`: `e2e_reference_backend_runtime_starts`, `e2e_reference_backend_migration_status_and_apply`, `e2e_reference_backend_job_flow_updates_health_and_db`, `e2e_reference_backend_claim_contention_is_not_failure`, and `e2e_reference_backend_multi_instance_claims_once` proving migration pending→applied truth, HTTP/DB/health agreement for job lifecycle state, and two-instance exact-once shared-DB processing without benign claim contention inflating `failed_jobs` or `last_error`. |
 | R004 | quality-attribute | active | M028/S05 | M028/S02, M028/S06 | mapped |
 | R005 | launchability | active | M028/S04 | M028/S06 | mapped |
 | R006 | quality-attribute | active | M028/S03 | M030/S01 (provisional), M030/S02 (provisional) | mapped |
@@ -269,7 +269,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 12
-- Mapped to slices: 12
-- Validated: 2 (R001, R002)
+- Active requirements: 11
+- Mapped to slices: 11
+- Validated: 3 (R001, R002, R003)
 - Unmapped active requirements: 0
