@@ -42,7 +42,7 @@
 
 ## Tasks
 
-- [ ] **T01: Repair and prove Mesh source-level supervisor child lifecycle** `est:2h`
+- [x] **T01: Repair and prove Mesh source-level supervisor child lifecycle** `est:2h`
   - Why: S05 cannot honestly rely on supervisors until the Mesh-language compiler/runtime bridge proves that compiled supervisors actually start children, restart crashes, and honor restart limits instead of only printing banner strings.
   - Files: `compiler/mesh-codegen/src/mir/lower.rs`, `compiler/mesh-codegen/src/codegen/expr.rs`, `compiler/mesh-rt/src/actor/mod.rs`, `compiler/meshc/tests/e2e_supervisors.rs`, `tests/e2e/supervisor_basic.mpl`, `tests/e2e/supervisor_restart_limit.mpl`
   - Do: Align supervisor lowering/codegen with the runtime child-spec parser, keep child start/shutdown metadata consistent end to end, and replace shallow fixture assertions with compiled Mesh checks that prove child boot, crash/restart, and restart-limit visibility from the source-level path.
