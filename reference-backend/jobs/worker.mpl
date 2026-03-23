@@ -140,6 +140,10 @@ fn log_worker_idle() do
   println("[reference-backend] Job worker idle")
 end
 
+fn log_worker_claim_miss(error_message :: String) do
+  println("[reference-backend] Job worker contention miss treated as idle: #{error_message}")
+end
+
 fn log_worker_claimed(job :: Job) do
   println("[reference-backend] Job worker claimed id=#{job.id} attempts=#{job.attempts}")
 end
@@ -154,6 +158,16 @@ fn log_worker_failure(job_id :: String, error_message :: String) do
   else
     println("[reference-backend] Job worker failed: #{error_message}")
   end
+end
+
+fn note_idle(worker_state, ts :: String) do
+  let _ = JobWorkerState.note_idle(worker_state, ts)
+  log_worker_idle()
+end
+
+fn note_idle_claim_miss(worker_state, ts :: String, error_message :: String) do
+  let _ = JobWorkerState.note_idle(worker_state, ts)
+  log_worker_claim_miss(error_message)
 end
 
 fn note_failed(worker_state, job_id :: String, error_message :: String) do
@@ -194,10 +208,13 @@ fn run_worker_iteration(pool :: PoolHandle, job_poll_ms :: Int, worker_state) do
     Ok(job) -> process_claimed_job(pool, worker_state, job)
     Err(e) -> do
       if e == "no pending jobs" do
-        let _ = JobWorkerState.note_idle(worker_state, tick_ts)
-        log_worker_idle()
+        note_idle(worker_state, tick_ts)
       else
-        note_failed(worker_state, "", e)
+        if e == "update_where: no rows matched" do
+          note_idle_claim_miss(worker_state, tick_ts, e)
+        else
+          note_failed(worker_state, "", e)
+        end
       end
     end
   end

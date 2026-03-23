@@ -56,13 +56,9 @@ fn current_timestamp() -> String do
   DateTime.to_iso8601(DateTime.utc_now())
 end
 
-fn oldest_pending_job(pool :: PoolHandle) -> Job!String do
-  let q = job_select_query()
-    |> Query.where_raw("status = 'pending'", [])
-    |> Query.order_by(:created_at, :asc)
-    |> Query.limit(1)
-  let rows = Repo.all(pool, q)?
-  find_single_job(rows, "no pending jobs")
+fn claim_pending_job_sql() -> String do
+  let table = jobs_table()
+  "UPDATE " <> table <> " SET status = 'processing', attempts = attempts + 1, updated_at = now() WHERE id = (SELECT id FROM " <> table <> " WHERE status = 'pending' ORDER BY created_at ASC, id ASC FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id::text AS id, status, attempts::text AS attempts, COALESCE(last_error, '') AS last_error, payload::text AS payload, created_at::text AS created_at, updated_at::text AS updated_at, COALESCE(processed_at::text, '') AS processed_at"
 end
 
 pub fn create_job(pool :: PoolHandle, payload :: String) -> Job!String do
@@ -84,17 +80,8 @@ pub fn get_job(pool :: PoolHandle, job_id :: String) -> Job!String do
 end
 
 pub fn claim_next_pending_job(pool :: PoolHandle) -> Job!String do
-  let job = oldest_pending_job(pool)?
-  let ts = current_timestamp()
-  let next_attempts = String.from(parse_attempts(job.attempts) + 1)
-  let q = Query.from(jobs_table())
-    |> Query.where_raw("id = ?::uuid AND status = 'pending'", [job.id])
-  let _ = Repo.update_where(pool, jobs_table(), %{
-    "status" => "processing",
-    "attempts" => next_attempts,
-    "updated_at" => ts
-  }, q)?
-  get_job(pool, job.id)
+  let rows = Repo.query_raw(pool, claim_pending_job_sql(), [])?
+  find_single_job(rows, "no pending jobs")
 end
 
 pub fn mark_job_processed(pool :: PoolHandle, job_id :: String) -> Job!String do
