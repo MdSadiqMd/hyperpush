@@ -48,6 +48,7 @@
   - Do: Align supervisor lowering/codegen with the runtime child-spec parser, keep child start/shutdown metadata consistent end to end, and replace shallow fixture assertions with compiled Mesh checks that prove child boot, crash/restart, and restart-limit visibility from the source-level path.
   - Verify: `cargo test -p mesh-rt supervisor::tests:: --lib -- --nocapture && cargo test -p meshc --test e2e_supervisors -- --nocapture`
   - Done when: `e2e_supervisors` fails if compiled Mesh supervisors stop starting children or restarting crashes, and the runtime supervisor donor tests still pass.
+  - Resume note (2026-03-23): Investigation reproduced the real gap with a direct-call probe: `BootSup()` returned and `main_done` printed, but the supervised child never emitted its `child_boot` marker. The likely first fix is in `compiler/mesh-codegen/src/codegen/expr.rs` because `codegen_supervisor_start(...)` serializes fewer child-spec fields than `compiler/mesh-rt/src/actor/mod.rs::parse_supervisor_config(...)` consumes.
 - [ ] **T02: Wire `reference-backend` worker startup under supervision and expose restart bookkeeping** `est:2h`
   - Why: The backend still boots its worker with a plain `spawn(...)` plus captured args, and the current state service cannot distinguish a healthy worker from a dead worker whose bookkeeping process survived.
   - Files: `reference-backend/main.mpl`, `reference-backend/runtime/registry.mpl`, `reference-backend/jobs/worker.mpl`, `reference-backend/api/health.mpl`, `compiler/meshc/tests/e2e_reference_backend.rs`
