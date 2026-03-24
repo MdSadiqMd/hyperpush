@@ -27,6 +27,13 @@ Make `mesher/services/event_processor.mpl` truthful again without changing produ
 - [ ] `mesher/services/event_processor.mpl` keeps `route_event(...)`, `process_extracted_fields(...)`, and the existing `EventProcessor` API shape unchanged.
 - [ ] The unused `compute_fingerprint` import is removed if it is still dead after the rewrite.
 
+## Observability Impact
+
+- No new runtime signal is introduced here; the task keeps the existing `EventProcessor.process_event(...) -> route_to_processor(...) -> bad_request_response(reason)` error path intact while making the comments point future agents at the real inspection surfaces.
+- The authoritative caller-side signal remains `mesher/ingestion/routes.mpl`, which currently performs payload-size validation only before `ProcessEvent`. If a future agent expects `validate_event(...)` to run here, this file pair should now make that mismatch obvious.
+- The authoritative extraction/failure surface remains `mesher/storage/queries.mpl`, where `extract_event_fields(...)` can still return `Err("extract_event_fields: no result")`. This task must not rename, swallow, or relocate that diagnostic.
+- Redaction constraint: keep comments structural. Do not add examples or diagnostics that embed raw event payloads, fingerprints, or auth material.
+
 ## Verification
 
 - `bash -lc '! rg -n "cross-module from_json limitation|from_json limitation per decision \\[88-02\\]|Validation is done by the caller|caller is responsible for JSON parsing and field validation" mesher/services/event_processor.mpl'`

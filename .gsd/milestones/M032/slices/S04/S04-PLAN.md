@@ -9,6 +9,13 @@
 - `mesher/storage/queries.mpl` no longer blames module-boundary `from_json` for `extract_event_fields(...)` while preserving the honest PostgreSQL JSONB / ORM expressiveness rationale.
 - Slice verification proves the supported cross-module `from_json` path still passes, `mesher/storage/writer.mpl` stays clear of revived folklore, and `meshc fmt --check mesher` plus `meshc build mesher` remain green.
 
+## Observability / Diagnostics
+
+- `Storage.Queries.extract_event_fields(...)` must keep returning a named `Err("extract_event_fields: no result")` surface when the SQL helper yields no row; this slice only rewrites boundary comments and must not hide or rename that failure.
+- `Services.EventProcessor.ProcessEvent(...)` must keep propagating query-layer failures unchanged so `Ingestion.Routes.route_to_processor(...)` still turns them into `bad_request_response(reason)` without inventing a second parsing path.
+- Comment rewrites must stay aligned with inspectable keep-sites: `mesher/ingestion/routes.mpl` only enforces payload-size checks before `ProcessEvent`, while `mesher/storage/queries.mpl` remains the truthful place to inspect SQL-side extraction / ORM-boundary rationale.
+- Redaction constraint: do not add comments or diagnostics that print raw event JSON, API keys, or other payload contents; keep references structural and path-level only.
+
 ## Verification
 
 - `cargo test -q -p meshc --test e2e e2e_m032_supported_cross_module_from_json -- --nocapture`
@@ -18,10 +25,11 @@
 - `bash -lc '! rg -n "from_json" mesher/storage/writer.mpl'`
 - `rg -n "from_json" mesher/types/event.mpl mesher/types/issue.mpl`
 - `rg -n "ORM boundary: ORM fragments cannot express CASE/jsonb_array_elements/string_agg|Repo.insert cannot express server-side JSONB extraction" mesher/storage/queries.mpl mesher/storage/writer.mpl`
+- `rg -n 'extract_event_fields: no result' mesher/storage/queries.mpl`
 
 ## Tasks
 
-- [ ] **T01: Rewrite EventProcessor boundary comments to match the live ingestion flow** `est:45m`
+- [x] **T01: Rewrite EventProcessor boundary comments to match the live ingestion flow** `est:45m`
   - Why: `mesher/services/event_processor.mpl` still mixes stale `from_json` folklore with a false claim about caller-side validation, so the file currently misstates both why the SQL path exists and what the route layer actually does.
   - Files: `mesher/services/event_processor.mpl`, `mesher/ingestion/routes.mpl`, `mesher/ingestion/validation.mpl`, `mesher/ingestion/fingerprint.mpl`, `mesher/storage/queries.mpl`
   - Do: Rewrite the top-of-file, `route_event(...)`, and service-call comments so they describe the real current flow; remove the unused `compute_fingerprint` import if it stays unused; keep `process_extracted_fields(...)`, the SQL-backed extraction path, and the service API shape unchanged.

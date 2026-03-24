@@ -1,16 +1,16 @@
-# EventProcessor service -- enriches events with fingerprint computation and
-# issue upsert before routing to StorageWriter.
-# Uses synchronous call handler so HTTP handlers get processing results back.
-# Validation is done by the caller (HTTP handler) using Ingestion.Validation
-# before calling ProcessEvent. This avoids cross-module from_json limitations.
+# EventProcessor service -- routes raw event JSON through SQL-backed field
+# extraction, discard checks, issue upsert, and StorageWriter forwarding.
+# Uses a synchronous call handler so HTTP routes get processing results back.
+# The current ingestion route does auth/rate-limit/payload-size checks, then
+# passes the raw body here; fingerprint, title, and level are derived by
+# Storage.Queries.extract_event_fields(...), not by Mesh-side payload parsing.
 #
 # Event processing pipeline:
-#   1. Extract fields and compute fingerprint via SQL (extract_event_fields)
-#   2. Check if fingerprint is discarded (is_issue_discarded)
-#   3. Upsert issue with regression detection (upsert_issue)
-#   4. Build enriched entry and forward to StorageWriter
+#   1. Extract fingerprint, title, and level via SQL (extract_event_fields)
+#   2. Check whether the fingerprint is discarded (is_issue_discarded)
+#   3. Upsert the issue with regression detection (upsert_issue)
+#   4. Build an enriched entry and forward the original JSON to StorageWriter
 
-from Ingestion.Fingerprint import compute_fingerprint
 from Storage.Queries import upsert_issue, is_issue_discarded, extract_event_fields
 from Services.Writer import StorageWriter
 
@@ -115,10 +115,10 @@ fields :: Map < String, String >) ->( ProcessorState, String ! String) do
   process_with_fingerprint(state, project_id, writer_pid, event_json, fingerprint, title, level)
 end
 
-# Route an event through the enrichment pipeline.
-# Extracts fields and computes fingerprint via SQL (avoids cross-module
-# from_json limitation per decision [88-02]), checks discard status,
-# upserts issue (with regression detection), and forwards to StorageWriter.
+# Route an event through the live ingestion path.
+# Accepts raw event JSON from the route layer, asks Storage.Queries to extract
+# fingerprint/title/level via SQL, then applies discard checks, issue upsert,
+# and StorageWriter forwarding.
 
 fn route_event(state :: ProcessorState, project_id :: String, writer_pid, event_json :: String) ->( ProcessorState, String ! String) do
   let fields_result = extract_event_fields(state.pool, event_json)
@@ -136,13 +136,13 @@ service EventProcessor do
     }
   end
   
-  # Synchronous event processing: computes fingerprint, upserts issue,
+  # Synchronous event processing for the live ingestion path.
   
-  # and routes enriched event to StorageWriter.
+  # Takes raw event JSON from the route layer, uses SQL-side extraction for
   
-  # The caller is responsible for JSON parsing and field validation
+  # fingerprint/title/level, applies discard checks and issue upsert, and
   
-  # (using Ingestion.Validation) before calling ProcessEvent.
+  # forwards the enriched entry to StorageWriter.
   
   # Returns Ok(issue_id) on success, Ok("discarded") for suppressed events.
   
