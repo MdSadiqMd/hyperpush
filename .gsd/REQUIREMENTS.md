@@ -35,7 +35,7 @@ This file is the explicit capability and coverage contract for the project.
 - Primary owning slice: M028/S06
 - Supporting slices: M028/S01, M028/S03, M028/S04, M028/S05
 - Validation: mapped
-- Notes: S03 advanced the documentation truth surface by syncing README, website tooling/testing/cheatsheet docs, reference-backend docs, and the VS Code README to the verified `meshc fmt`, project-directory `meshc test`, honest `--coverage` contract, and JSON-RPC-proven LSP feature set. Full production-proof documentation promotion still belongs to S06.
+- Notes: S03 advanced the documentation truth surface by syncing README, website tooling/testing/cheatsheet docs, reference-backend docs, and the VS Code README to the verified `meshc fmt`, project-directory `meshc test`, honest `--coverage` contract, and JSON-RPC-proven LSP feature set. S06 partially added the production proof page, README/generic-doc routing, and doc-truth verifier, but R008 remains open until the promoted recovery proofs are green again.
 
 ### R009 — Mesh proves itself through a real reference backend that exercises the language as a backend platform instead of proving subsystems only in isolation.
 - Class: differentiator
@@ -46,7 +46,7 @@ This file is the explicit capability and coverage contract for the project.
 - Primary owning slice: M028/S06
 - Supporting slices: M028/S01, M028/S02, M028/S05
 - Validation: mapped
-- Notes: The reference backend may be a focused app or a narrowed dogfooded app, but it must be real and end-to-end.
+- Notes: The reference backend remains the real end-to-end proof target. S06 restored build/fmt/test, deploy-smoke, and public proof-surface discoverability, but the crash/recovery visibility proofs are still the blocker before this requirement can be validated.
 
 ### R010 — The project can point to specific ways Mesh is easier to deploy, measurably fast, and nicer for backend development rather than vaguely claiming it is “better than Elixir.”
 - Class: differentiator
