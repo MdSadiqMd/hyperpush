@@ -57,7 +57,7 @@ This milestone is complete only when all are true:
 - [x] **S03: Request, handler, and control-flow dogfood cleanup** `risk:medium` `depends:[S01]`
   > After this: mesher uses currently supported request and handler patterns directly in selected audited modules, with stale workaround comments removed.
 
-- [ ] **S04: Module-boundary JSON and workaround convergence** `risk:medium` `depends:[S01,S02]`
+- [x] **S04: Module-boundary JSON and workaround convergence** `risk:medium` `depends:[S01,S02]`
   > After this: a validated module-boundary workaround family is simplified in mesher to the repaired or already-supported Mesh path without product drift.
 
 - [ ] **S05: Integrated mesher proof and retained-limit ledger** `risk:low` `depends:[S02,S03,S04]`
