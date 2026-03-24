@@ -58,7 +58,7 @@ This milestone is complete only when all are true:
 - [x] **S02: Mesher JSON serialization and pipe cleanup** `risk:medium` `depends:[]`
   > After this: mesher `<>` chains in alerts/search/detail replaced with `json {}` or `#{}` interpolation; `List.map(rows, fn)` patterns converted to pipe style; obvious non-SQL `<>` in queries.mpl converted to interpolation. `meshc build mesher` succeeds.
 
-- [ ] **S03: Multiline imports and final formatter compliance** `risk:low` `depends:[S01]`
+- [x] **S03: Multiline imports and final formatter compliance** `risk:low` `depends:[S01]`
   > After this: all 20+ mesher files with >120 char imports use parenthesized multiline form; reference-backend dot-paths corrected; `meshc fmt --check reference-backend` and `meshc fmt --check mesher` both pass with 0 files needing reformatting.
 
 ## Boundary Map

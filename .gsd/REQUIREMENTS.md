@@ -70,17 +70,6 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: mapped
 - Notes: Launch-through-app remains desirable if Bags support proves smooth enough later.
 
-### R024 — `mesher/` should have zero `let _ =` for side effects, string interpolation replacing `<>` concatenation where appropriate, multiline imports for long lines, and pipe operators used idiomatically.
-- Class: quality-attribute
-- Status: active
-- Description: `mesher/` should have zero `let _ =` for side effects, string interpolation replacing `<>` concatenation where appropriate, multiline imports for long lines, and pipe operators used idiomatically.
-- Why it matters: Mesher is the larger dogfood app — its code quality reflects language usability.
-- Source: user
-- Primary owning slice: M029/S02
-- Supporting slices: M029/S01, M029/S03
-- Validation: Partially validated by M031/S04: zero `let _ =` (72 removed). Remaining: `<>` JSON serialization → `json {}` macro + interpolation, pipe operator adoption, multiline imports.
-- Notes: M029/S02 closed the mesher JSON/interpolation and pipe-style portion of the requirement: `mesher/api/{alerts,detail,search}.mpl` now have zero `<>` serializer chains, `mesher/storage/queries.mpl` keeps only the designated SQL/DDL `<>` sites, and the authoritative `rg -n 'List\.map\(rows,|Ok\(List\.map\(' mesher -g '*.mpl'` gate now returns 0. Remaining R024 work is S03 multiline-import adoption plus final `meshc fmt --check mesher` compliance.
-
 ## Validated
 
 ### R001 — Mesh has an explicit definition of what "production ready language needs to have" means for this repo, and that baseline can be checked through concrete proof rather than vague claims.
@@ -237,6 +226,17 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: Validated by M031/S03: `rg 'let _ =' reference-backend/ -g '*.mpl'` returns 0 matches, `rg '== true' reference-backend/ -g '*.mpl'` returns 0 matches, all 8 WorkerState full reconstructions replaced with struct update syntax, all nested if/else chains flattened to else if, long import converted to multiline. Build, formatter, project tests, and 313 e2e tests pass clean.
 - Notes: 53 `let _ =` removed (44 in worker.mpl, 9 in other files), 15 `== true` removed (11 in worker.mpl, 4 in health.mpl), 8 struct reconstructions replaced, 7 nested if/else chains flattened.
 
+### R024 — `mesher/` should have zero `let _ =` for side effects, string interpolation replacing `<>` concatenation where appropriate, multiline imports for long lines, and pipe operators used idiomatically.
+- Class: quality-attribute
+- Status: validated
+- Description: `mesher/` should have zero `let _ =` for side effects, string interpolation replacing `<>` concatenation where appropriate, multiline imports for long lines, and pipe operators used idiomatically.
+- Why it matters: Mesher is the larger dogfood app — its code quality reflects language usability.
+- Source: user
+- Primary owning slice: M029/S02
+- Supporting slices: M029/S01, M029/S03
+- Validation: Validated by M029/S02 + M029/S03: Mesher now has zero `let _ =` side-effect bindings from the earlier cleanup pass, non-SQL JSON serialization uses `json {}` or `#{}` interpolation with only the five designated SQL/DDL `<>` keep sites remaining in `mesher/storage/{queries,schema}.mpl`, the authoritative `rg -n 'List\.map\(rows,|Ok\(List\.map\(' mesher -g '*.mpl'` pipe-style gate returns 0, all over-120-character Mesher imports were converted to parenthesized multiline form, `cargo run -q -p meshc -- fmt --check mesher` passes, and `cargo run -q -p meshc -- build mesher` passes.
+- Notes: M029 completed this requirement in two parts: S02 closed the remaining Mesher JSON/interpolation and pipe-style cleanup, and S03 converted the final long imports to parenthesized multiline form, repaired the last formatter/CLI regressions exposed by the closeout gate, and left `mesher/` formatter-clean under the canonical output.
+
 ### R025 — New e2e tests must cover: bare expression statements, `else if` chains (Int/String/Bool), `if fn_call() do`, `while fn_call() do`, `case fn_call() do`, `for x in fn_call() do`, `not fn_call()` in conditions, multiline fn calls, multiline imports, trailing commas, struct update in service handlers, pipe chains.
 - Class: quality-attribute
 - Status: validated
@@ -389,7 +389,7 @@ This file is the explicit capability and coverage contract for the project.
 | R021 | admin/support | deferred | none | none | unmapped |
 | R022 | operability | deferred | M027/S02 (provisional) | none | unmapped |
 | R023 | quality-attribute | validated | M031/S03 | none | Validated by M031/S03: `rg 'let _ =' reference-backend/ -g '*.mpl'` returns 0 matches, `rg '== true' reference-backend/ -g '*.mpl'` returns 0 matches, all 8 WorkerState full reconstructions replaced with struct update syntax, all nested if/else chains flattened to else if, long import converted to multiline. Build, formatter, project tests, and 313 e2e tests pass clean. |
-| R024 | quality-attribute | active | M029/S02 | M029/S01, M029/S03 | Partially validated by M031/S04: zero `let _ =` (72 removed). Remaining: `<>` JSON serialization → `json {}` macro + interpolation, pipe operator adoption, multiline imports. |
+| R024 | quality-attribute | validated | M029/S02 | M029/S01, M029/S03 | Validated by M029/S02 + M029/S03: Mesher now has zero `let _ =` side-effect bindings from the earlier cleanup pass, non-SQL JSON serialization uses `json {}` or `#{}` interpolation with only the five designated SQL/DDL `<>` keep sites remaining in `mesher/storage/{queries,schema}.mpl`, the authoritative `rg -n 'List\.map\(rows,|Ok\(List\.map\(' mesher -g '*.mpl'` pipe-style gate returns 0, all over-120-character Mesher imports were converted to parenthesized multiline form, `cargo run -q -p meshc -- fmt --check mesher` passes, and `cargo run -q -p meshc -- build mesher` passes. |
 | R025 | quality-attribute | validated | M031/S05 | M031/S01, M031/S02 | Validated by M031/S05 — all 12 listed pattern categories have dedicated e2e tests: bare expression statements (2 tests), else-if chains (S01 tests), if/while/case/for fn_call() do (S01 tests), not fn_call() in conditions (2 tests), multiline fn calls (S01 tests), multiline imports (S02 tests), trailing commas (S02 tests), struct update in service handlers (1 test), pipe chains (S03/S04 dogfood). Full suite: 328 tests, 318 pass, 10 pre-existing try_* failures. |
 | R026 | quality-attribute | validated | M029/S01 | none | Validated by M029/S01: `meshc fmt` now preserves dotted module paths and parenthesized multiline imports. Proof: `cargo test -q -p mesh-fmt --lib` passed (124 tests), `cargo test -q -p meshc --test e2e_fmt -- --nocapture` passed, `cargo test -q -p meshc --test e2e_fmt fmt_preserves_dotted_paths_exactly -- --nocapture` passed, and `cargo test -q -p meshc --test e2e e2e_multiline_import_paren -- --nocapture` stayed green. |
 | R027 | quality-attribute | validated | M029/S01 | none | Validated by M029/S01: repaired canonical dotted imports in `reference-backend/main.mpl`, `api/health.mpl`, `api/router.mpl`, `api/jobs.mpl`, `storage/jobs.mpl`, and `jobs/worker.mpl`; then `cargo run -q -p meshc -- fmt --check reference-backend` passed and `rg -n '^from .*\. ' reference-backend -g '*.mpl'` returned no matches. |
@@ -401,7 +401,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 7
-- Mapped to slices: 7
-- Validated: 17 (R001, R002, R003, R004, R005, R006, R008, R009, R015, R016, R017, R018, R019, R023, R025, R026, R027)
+- Active requirements: 6
+- Mapped to slices: 6
+- Validated: 18 (R001, R002, R003, R004, R005, R006, R008, R009, R015, R016, R017, R018, R019, R023, R024, R025, R026, R027)
 - Unmapped active requirements: 0
