@@ -6645,3 +6645,179 @@ end
     let output = compile_and_run(source);
     assert_eq!(output, "30\n");
 }
+
+// ── R025 gap coverage: bare expressions, not-fn-call conditions, struct update in services ──
+
+/// Bare expression statements: multiple side-effect calls without `let _ =`.
+/// Proves that bare `println()` and bare helper function calls compile and execute.
+#[test]
+fn e2e_bare_expression_side_effects() {
+    let source = r#"
+fn greet(name :: String) -> String do
+  "hello " <> name
+end
+
+fn main() do
+  println("first")
+  println("second")
+  println(greet("world"))
+  println("done")
+end
+"#;
+    let output = compile_and_run(source);
+    assert_eq!(output, "first\nsecond\nhello world\ndone\n");
+}
+
+/// Bare expressions inside nested block contexts: if branches, else branches, function bodies.
+#[test]
+fn e2e_bare_expression_in_block() {
+    let source = r#"
+fn side_effect(label :: String) -> String do
+  label <> " ran"
+end
+
+fn main() do
+  # bare expression in top-level function body
+  println("top")
+
+  # bare expression inside if/else branches
+  if true do
+    println("if-branch")
+    println(side_effect("if"))
+  else
+    println("else-branch")
+  end
+
+  # bare expressions in an else branch
+  if false do
+    println("skip")
+  else
+    println("else")
+    println(side_effect("else"))
+  end
+end
+"#;
+    let output = compile_and_run(source);
+    assert_eq!(output, "top\nif-branch\nif ran\nelse\nelse ran\n");
+}
+
+/// `not fn_call()` in an `if` condition: unary `not` preceding a function call.
+#[test]
+fn e2e_not_fn_call_if_condition() {
+    let source = r#"
+fn is_empty(n :: Int) -> Bool do
+  n == 0
+end
+
+fn main() do
+  let count = 5
+  if not is_empty(count) do
+    println("not empty")
+  else
+    println("empty")
+  end
+
+  if not is_empty(0) do
+    println("not empty")
+  else
+    println("empty")
+  end
+end
+"#;
+    let output = compile_and_run(source);
+    assert_eq!(output, "not empty\nempty\n");
+}
+
+/// `not fn_call()` in a `while` condition: negated function call controls loop entry.
+/// Since Mesh has no mutable variables, we test both the true and false branches
+/// of `while not fn_call()` to prove parsing and execution correctness.
+#[test]
+fn e2e_not_fn_call_while_condition() {
+    let source = r#"
+fn always_true() -> Bool do
+  true
+end
+
+fn always_false() -> Bool do
+  false
+end
+
+fn main() do
+  # while not always_true() => condition is false, body never executes
+  while not always_true() do
+    println("should not print")
+  end
+  println("skipped")
+
+  # while not always_false() => condition is true, body runs once then breaks
+  while not always_false() do
+    println("entered")
+    break
+  end
+  println("done")
+end
+"#;
+    let output = compile_and_run(source);
+    assert_eq!(output, "skipped\nentered\ndone\n");
+}
+
+/// Struct update `%{state | field: expr}` inside service call/cast handlers.
+/// The service maintains a CounterState struct and updates it with struct update syntax
+/// in both call and cast handlers, proving the pattern works inside the (next_state, value) tuple.
+#[test]
+fn e2e_struct_update_in_service_call() {
+    let output = compile_multifile_and_run(&[
+        (
+            "counter.mpl",
+            r#"
+struct CounterState do
+  count :: Int
+  label :: String
+end
+
+service Counter do
+  fn init(label :: String) -> CounterState do
+    CounterState { count: 0, label: label }
+  end
+
+  call Increment() :: Int do |state|
+    let next = %{state | count: state.count + 1}
+    (next, next.count)
+  end
+
+  call GetCount() :: Int do |state|
+    (state, state.count)
+  end
+
+  cast SetLabel(new_label :: String) do |state|
+    %{state | label: new_label}
+  end
+
+  call GetLabel() :: String do |state|
+    (state, state.label)
+  end
+end
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
+from Counter import Counter
+
+fn main() do
+  let pid = Counter.start("initial")
+  let c1 = Counter.increment(pid)
+  println("${c1}")
+  let c2 = Counter.increment(pid)
+  println("${c2}")
+  let c3 = Counter.get_count(pid)
+  println("${c3}")
+  Counter.set_label(pid, "updated")
+  let lbl = Counter.get_label(pid)
+  println(lbl)
+end
+"#,
+        ),
+    ]);
+    assert_eq!(output, "1\n2\n2\nupdated\n");
+}

@@ -20,7 +20,7 @@
 
 ## Tasks
 
-- [ ] **T01: Add e2e tests for bare expressions, not-fn-call conditions, and struct update in services** `est:30m`
+- [x] **T01: Add e2e tests for bare expressions, not-fn-call conditions, and struct update in services** `est:30m`
   - Why: R025 requires coverage for these 3 pattern categories — they work in dogfood code but have no isolated regression tests
   - Files: `compiler/meshc/tests/e2e.rs`
   - Do: Append 5–6 new `#[test]` functions using `compile_and_run` (bare expression, not-fn-call) and `compile_multifile_and_run` (service struct update). Use typed function signatures per KNOWLEDGE.md. Follow existing naming convention `e2e_<category>_<detail>`.
@@ -30,3 +30,10 @@
 ## Files Likely Touched
 
 - `compiler/meshc/tests/e2e.rs`
+
+## Observability / Diagnostics
+
+- **Runtime signals:** None — these are compile-time e2e tests that run built binaries and assert stdout. No runtime services, background processes, or persistent state.
+- **Inspection surface:** `cargo test -p meshc --test e2e <test_name>` with `-- --nocapture` shows full compiler and binary output for any individual test.
+- **Failure visibility:** Test failures print the full meshc build stderr (parse/type errors) or binary execution stderr, plus expected vs actual stdout. The test harness names map directly to the pattern categories: `bare_expression`, `not_fn_call`, `struct_update_in_service`.
+- **Redaction:** No secrets or credentials involved.
