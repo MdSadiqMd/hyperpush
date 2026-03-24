@@ -20,6 +20,7 @@
 
 - `cargo test -q -p mesh-fmt --lib`
 - `cargo test -q -p meshc --test e2e_fmt -- --nocapture`
+- `cargo test -q -p meshc --test e2e_fmt fmt_preserves_dotted_paths_exactly -- --nocapture`
 - `cargo test -q -p meshc --test e2e e2e_multiline_import_paren -- --nocapture`
 - `cargo run -q -p meshc -- fmt --check reference-backend`
 - `! rg -n "^from .*\\. " reference-backend -g '*.mpl'`
@@ -28,6 +29,7 @@
 ## Observability / Diagnostics
 
 - Primary inspection surface is exact-output formatter coverage in `compiler/mesh-fmt/src/walker.rs`; failures must show expected vs actual text for dotted imports, parenthesized multiline imports, and qualified impl headers.
+- The CLI-level exact-output surface is `compiler/meshc/tests/e2e_fmt.rs::fmt_preserves_dotted_paths_exactly`; it must fail with the actual formatted file text if `meshc fmt` ever emits `Api. Router` or `Foo. Bar` while still otherwise succeeding.
 - Secondary inspection surface is `meshc fmt --check reference-backend`, whose stderr diff should expose any regression that reintroduces `Foo. Bar` spacing or collapses multiline import layout.
 - The repo-level sweep `rg -n "^from .*\\. " reference-backend -g '*.mpl'` is the cheap corruption detector for already-formatted backend files.
 - No new runtime logging or secret-bearing output is introduced in this slice; diagnostics must stay limited to formatter test assertions, unified diffs, and source grep results.
@@ -46,7 +48,7 @@
   - Do: Add a dedicated `PATH` formatting path in `compiler/mesh-fmt/src/walker.rs`, keep the generic token spacer unchanged unless a new failing proof forces broader surgery, and add walker-level exact-output regressions for dotted imports and qualified impl headers.
   - Verify: `cargo test -q -p mesh-fmt --lib`
   - Done when: `PATH` formatting keeps `Foo.Bar` exact in imports and impl headers, and the formatter lib suite stays green.
-- [ ] **T02: Add truthful library and CLI regressions for dotted imports** `est:45m`
+- [x] **T02: Add truthful library and CLI regressions for dotted imports** `est:45m`
   - Why: Existing coverage can stay green on semantically corrupted-but-idempotent output, so the slice needs library-level snapshots/idempotence and CLI text assertions that would fail on `Api. Router` or `Foo. Bar`.
   - Files: `compiler/mesh-fmt/src/lib.rs`, `compiler/meshc/tests/e2e_fmt.rs`, `compiler/meshc/tests/e2e.rs`
   - Do: Extend the formatter library regressions to dotted imports, add CLI temp-file tests that assert exact formatted text for dotted single-line imports, parenthesized multiline imports, and qualified impl headers, and keep the existing multiline-import compiler e2e green.

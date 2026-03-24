@@ -25,6 +25,34 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn fmt_file_contents(source: &str) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("test.mpl");
+    std::fs::write(&file, source).unwrap();
+
+    let output = Command::new(find_meshc())
+        .args(["fmt", file.to_str().unwrap()])
+        .output()
+        .expect("failed to run meshc fmt");
+
+    assert!(
+        output.status.success(),
+        "meshc fmt failed for exact-output check:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    std::fs::read_to_string(&file).unwrap()
+}
+
+fn assert_fmt_exact(case: &str, source: &str, expected: &str) {
+    let formatted = fmt_file_contents(source);
+    assert_eq!(
+        formatted, expected,
+        "exact formatted output mismatch for {case}\nsource:\n{source}"
+    );
+}
+
 #[test]
 fn fmt_formats_single_file_in_place() {
     let dir = tempfile::tempdir().unwrap();
@@ -107,6 +135,31 @@ fn fmt_check_exits_0_on_formatted() {
         "Expected exit 0 for formatted file, got: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn fmt_preserves_dotted_paths_exactly() {
+    let cases = [
+        (
+            "single-line dotted from import",
+            "from Api.Router import build_router",
+            "from Api.Router import build_router\n",
+        ),
+        (
+            "parenthesized multiline dotted from import",
+            "from Api.Router import (\nbuild_router,\nhealth_router\n)",
+            "from Api.Router import (\n  build_router,\n  health_router\n)\n",
+        ),
+        (
+            "qualified impl header",
+            "impl Foo.Bar for Baz.Qux do\nfn run(self) do\nself\nend\nend",
+            "impl Foo.Bar for Baz.Qux do\n  fn run(self) do\n    self\n  end\nend\n",
+        ),
+    ];
+
+    for (case, source, expected) in cases {
+        assert_fmt_exact(case, source, expected);
+    }
 }
 
 #[test]

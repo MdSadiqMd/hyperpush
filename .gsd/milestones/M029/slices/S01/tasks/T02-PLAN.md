@@ -44,3 +44,9 @@ Close the semantic proof gap above the walker unit tests. This task makes the fo
 
 - `compiler/mesh-fmt/src/lib.rs` — dotted-path idempotence and snapshot regression coverage
 - `compiler/meshc/tests/e2e_fmt.rs` — CLI exact-output regression coverage for dotted paths and parenthesized multiline imports
+
+## Observability Impact
+
+- The cheapest new inspection surface is a targeted CLI exact-output test in `compiler/meshc/tests/e2e_fmt.rs`; when dotted-path formatting regresses, it must show the actual rewritten file text so `Api. Router` / `Foo. Bar` corruption is visible without relying on `fmt --check` exit codes alone.
+- Library-layer coverage in `compiler/mesh-fmt/src/lib.rs` now asserts canonical dotted import text directly, so future regressions can be isolated between walker/lib formatting and `meshc fmt` CLI plumbing instead of hiding behind idempotent but semantically wrong output.
+- The existing compiler proof `cargo test -q -p meshc --test e2e e2e_multiline_import_paren -- --nocapture` remains the cross-check that parser/compiler support for parenthesized multiline imports still holds after formatter-focused changes.

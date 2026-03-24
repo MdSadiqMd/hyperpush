@@ -256,6 +256,19 @@ mod idempotency_tests {
     }
 
     #[test]
+    fn idempotent_dotted_from_import() {
+        assert_idempotent("dotted from import", "from Api.Router import build_router");
+    }
+
+    #[test]
+    fn idempotent_parenthesized_dotted_from_import() {
+        assert_idempotent(
+            "parenthesized dotted from import",
+            "from Api.Router import (\nbuild_router,\nhealth_router\n)",
+        );
+    }
+
+    #[test]
     fn idempotent_tuple_expr() {
         assert_idempotent("tuple expression", "let t = (1, 2, 3)");
     }
@@ -542,6 +555,24 @@ mod snapshot_tests {
         let result = fmt("from Math import sqrt, pow");
         insta::assert_snapshot!(result, @"from Math import sqrt, pow
 ");
+    }
+
+    #[test]
+    fn snapshot_dotted_from_import() {
+        let result = fmt("from Api.Router import build_router");
+        insta::assert_snapshot!(result, @"from Api.Router import build_router
+");
+    }
+
+    #[test]
+    fn snapshot_parenthesized_dotted_from_import() {
+        let result = fmt("from Api.Router import (\nbuild_router,\nhealth_router\n)");
+        insta::assert_snapshot!(result, @r"
+        from Api.Router import (
+          build_router,
+          health_router
+        )
+        ");
     }
 
     #[test]
