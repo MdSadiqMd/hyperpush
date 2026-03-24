@@ -18,6 +18,7 @@
 ## Verification
 
 - `cargo run -q -p meshc -- build mesher`
+- `(cargo run -q -p meshc -- build mesher > /tmp/m029-s02-build.log 2>&1 && rg -n 'Compiled: mesher/mesher' /tmp/m029-s02-build.log) || (rg -n 'error(\[|:)|panic' /tmp/m029-s02-build.log && false)`
 - `! rg -n '<>' mesher/api/alerts.mpl mesher/api/detail.mpl mesher/api/search.mpl`
 - `diff -u <(rg -n '<>' mesher -g '*.mpl' | cut -d: -f1-2 | sort) <(printf '%s\n' mesher/storage/queries.mpl:486 mesher/storage/queries.mpl:787 mesher/storage/schema.mpl:11 mesher/storage/schema.mpl:12 mesher/storage/schema.mpl:13)`
 - `! rg -n 'List\.map\(rows,|Ok\(List\.map\(' mesher -g '*.mpl'`
@@ -25,8 +26,8 @@
 ## Observability / Diagnostics
 
 - Runtime signals: none added; the truth surface is compiler success plus exact-location grep proofs.
-- Inspection surfaces: `cargo run -q -p meshc -- build mesher`, the targeted API `<>` grep for `mesher/api/alerts.mpl`, `mesher/api/detail.mpl`, and `mesher/api/search.mpl`, the repo-wide `<>` diff against the five designated keep sites, and the zero-match wrapping-map grep.
-- Failure visibility: build errors expose syntax/type drift; the targeted API grep exposes accidental serializer concatenation survivors in T01 scope; the `<>` diff exposes accidental new concatenation sites slice-wide; the wrapping-map grep exposes non-idiomatic `List.map(rows, ...)` survivors.
+- Inspection surfaces: `cargo run -q -p meshc -- build mesher`, `/tmp/m029-s02-build.log` for captured compiler success/error lines, the targeted API `<>` grep for `mesher/api/alerts.mpl`, `mesher/api/detail.mpl`, and `mesher/api/search.mpl`, the repo-wide `<>` diff against the five designated keep sites, and the zero-match wrapping-map grep.
+- Failure visibility: build errors expose syntax/type drift; the captured build log makes compiler failure lines inspectable after the fact; the targeted API grep exposes accidental serializer concatenation survivors in T01 scope; the `<>` diff exposes accidental new concatenation sites slice-wide; the wrapping-map grep exposes non-idiomatic `List.map(rows, ...)` survivors.
 - Redaction constraints: none beyond normal repo hygiene; this slice should not introduce secret-bearing output.
 
 ## Integration Closure
@@ -43,7 +44,7 @@
   - Do: Replace the remaining `<>` JSON assembly in the three API files using `json {}` only where values are true scalar/option payloads and `#{}` interpolation where query rows already carry raw JSON text, preserving nullable timestamp/id handling, pagination cursor fields, nested prebuilt JSON, and the dynamic tag JSON key path.
   - Verify: `! rg -n '<>' mesher/api/alerts.mpl mesher/api/detail.mpl mesher/api/search.mpl && cargo run -q -p meshc -- build mesher`
   - Done when: The three API files have zero `<>` sites, raw JSON fragments stay unquoted where intended, and `meshc build mesher` still passes.
-- [ ] **T02: Convert storage helpers to pipe style and close the slice proofs** `est:45m`
+- [x] **T02: Convert storage helpers to pipe style and close the slice proofs** `est:45m`
   - Why: The remaining wrapping `List.map(rows, ...)` survivors and non-SQL token concatenations all live in `mesher/storage/queries.mpl`, so finishing that file provides the final repo-wide proof for R024 without widening scope.
   - Files: `mesher/storage/queries.mpl`, `mesher/storage/schema.mpl`
   - Do: Rewrite the four wrapping `Ok(List.map(rows, ...))` returns to match Mesher's existing pipe style, replace the two non-SQL token concatenations with interpolation, leave the SQL/DDL `<>` keep sites untouched, and rerun the exact-location `<>` diff plus the authoritative wrapping-map grep as the slice closeout gate.

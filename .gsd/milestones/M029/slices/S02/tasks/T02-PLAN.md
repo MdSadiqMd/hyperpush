@@ -42,3 +42,9 @@ Finish the remaining storage-side cleanup in `mesher/storage/queries.mpl`: repla
 ## Expected Output
 
 - `mesher/storage/queries.mpl` — storage helpers converted to interpolation/pipe style with designated keep sites preserved
+
+## Observability Impact
+
+- Runtime signals: none added; this task is source-only cleanup in existing storage helpers.
+- Inspection surfaces: `cargo run -q -p meshc -- build mesher`, the repo-wide `<>` diff against the five designated keep sites, the authoritative wrapping-map grep, and an optional captured build log such as `/tmp/m029-t02-build.log` when compiler errors need to be inspected after a failed run.
+- Failure visibility: interpolation mistakes surface as compile errors or unexpected extra `<>` matches, and missed pipe conversions surface through `rg -n 'List\.map\(rows,|Ok\(List\.map\(' mesher -g '*.mpl'`.

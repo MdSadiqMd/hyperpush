@@ -52,7 +52,7 @@ pub fn list_orgs(pool :: PoolHandle) -> List<Organization>!String do
   let q = Query.from(Organization.__table__())
     |> Query.order_by(:name, :asc)
   let rows = Repo.all(pool, q)?
-  Ok(List.map(rows, fn(row) do
+  Ok(rows |> List.map(fn(row) do
     Organization { id: Map.get(row, "id"), name: Map.get(row, "name"), slug: Map.get(row, "slug"), created_at: Map.get(row, "created_at") }
   end))
 end
@@ -85,7 +85,7 @@ pub fn list_projects_by_org(pool :: PoolHandle, org_id :: String) -> List<Projec
     |> Query.where(:org_id, org_id)
     |> Query.order_by(:name, :asc)
   let rows = Repo.all(pool, q)?
-  Ok(List.map(rows, fn(row) do
+  Ok(rows |> List.map(fn(row) do
     Project { id: Map.get(row, "id"), org_id: Map.get(row, "org_id"), name: Map.get(row, "name"), platform: Map.get(row, "platform"), created_at: Map.get(row, "created_at") }
   end))
 end
@@ -97,7 +97,7 @@ end
 # Format: "mshr_" + UUID4 (36 chars) = 41-char key.
 pub fn create_api_key(pool :: PoolHandle, project_id :: String, label :: String) -> String!String do
   # Generate API key using Crypto stdlib -- no DB round-trip needed
-  let key_value = "mshr_" <> Crypto.uuid4()
+  let key_value = "mshr_#{Crypto.uuid4()}"
   let fields = %{"project_id" => project_id, "key_value" => key_value, "label" => label}
   Repo.insert(pool, ApiKey.__table__(), fields)?
   Ok(key_value)
@@ -188,7 +188,7 @@ pub fn create_session(pool :: PoolHandle, user_id :: String) -> String!String do
   # Two UUID4s with hyphens stripped = 32 + 32 = 64 hex chars (same format as before)
   let uuid1 = Crypto.uuid4() |> String.replace("-", "")
   let uuid2 = Crypto.uuid4() |> String.replace("-", "")
-  let token = uuid1 <> uuid2
+  let token = "#{uuid1}#{uuid2}"
   let fields = %{"token" => token, "user_id" => user_id}
   Repo.insert(pool, Session.__table__(), fields)?
   Ok(token)
@@ -232,7 +232,7 @@ pub fn get_members(pool :: PoolHandle, org_id :: String) -> List<OrgMembership>!
   let q = Query.from(OrgMembership.__table__())
     |> Query.where(:org_id, org_id)
   let rows = Repo.all(pool, q)?
-  Ok(List.map(rows, fn(row) do
+  Ok(rows |> List.map(fn(row) do
     OrgMembership { id: Map.get(row, "id"), user_id: Map.get(row, "user_id"), org_id: Map.get(row, "org_id"), role: Map.get(row, "role"), joined_at: Map.get(row, "joined_at") }
   end))
 end
@@ -365,7 +365,7 @@ pub fn list_issues_by_status(pool :: PoolHandle, project_id :: String, status ::
     |> Query.order_by(:last_seen, :desc)
     |> Query.select_raw(["id::text", "project_id::text", "fingerprint", "title", "level", "status", "event_count::text", "first_seen::text", "last_seen::text", "COALESCE(assigned_to::text, '') as assigned_to"])
   let rows = Repo.all(pool, q)?
-  Ok(List.map(rows, fn(row) do
+  Ok(rows |> List.map(fn(row) do
     Issue { id: Map.get(row, "id"), project_id: Map.get(row, "project_id"), fingerprint: Map.get(row, "fingerprint"), title: Map.get(row, "title"), level: Map.get(row, "level"), status: Map.get(row, "status"), event_count: parse_event_count(Map.get(row, "event_count")), first_seen: Map.get(row, "first_seen"), last_seen: Map.get(row, "last_seen"), assigned_to: Map.get(row, "assigned_to") }
   end))
 end
