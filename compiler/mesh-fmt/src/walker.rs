@@ -52,6 +52,7 @@ pub fn walk_node(node: &SyntaxNode) -> FormatIR {
         SyntaxKind::RETURN_EXPR => walk_return_expr(node),
         SyntaxKind::IMPORT_DECL => walk_import_decl(node),
         SyntaxKind::FROM_IMPORT_DECL => walk_from_import_decl(node),
+        SyntaxKind::IMPORT_LIST => walk_import_list(node),
         SyntaxKind::STRING_EXPR => walk_string_expr(node),
         SyntaxKind::TUPLE_EXPR => walk_paren_list(node),
         SyntaxKind::FIELD_ACCESS => walk_field_access(node),
@@ -105,7 +106,6 @@ pub fn walk_node(node: &SyntaxNode) -> FormatIR {
         | SyntaxKind::FN_EXPR_BODY
         | SyntaxKind::INTERPOLATION
         | SyntaxKind::TRAILING_CLOSURE
-        | SyntaxKind::IMPORT_LIST
         | SyntaxKind::TYPE_PARAM_LIST
         | SyntaxKind::GENERIC_PARAM_LIST
         | SyntaxKind::GENERIC_ARG_LIST
@@ -813,7 +813,29 @@ fn walk_paren_list(node: &SyntaxNode) -> FormatIR {
                 }
                 SyntaxKind::COMMA => {
                     parts.push(ir::text(","));
-                    parts.push(ir::space());
+                    // Suppress trailing space when the next non-trivia token is R_PAREN
+                    // (i.e. trailing comma before closing paren).
+                    let mut next = tok.next_sibling_or_token();
+                    while let Some(ref sib) = next {
+                        match sib {
+                            NodeOrToken::Token(t)
+                                if matches!(
+                                    t.kind(),
+                                    SyntaxKind::NEWLINE | SyntaxKind::WHITESPACE
+                                ) =>
+                            {
+                                next = t.next_sibling_or_token();
+                            }
+                            _ => break,
+                        }
+                    }
+                    let is_trailing = matches!(
+                        next,
+                        Some(NodeOrToken::Token(ref t)) if t.kind() == SyntaxKind::R_PAREN
+                    );
+                    if !is_trailing {
+                        parts.push(ir::space());
+                    }
                 }
                 SyntaxKind::NEWLINE => {}
                 _ => {
@@ -1306,6 +1328,54 @@ fn walk_return_expr(node: &SyntaxNode) -> FormatIR {
 
 fn walk_import_decl(node: &SyntaxNode) -> FormatIR {
     walk_tokens_inline(node)
+}
+
+fn walk_import_list(node: &SyntaxNode) -> FormatIR {
+    // Check whether this import list is wrapped in parens.
+    let has_parens = node.children_with_tokens().any(|child| {
+        matches!(child, NodeOrToken::Token(ref tok) if tok.kind() == SyntaxKind::L_PAREN)
+    });
+
+    if !has_parens {
+        // Non-parenthesized: inline formatting (e.g. "sqrt, pow")
+        return walk_tokens_inline(node);
+    }
+
+    // Parenthesized: collect name parts and emit one per indented line.
+    let mut names: Vec<FormatIR> = Vec::new();
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Token(tok) => match tok.kind() {
+                SyntaxKind::L_PAREN | SyntaxKind::R_PAREN => {}
+                SyntaxKind::COMMA | SyntaxKind::NEWLINE => {}
+                _ => {
+                    names.push(ir::text(tok.text()));
+                }
+            },
+            NodeOrToken::Node(n) => {
+                names.push(walk_node(&n));
+            }
+        }
+    }
+
+    // Emit: "(\n  name1,\n  name2\n)"
+    let mut inner_parts = Vec::new();
+    inner_parts.push(ir::hardline());
+    for (i, name) in names.iter().enumerate() {
+        inner_parts.push(name.clone());
+        if i < names.len() - 1 {
+            inner_parts.push(ir::text(","));
+            inner_parts.push(ir::hardline());
+        }
+    }
+
+    let mut parts = Vec::new();
+    parts.push(ir::text("("));
+    parts.push(ir::indent(ir::concat(inner_parts)));
+    parts.push(ir::hardline());
+    parts.push(ir::text(")"));
+
+    ir::concat(parts)
 }
 
 fn walk_from_import_decl(node: &SyntaxNode) -> FormatIR {
@@ -2469,5 +2539,50 @@ mod tests {
     fn empty_map_literal() {
         let result = fmt("%{}");
         assert_eq!(result, "%{}\n");
+    }
+
+    #[test]
+    fn from_import_paren_single_line() {
+        let result = fmt("from Math import (sqrt, pow)");
+        assert_eq!(
+            result,
+            "from Math import (\n  sqrt,\n  pow\n)\n",
+            "Parenthesized imports should format with one name per indented line"
+        );
+    }
+
+    #[test]
+    fn from_import_paren_multiline() {
+        let result = fmt("from Math import (\n  sqrt,\n  pow\n)");
+        assert_eq!(
+            result,
+            "from Math import (\n  sqrt,\n  pow\n)\n",
+            "Multiline parenthesized imports should preserve structure"
+        );
+    }
+
+    #[test]
+    fn from_import_paren_trailing_comma() {
+        let result = fmt("from Math import (\n  sqrt,\n  pow,\n)");
+        assert_eq!(
+            result,
+            "from Math import (\n  sqrt,\n  pow\n)\n",
+            "Trailing comma in parenthesized imports should be cleaned up"
+        );
+    }
+
+    #[test]
+    fn trailing_comma_arg_list() {
+        let result = fmt("fn main() do\n  add(1, 2,)\nend");
+        assert!(
+            !result.contains(", )"),
+            "Trailing comma before ) should not produce extra space. Got: {:?}",
+            result
+        );
+        assert!(
+            result.contains(",)"),
+            "Trailing comma should be preserved but without space before ). Got: {:?}",
+            result
+        );
     }
 }

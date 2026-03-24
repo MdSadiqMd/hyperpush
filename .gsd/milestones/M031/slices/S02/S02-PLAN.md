@@ -37,7 +37,7 @@
   - Verify: `cargo test -p mesh-parser --lib && cargo test -p meshc --test e2e multiline_import && cargo test -p meshc --test e2e trailing_comma && cargo run -p meshc -- build reference-backend && cargo run -p meshc -- build mesher`
   - Done when: All new tests pass, all existing 308+ passing e2e tests still pass, both dogfood codebases build.
 
-- [ ] **T02: Formatter support for parenthesized imports and trailing comma cleanup** `est:30m`
+- [x] **T02: Formatter support for parenthesized imports and trailing comma cleanup** `est:30m`
   - Why: Without formatter support, `meshc fmt` will collapse parenthesized imports or produce malformed output. Trailing commas currently produce `a, b, )` with an ugly space — needs suppression.
   - Files: `compiler/mesh-fmt/src/walker.rs`
   - Do: In `walk_from_import_decl`, add explicit `L_PAREN`/`R_PAREN` arms. When parens are detected, emit names on separate indented lines (hardline between names) to preserve the multiline intent. In `walk_paren_list`, suppress the trailing space after COMMA when the next sibling token is `R_PAREN`. Add formatter unit tests: paren import single-line → multiline output, paren import multiline → preserved multiline, trailing comma in arg list → clean `, )` without extra space.

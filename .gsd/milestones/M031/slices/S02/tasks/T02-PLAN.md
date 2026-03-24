@@ -54,3 +54,9 @@ The formatter's `walk_from_import_decl` currently has no handling for `L_PAREN`/
 ## Expected Output
 
 - `compiler/mesh-fmt/src/walker.rs` — modified `walk_from_import_decl` with paren handling, modified `walk_paren_list` with trailing-comma space suppression, 4 new formatter test functions
+
+## Observability Impact
+
+- **Formatter regression visibility:** 4 new unit tests pin the exact formatter output for parenthesized imports (single-line, multiline, trailing comma) and trailing-comma arg lists. Any regression produces a direct `assert_eq` diff.
+- **No new runtime signals:** This is a compile-time formatting feature — no runtime observability changes.
+- **Diagnostic preservation:** Parse errors on malformed parenthesized imports (`expected R_PAREN`) continue to surface through the parser; the formatter only processes valid CST nodes.
