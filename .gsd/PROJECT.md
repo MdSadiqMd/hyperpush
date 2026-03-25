@@ -26,11 +26,12 @@ Recent milestone state:
 - M032/S05 replayed the full Mesher proof matrix, closed the supported-now versus retained-limit ledger, and left a short file-backed keep-list for the remaining Mesh and data-layer pressure sites
 - M032/S06 backfilled the missing S01 acceptance artifact, reran the live S01 proof bundle with non-zero test-count guards, and closed the last milestone evidence gap so M032 now seals cleanly
 - M032 is now fully closed through `.gsd/milestones/M032/M032-SUMMARY.md`, which records the compiler repair, the Mesher dogfood cleanup, and the three-bucket handoff into M033 (supported-now proof, still-real Mesh keep-sites, and real data-layer follow-on work)
+- M033/S01 is now complete: Mesh ships the neutral expression builder and expression-aware Query/Repo select/update/upsert surface, Mesher’s S01-owned write paths run on that core, the live ingest/rate-limit/writer blockers are retired, and `bash scripts/verify-m033-s01.sh` closes green against the Postgres-backed acceptance suite
 
 The next planned work is M033:
-1. S01 has now landed the neutral expression/runtime/compiler plumbing plus Mesher write-path rewrites for `revoke_api_key`, `assign_issue`, `acknowledge_alert`, `resolve_fired_alert`, `update_project_settings`, and `upsert_issue`, but the slice closeout still records a live Mesher HTTP-readiness blocker in the new `e2e_m033_s01` harness.
-2. finish the blocked S01 acceptance rerun, then continue with explicit PG extras around the recurring `mesher/storage/queries.mpl` and `mesher/storage/writer.mpl` ORM boundary families
-3. cover the retained migration/DDL gap anchored by the `PARTITION BY` note while keeping a clean path for SQLite-specific extras later
+1. S02 should replace the remaining explicit PostgreSQL raw keep-sites (`create_alert_rule`, `fire_alert`, `insert_event`, and related JSONB/search/crypto families) with honest PG helper surfaces built on the new expression core.
+2. S03 should reuse the proven serializer/runtime contract to retire the harder read-side raw-query families without pretending every remaining query belongs in a universal neutral AST.
+3. S04 should cover the retained migration/DDL gap anchored by the `PARTITION BY` note while keeping SQLite-specific extras as a later vendor-specific seam instead of backing out a PG-only abstraction.
 
 ## Architecture / Key Patterns
 

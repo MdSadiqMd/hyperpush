@@ -60,16 +60,25 @@ owned = [
 ]
 for name in owned:
     block = fn_block(queries, name)
-    if "Repo.execute_raw" in block or "Repo.query_raw" in block:
+    code_only = "\n".join(
+        line for line in block.splitlines() if not line.lstrip().startswith("#")
+    )
+    if "Repo.execute_raw" in code_only or "Repo.query_raw" in code_only:
         raise SystemExit(f"{name} still uses raw SQL:\n{block}")
 
 for name in ["create_alert_rule", "fire_alert"]:
     block = fn_block(queries, name)
-    if "Repo.execute_raw" not in block and "Repo.query_raw" not in block:
+    code_only = "\n".join(
+        line for line in block.splitlines() if not line.lstrip().startswith("#")
+    )
+    if "Repo.execute_raw" not in code_only and "Repo.query_raw" not in code_only:
         raise SystemExit(f"{name} should still be an explicit PG keep-site for S02:\n{block}")
 
 insert_event = fn_block(writer, "insert_event")
-if "Repo.execute_raw" not in insert_event:
+insert_event_code = "\n".join(
+    line for line in insert_event.splitlines() if not line.lstrip().startswith("#")
+)
+if "Repo.execute_raw" not in insert_event_code:
     raise SystemExit(f"insert_event should still be an explicit PG JSONB keep-site for S02:\n{insert_event}")
 
 print("raw keep-list ok")

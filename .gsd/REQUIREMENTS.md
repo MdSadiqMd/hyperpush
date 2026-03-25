@@ -23,8 +23,8 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M033/S01
 - Supporting slices: M033/S02, M033/S04
-- Validation: mapped
-- Notes: M033 proves the neutral core through a real expression DSL first, then layers PG-specific helpers on top without collapsing the boundary.
+- Validation: Evidence advanced in M033/S01 by `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_issue_upsert -- --nocapture`, and `bash scripts/verify-m033-s01.sh`.
+- Notes: Advanced by M033/S01: Mesh now ships a neutral Expr builder plus expression-aware Query/Repo select/update/upsert work on the live Mesher path, while PG-only JSONB/crypto/event-write sites stay explicit keep-sites for later slices. Full validation still depends on S02/S04 explicit vendor-extra surfaces.
 
 ### R037 — Mesh should expose PG-specific query and migration surfaces for the cases `mesher/` actually needs today: JSONB-heavy data access, expression-heavy updates, full-text search, crypto helpers, and partition-related DDL.
 - Class: integration
@@ -498,7 +498,7 @@ This file is the explicit capability and coverage contract for the project.
 | R033 | constraint | out-of-scope | none | none | n/a |
 | R034 | anti-feature | out-of-scope | none | none | n/a |
 | R035 | quality-attribute | validated | M032/S01 | M032/S03, M032/S04, M032/S05, M032/S06 | Validated by the named `e2e_m032_*` proofs, `bash scripts/verify-m032-s01.sh`, Mesher fmt/build, the negative grep over stale disproven limitation phrases, the positive grep over the retained keep-sites in `mesher/ingestion/routes.mpl`, `mesher/services/stream_manager.mpl`, `mesher/services/writer.mpl`, `mesher/ingestion/pipeline.mpl`, `mesher/services/event_processor.mpl`, `mesher/ingestion/fingerprint.mpl`, `mesher/services/retention.mpl`, `mesher/api/team.mpl`, `mesher/storage/queries.mpl`, `mesher/storage/writer.mpl`, `mesher/migrations/20260216120000_create_initial_schema.mpl`, `mesher/types/event.mpl`, and `mesher/types/issue.mpl`, plus the backfilled `.gsd/milestones/M032/slices/S01/S01-UAT.md` acceptance artifact that now replays the current proof bundle instead of a placeholder. |
-| R036 | core-capability | active | M033/S01 | M033/S02, M033/S04 | mapped |
+| R036 | core-capability | active | M033/S01 | M033/S02, M033/S04 | Evidence advanced in M033/S01 by `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_issue_upsert -- --nocapture`, and `bash scripts/verify-m033-s01.sh`. |
 | R037 | integration | active | M033/S02 | M033/S03, M033/S04 | mapped |
 | R038 | quality-attribute | active | M033/S03 (provisional) | M033/S04, M033/S05 (provisional) | mapped |
 | R039 | launchability | active | M033/S04 (provisional) | M033/S02 (provisional) | mapped |

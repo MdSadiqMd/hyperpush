@@ -1,5 +1,5 @@
 # StorageWriter service -- per-project batch writer with bounded buffer and dual flush triggers.
-# Receives enriched event entries (issue_id|||fingerprint|||event_json), buffers them,
+# Receives enriched event entries (project_id|||issue_id|||fingerprint|||event_json), buffers them,
 # and flushes to PostgreSQL in batches.
 # Dual flush triggers: size-based (batch_size threshold) and timer-based (flush_ticker actor).
 # Retry strategy: 3 attempts with exponential backoff (100ms, 500ms), drop on final failure.
@@ -8,8 +8,8 @@
 from Storage.Writer import flush_batch
 
 # WriterState holds all service state for a single project writer.
-# Buffer stores enriched event entries as "issue_id|||fingerprint|||event_json"
-# strings. The flush loop splits these to pass issue_id and fingerprint as
+# Buffer stores enriched event entries as "project_id|||issue_id|||fingerprint|||event_json"
+# strings. The flush loop splits these to pass project_id, issue_id, and fingerprint as
 # separate SQL parameters to flush_batch.
 
 struct WriterState do
@@ -25,34 +25,34 @@ end
 # LOCKED: 3 attempts with exponential backoff (100ms, 500ms), drop on final failure.
 # Uses recursive loop since Mesh has no mutable variable assignment.
 
-fn flush_drop(project_id :: String, count_val :: Int) -> Int ! String do
+fn flush_drop(project_id :: String, count_val :: Int) -> String ! String do
   println("[StorageWriter] Dropping batch of #{count_val} events for project #{project_id} after 3 retries")
-  Ok(0)
+  Ok("dropped")
 end
 
-fn flush_retry3(pool :: PoolHandle, project_id :: String, events, event_count :: Int) -> Int ! String do
+fn flush_retry3(pool :: PoolHandle, project_id :: String, events, event_count :: Int) -> String ! String do
   Timer.sleep(500)
-  let r3 = flush_batch(pool, project_id, events)
+  let r3 = flush_batch(pool, events)
   case r3 do
-    Ok( n) -> Ok(n)
+    Ok( _) -> Ok("flushed")
     Err( _) -> flush_drop(project_id, event_count)
   end
 end
 
-fn flush_retry2(pool :: PoolHandle, project_id :: String, events, event_count :: Int) -> Int ! String do
+fn flush_retry2(pool :: PoolHandle, project_id :: String, events, event_count :: Int) -> String ! String do
   Timer.sleep(100)
-  let r2 = flush_batch(pool, project_id, events)
+  let r2 = flush_batch(pool, events)
   case r2 do
-    Ok( n) -> Ok(n)
+    Ok( _) -> Ok("flushed")
     Err( _) -> flush_retry3(pool, project_id, events, event_count)
   end
 end
 
-fn flush_with_retry(pool :: PoolHandle, project_id :: String, events) -> Int ! String do
+fn flush_with_retry(pool :: PoolHandle, project_id :: String, events) -> String ! String do
   let event_count = List.length(events)
-  let r1 = flush_batch(pool, project_id, events)
+  let r1 = flush_batch(pool, events)
   case r1 do
-    Ok( n) -> Ok(n)
+    Ok( _) -> Ok("flushed")
     Err( _) -> flush_retry2(pool, project_id, events, event_count)
   end
 end
@@ -132,7 +132,7 @@ service StorageWriter do
     }
   end
   
-  # Store an enriched event entry (issue_id|||fingerprint|||event_json) in the buffer.
+  # Store an enriched event entry (project_id|||issue_id|||fingerprint|||event_json) in the buffer.
   
   # Drops oldest events if buffer exceeds capacity.
   
@@ -160,4 +160,10 @@ actor flush_ticker(writer_pid, interval :: Int) do
   StorageWriter.flush(writer_pid)
   
   flush_ticker(writer_pid, interval)
+end
+
+pub fn start_writer(pool :: PoolHandle, project_id :: String) do
+  let writer_pid = StorageWriter.start(pool, project_id)
+  spawn(flush_ticker, writer_pid, 1000)
+  writer_pid
 end

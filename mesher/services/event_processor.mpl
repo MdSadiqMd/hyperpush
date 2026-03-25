@@ -20,19 +20,23 @@ struct ProcessorState do
 end
 
 # Build an enriched entry string for StorageWriter.
-# Format: "issue_id|||fingerprint|||event_json"
-# The StorageWriter splits this to pass issue_id and fingerprint as separate
-# SQL parameters to insert_event (avoiding JSON field injection in Mesh).
+# Format: "project_id|||issue_id|||fingerprint|||event_json"
+# The StorageWriter splits this to pass project_id, issue_id, and fingerprint
+# as separate SQL parameters to insert_event (avoiding JSON field injection in Mesh).
 
-fn build_enriched_entry(issue_id :: String, fingerprint :: String, event_json :: String) -> String do
-  "#{issue_id}|||#{fingerprint}|||#{event_json}"
+fn build_enriched_entry(project_id :: String,
+issue_id :: String,
+fingerprint :: String,
+event_json :: String) -> String do
+  "#{project_id}|||#{issue_id}|||#{fingerprint}|||#{event_json}"
 end
 
 fn store_enriched_event(writer_pid,
+project_id :: String,
 event_json :: String,
 issue_id :: String,
 fingerprint :: String) -> String ! String do
-  let enriched = build_enriched_entry(issue_id, fingerprint, event_json)
+  let enriched = build_enriched_entry(project_id, issue_id, fingerprint, event_json)
   StorageWriter.store(writer_pid, enriched)
   Ok(issue_id)
 end
@@ -47,7 +51,7 @@ level :: String) -> String ! String do
   let upsert_result = upsert_issue(pool, project_id, fingerprint, title, level)
   case upsert_result do
     Err( e) -> Err(e)
-    Ok( issue_id) -> store_enriched_event(writer_pid, event_json, issue_id, fingerprint)
+    Ok( issue_id) -> store_enriched_event(writer_pid, project_id, event_json, issue_id, fingerprint)
   end
 end
 

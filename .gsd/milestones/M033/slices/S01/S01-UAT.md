@@ -1,120 +1,58 @@
 # S01: Neutral expression core on real write paths — UAT
 
 **Milestone:** M033
-**Written:** 2026-03-25
+**Written:** 2026-03-25T16:12:59.858Z
 
-## UAT Type
-
-- UAT mode: mixed
-- Why this mode is sufficient: S01 changed compiler/runtime expression plumbing, Mesher storage mutations, and the slice verifier. The compiler-side expression contract is directly testable today, while the live Mesher route replay is currently blocked and is recorded explicitly below.
+# S01 UAT — Neutral expression core on real write paths
 
 ## Preconditions
+- Run from the repo root with Docker available locally.
+- `postgres:16` is available or pullable.
+- No other process is holding port `5432` while the temporary Postgres container is running.
+- Rust/Cargo tooling is installed and able to build `meshc` and `mesher`.
 
-1. Docker is available locally for the temporary PostgreSQL container used by `compiler/meshc/tests/e2e_m033_s01.rs`.
-2. `cargo build -p mesh-rt` has been run at least once in the current tree so `libmesh_rt.a` includes the newest exported symbols.
-3. No other process is bound to local port `5432` while the temporary test Postgres container is running.
-4. The repo root is the current working directory.
+## Test Case 1 — Portable expression core compiles and executes
+1. Run `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture`.
+   - **Expected:** All expr-focused tests pass, including expression-valued SELECT, computed UPDATE, conflict-update UPSERT, UUID assignment/clear, and the negative guard tests.
+2. Confirm the test output includes the named successes for `e2e_m033_expr_select_executes`, `e2e_m033_expr_repo_executes`, and `e2e_m033_expr_uuid_update_executes`.
+   - **Expected:** The neutral core proves expression-valued select/update/upsert work without `RAW:` escape hatches.
 
-## Smoke Test
+## Test Case 2 — Fresh Mesher boot accepts the first event and rate limits honestly
+1. Run `cargo test -p meshc --test e2e_m033_s01 mesher_ingest_first_event -- --nocapture`.
+   - **Expected:** The first seeded-key `/api/v1/events` request returns `202 Accepted`, a second under-threshold request is still accepted, and the configured threshold is enforced only when exceeded.
+2. Review the test assertions/logs.
+   - **Expected:** The harness sees `RateLimiter started (60s window, 2 max)` and the DB-side `issues.event_count` stays unchanged on the rejected request.
 
-Run:
+## Test Case 3 — Live mutation routes drive the neutral write surface
+1. Run `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`.
+   - **Expected:** The test passes end to end against a real Postgres-backed Mesher instance.
+2. Verify the assertions exercised by the test.
+   - **Expected:**
+     - assigning and unassigning an issue changes `issues.assigned_to` between a UUID and `NULL`
+     - revoking an API key sets `api_keys.revoked_at`
+     - acknowledging and resolving an alert set `alerts.acknowledged_at` and `alerts.resolved_at`
+     - partial settings updates change `projects.retention_days` and `projects.sample_rate`
 
-```bash
-cargo test -p meshc --test e2e_m033_s01 e2e_m033_expr_repo_executes -- --nocapture
-```
+## Test Case 4 — Repeated ingest upserts the same issue and persists events
+1. Run `cargo test -p meshc --test e2e_m033_s01 mesher_issue_upsert -- --nocapture`.
+   - **Expected:** The test passes against a real Postgres-backed Mesher instance.
+2. Confirm the behavior asserted by the harness.
+   - **Expected:**
+     - first ingest creates one issue with `status = unresolved` and `event_count = 1`
+     - second ingest updates the same issue row, increments `event_count` to `2`, and advances `last_seen`
+     - resolving the issue flips `status` to `resolved`
+     - a later repeated event reopens the same issue, increments `event_count` to `3`, advances `last_seen`, and persists `3` rows in `events` for that `issue_id`
+3. Edge condition to watch.
+   - **Expected:** Low-volume event persistence still succeeds even though the batch size is not reached, because the timer flush path is active.
 
-**Expected:** the test passes and proves the neutral expression runtime can execute computed `UPDATE` and `INSERT ... ON CONFLICT DO UPDATE` work with arithmetic, `now()`, and `CASE` expressions.
-
-## Test Cases
-
-### 1. Expression error surfaces stay explicit
-
-1. Run:
-   ```bash
-   cargo test -p meshc --test e2e_m033_s01 expr_error_ -- --nocapture
-   ```
-2. Confirm both named tests pass.
-3. **Expected:** `expr_error_update_where_expr_requires_where_clause` returns `update_where_expr: no WHERE conditions`, and `expr_error_insert_or_update_expr_requires_conflict_targets` returns `insert_or_update_expr: no conflict targets provided`.
-
-### 2. Mesher still builds after the write-path rewrite
-
-1. Run:
-   ```bash
-   cargo run -q -p meshc -- build mesher
-   ```
-2. **Expected:** the command succeeds and emits the `mesher/mesher` binary.
-
-### 3. Raw keep-list stays honest for S01 vs S02
-
-1. Run:
-   ```bash
-   bash scripts/verify-m033-s01.sh
-   ```
-2. If the command fails, inspect `.tmp/m033-s01/verify/`.
-3. **Expected after the startup blocker is fixed:** the script proves that `revoke_api_key`, `assign_issue`, `acknowledge_alert`, `resolve_fired_alert`, `update_project_settings`, and `upsert_issue` no longer use raw SQL, while `insert_event`, `create_alert_rule`, and `fire_alert` remain the explicit PG keep-sites for S02.
-
-### 4. Live Mesher mutation replay (currently blocked)
-
-1. Run:
-   ```bash
-   cargo test -p meshc --test e2e_m033_s01 e2e_m033_mesher_mutations -- --nocapture
-   ```
-2. The test migrates a temporary Mesher database, builds Mesher, starts the Mesher binary, then drives these live routes:
-   - `POST /api/v1/events`
-   - `POST /api/v1/issues/:id/assign` (assign + unassign)
-   - `POST /api/v1/api-keys/:key_id/revoke`
-   - `POST /api/v1/alerts/:id/acknowledge`
-   - `POST /api/v1/alerts/:id/resolve`
-   - `POST /api/v1/projects/default/settings`
-3. **Expected after the blocker is fixed:** the DB assertions prove `assigned_to` toggles between UUID and `NULL`, `revoked_at` is set, alert timestamps are set, and project settings update without clobbering untouched fields.
-4. **Current blocker:** Mesher builds but the test never observes an HTTP-ready server.
-
-### 5. Live Mesher issue upsert replay (currently blocked)
-
-1. Run:
-   ```bash
-   cargo test -p meshc --test e2e_m033_s01 e2e_m033_mesher_issue_upsert -- --nocapture
-   ```
-2. The test migrates/builds/starts Mesher, ingests the same event repeatedly, resolves the created issue through the live route, then ingests again.
-3. **Expected after the blocker is fixed:** one stable issue row remains, `event_count` progresses `1 -> 2 -> 3`, `last_seen` advances on each ingest, and `status` flips from `resolved` back to `unresolved` after the post-resolve event.
-4. **Current blocker:** identical to Test Case 4 — the harness never sees Mesher reach HTTP readiness.
-
-## Edge Cases
-
-### Neutral NULL assignment
-
-1. Exercise `POST /api/v1/issues/:id/assign` with `{"user_id":""}` once the live harness is green.
-2. **Expected:** `issues.assigned_to` becomes SQL `NULL`, not an empty-string sentinel.
-
-### Partial settings update
-
-1. Post `{"retention_days":30}` and then `{"sample_rate":0.25}` to `/api/v1/projects/default/settings`.
-2. **Expected:** the untouched field remains unchanged after each request.
-
-### Resolved issue regression path
-
-1. Resolve an issue, then ingest another matching event.
-2. **Expected:** the existing issue row is reused, `event_count` increments, `last_seen` advances, and `status` becomes `unresolved` again.
-
-## Failure Signals
-
-- `meshc build mesher` fails after the expression rewrite.
-- `expr_error_` tests stop returning the exact expected error strings.
-- `scripts/verify-m033-s01.sh` reports that an S01-owned write function still uses raw SQL.
-- Live route tests stall with only the Mesher startup banner and never observe HTTP readiness.
-- DB assertions show empty-string sentinels instead of `NULL`, unchanged timestamps after ack/resolve/revoke, or duplicate issue rows during repeated ingest.
-
-## Requirements Proved By This UAT
-
-- R036 — proves the neutral expression/write surface is real at the compiler/runtime level and is wired into the designated Mesher write families.
-- R040 — proves the slice still keeps PG-only JSONB-heavy families explicit instead of leaking them into the neutral baseline.
-
-## Not Proven By This UAT
-
-- Full validation of R036/R040 is not complete yet because the live Mesher route replay still fails before HTTP readiness.
-- S02 PG extras, S03 read-side coverage, and S04 partition/schema helpers are intentionally out of scope for this slice.
-
-## Notes for Tester
-
-- If the live Mesher tests fail early, inspect Mesher startup/HTTP serving first; the neutral expression contract itself already has passing direct compiler/runtime coverage.
-- If parser errors appear around `Expr.call(...)` or `Expr.case(...)` inside expression maps, use the current working aliases `Expr.fn_call(...)` and `Expr.case_when(...)` until that parser path is repaired.
+## Test Case 5 — Slice acceptance bundle and raw keep-list stay honest
+1. Run `bash scripts/verify-m033-s01.sh`.
+   - **Expected:** The script finishes with `verify-m033-s01: ok`.
+2. Confirm what the script enforces.
+   - **Expected:**
+     - full `e2e_m033_s01` suite passes
+     - `cargo run -q -p meshc -- fmt --check mesher` passes
+     - `cargo run -q -p meshc -- build mesher` passes
+     - the raw keep-list sweep only allows the explicit S02-owned PG sites (`create_alert_rule`, `fire_alert`, `insert_event`)
+3. Negative boundary check.
+   - **Expected:** The portable S01-owned write families (`revoke_api_key`, `upsert_issue`, `assign_issue`, `acknowledge_alert`, `resolve_fired_alert`, `update_project_settings`) do not trip the raw SQL keep-list gate.

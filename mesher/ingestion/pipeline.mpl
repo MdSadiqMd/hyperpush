@@ -4,7 +4,7 @@
 
 from Services.RateLimiter import start_rate_limiter
 from Services.EventProcessor import EventProcessor
-from Services.Writer import StorageWriter
+from Services.Writer import start_writer
 from Services.StreamManager import StreamManager
 from Storage.Queries import check_volume_spikes, get_threshold_rules, evaluate_threshold_rule, fire_alert
 from Services.Retention import retention_cleaner
@@ -464,7 +464,7 @@ end
 fn restart_all_services(pool :: PoolHandle) do
   let rate_limiter_pid = start_configured_rate_limiter()
   let processor_pid = EventProcessor.start(pool)
-  let writer_pid = StorageWriter.start(pool, "default")
+  let writer_pid = start_writer(pool, "default")
   let stream_mgr_pid = StreamManager.start()
   Process.register("stream_manager", stream_mgr_pid)
   # Spawn drain ticker for StreamManager buffer backpressure (250ms interval)
@@ -505,7 +505,7 @@ pub fn start_pipeline(pool :: PoolHandle) do
   let processor_pid = EventProcessor.start(pool)
   println("[Mesher] EventProcessor started")
   # Start a default StorageWriter
-  let writer_pid = StorageWriter.start(pool, "default")
+  let writer_pid = start_writer(pool, "default")
   println("[Mesher] StorageWriter started (default project)")
   # Start pipeline registry
   let registry_pid = PipelineRegistry.start(pool, rate_limiter_pid, processor_pid, writer_pid)
