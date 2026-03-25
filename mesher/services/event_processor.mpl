@@ -28,68 +28,56 @@ fn build_enriched_entry(issue_id :: String, fingerprint :: String, event_json ::
   "#{issue_id}|||#{fingerprint}|||#{event_json}"
 end
 
-# Store enriched event via StorageWriter and return updated state.
-
-fn store_enriched_event(state :: ProcessorState,
-writer_pid,
+fn store_enriched_event(writer_pid,
 event_json :: String,
 issue_id :: String,
-fingerprint :: String) ->( ProcessorState, String ! String) do
+fingerprint :: String) -> String ! String do
   let enriched = build_enriched_entry(issue_id, fingerprint, event_json)
   StorageWriter.store(writer_pid, enriched)
-  let new_state = ProcessorState {
-    pool : state.pool,
-    processed_count : state.processed_count + 1
-  }
-  (new_state, Ok(issue_id))
+  Ok(issue_id)
 end
 
-# Upsert the issue and store the enriched event if successful.
-
-fn do_upsert_and_store(state :: ProcessorState,
+fn upsert_and_store(pool :: PoolHandle,
 project_id :: String,
 writer_pid,
 event_json :: String,
 fingerprint :: String,
 title :: String,
-level :: String) ->( ProcessorState, String ! String) do
-  let upsert_result = upsert_issue(state.pool, project_id, fingerprint, title, level)
+level :: String) -> String ! String do
+  let upsert_result = upsert_issue(pool, project_id, fingerprint, title, level)
   case upsert_result do
-    Err( e) -> (state, Err(e))
-    Ok( issue_id) -> store_enriched_event(state, writer_pid, event_json, issue_id, fingerprint)
+    Err( e) -> Err(e)
+    Ok( issue_id) -> store_enriched_event(writer_pid, event_json, issue_id, fingerprint)
   end
 end
 
-# Process event if not discarded; otherwise skip with Ok("discarded").
-
-fn process_if_not_discarded(state :: ProcessorState,
+fn process_discarded_result(pool :: PoolHandle,
 project_id :: String,
 writer_pid,
 event_json :: String,
 fingerprint :: String,
 title :: String,
 level :: String,
-discarded :: Bool) ->( ProcessorState, String ! String) do
+discarded :: Bool) -> String ! String do
   if discarded do
-    (state, Ok("discarded"))
+    Ok("discarded")
   else
-    do_upsert_and_store(state, project_id, writer_pid, event_json, fingerprint, title, level)
+    upsert_and_store(pool, project_id, writer_pid, event_json, fingerprint, title, level)
   end
 end
 
-# Check discard status and process accordingly.
-
-fn process_with_fingerprint(state :: ProcessorState,
+fn process_fields(pool :: PoolHandle,
 project_id :: String,
 writer_pid,
 event_json :: String,
-fingerprint :: String,
-title :: String,
-level :: String) ->( ProcessorState, String ! String) do
-  let discarded_result = is_issue_discarded(state.pool, project_id, fingerprint)
+fields :: Map < String, String >) -> String ! String do
+  let fingerprint = Map.get(fields, "fingerprint")
+  let title = Map.get(fields, "title")
+  let level = Map.get(fields, "level")
+  let discarded_result = is_issue_discarded(pool, project_id, fingerprint)
   case discarded_result do
-    Err( e) -> (state, Err(e))
-    Ok( discarded) -> process_if_not_discarded(state,
+    Err( e) -> Err(e)
+    Ok( discarded) -> process_discarded_result(pool,
     project_id,
     writer_pid,
     event_json,
@@ -100,31 +88,27 @@ level :: String) ->( ProcessorState, String ! String) do
   end
 end
 
-# Process extracted fields: get fingerprint, title, level from the map
-# and continue to fingerprint processing pipeline.
-# Extracted from case arm per Mesh single-expression case arm constraint.
-
-fn process_extracted_fields(state :: ProcessorState,
-project_id :: String,
-writer_pid,
-event_json :: String,
-fields :: Map < String, String >) ->( ProcessorState, String ! String) do
-  let fingerprint = Map.get(fields, "fingerprint")
-  let title = Map.get(fields, "title")
-  let level = Map.get(fields, "level")
-  process_with_fingerprint(state, project_id, writer_pid, event_json, fingerprint, title, level)
-end
-
 # Route an event through the live ingestion path.
 # Accepts raw event JSON from the route layer, asks Storage.Queries to extract
 # fingerprint/title/level via SQL, then applies discard checks, issue upsert,
 # and StorageWriter forwarding.
 
-fn route_event(state :: ProcessorState, project_id :: String, writer_pid, event_json :: String) ->( ProcessorState, String ! String) do
-  let fields_result = extract_event_fields(state.pool, event_json)
+fn route_event(pool :: PoolHandle, project_id :: String, writer_pid, event_json :: String) -> String ! String do
+  let fields_result = extract_event_fields(pool, event_json)
   case fields_result do
-    Err( e) -> (state, Err(e))
-    Ok( fields) -> process_extracted_fields(state, project_id, writer_pid, event_json, fields)
+    Err( e) -> Err(e)
+    Ok( fields) -> process_fields(pool, project_id, writer_pid, event_json, fields)
+  end
+end
+
+fn next_processed_count(state :: ProcessorState, result :: String ! String) -> Int do
+  case result do
+    Ok( issue_id) -> if issue_id == "discarded" do
+      state.processed_count
+    else
+      state.processed_count + 1
+    end
+    Err( _) -> state.processed_count
   end
 end
 
@@ -147,6 +131,11 @@ service EventProcessor do
   # Returns Ok(issue_id) on success, Ok("discarded") for suppressed events.
   
   call ProcessEvent(project_id :: String, writer_pid, event_json :: String) do|state|
-    route_event(state, project_id, writer_pid, event_json)
+    let result = route_event(state.pool, project_id, writer_pid, event_json)
+    let new_state = ProcessorState {
+      pool : state.pool,
+      processed_count : next_processed_count(state, result)
+    }
+    (new_state, result)
   end
 end

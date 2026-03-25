@@ -65,7 +65,7 @@ Must-Haves
 `cargo run -q -p meshc -- fmt --check mesher`
 `cargo run -q -p meshc -- build mesher`
 
-- [ ] **T03: Retire the clean-start ingest 429 blocker on the live Mesher path** `est:2h`
+- [x] **T03: Retire the clean-start ingest 429 blocker on the live Mesher path** `est:2h`
   Why: Every remaining S01 proof depends on fresh-instance event ingest working with the seeded default API key. Right now the first /api/v1/events request is rejected with HTTP 429 before the neutral write paths are exercised, so the slice cannot be truthfully closed.
 
 Do:
@@ -77,7 +77,7 @@ Done when: the first /api/v1/events call on a clean Mesher boot returns 202 inst
   - Files: `mesher/services/rate_limiter.mpl`, `mesher/ingestion/routes.mpl`, `mesher/ingestion/pipeline.mpl`, `compiler/meshc/tests/e2e_m033_s01.rs`
   - Verify: cargo test -p meshc --test e2e_m033_s01 mesher_ingest_first_event -- --nocapture
 
-- [ ] **T04: Re-prove the issue-upsert slice demo on the repaired ingest path** `est:1.5h`
+- [x] **T04: Re-prove the issue-upsert slice demo on the repaired ingest path** `est:1.5h`
   Why: The neutral write rewrites and the expression-based upsert path are already present in local reality, but S01 is not done until the live Mesher routes are re-proven after the ingest blocker is fixed.
 
 Do:

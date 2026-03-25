@@ -10,17 +10,18 @@ end
 
 fn check_limit_impl(state :: RateLimitState, project_id :: String) ->( RateLimitState, Bool) do
   let count = Map.get(state.limits, project_id)
-  if count >= state.max_events do
-    (state, false)
+  let allowed = count < state.max_events
+  let next_limits = if allowed do
+    Map.put(state.limits, project_id, count + 1)
   else
-    let new_limits = Map.put(state.limits, project_id, count + 1)
-    let new_state = RateLimitState {
-      limits : new_limits,
-      window_seconds : state.window_seconds,
-      max_events : state.max_events
-    }
-    (new_state, true)
+    state.limits
   end
+  let new_state = RateLimitState {
+    limits : next_limits,
+    window_seconds : state.window_seconds,
+    max_events : state.max_events
+  }
+  (new_state, allowed)
 end
 
 fn reset_window_impl(state :: RateLimitState) -> RateLimitState do
@@ -62,4 +63,10 @@ actor rate_window_ticker(limiter_pid, interval :: Int) do
   RateLimiter.reset_window(limiter_pid)
   
   rate_window_ticker(limiter_pid, interval)
+end
+
+pub fn start_rate_limiter(window_seconds :: Int, max_events :: Int) do
+  let limiter_pid = RateLimiter.start(window_seconds, max_events)
+  spawn(rate_window_ticker, limiter_pid, window_seconds * 1000)
+  limiter_pid
 end

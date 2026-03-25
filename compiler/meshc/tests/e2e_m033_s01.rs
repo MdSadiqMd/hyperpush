@@ -23,6 +23,8 @@ const POSTGRES_CONTAINER_PREFIX: &str = "mesh-m033-s01-pg";
 struct MesherConfig {
     http_port: u16,
     ws_port: u16,
+    rate_limit_window_seconds: Option<u16>,
+    rate_limit_max_events: Option<u16>,
 }
 
 struct SpawnedMesher {
@@ -119,6 +121,16 @@ fn mesher_test_config() -> MesherConfig {
     MesherConfig {
         http_port: pick_unused_port(),
         ws_port: pick_unused_port(),
+        rate_limit_window_seconds: None,
+        rate_limit_max_events: None,
+    }
+}
+
+fn mesher_test_config_with_rate_limit(max_events: u16) -> MesherConfig {
+    MesherConfig {
+        rate_limit_window_seconds: Some(60),
+        rate_limit_max_events: Some(max_events),
+        ..mesher_test_config()
     }
 }
 
@@ -145,10 +157,22 @@ fn spawn_mesher(config: MesherConfig) -> SpawnedMesher {
     let stderr_file = File::create(&stderr_path)
         .unwrap_or_else(|e| panic!("failed to create {}: {}", stderr_path.display(), e));
 
-    let child = Command::new(&binary)
+    let mut command = Command::new(&binary);
+    command
         .current_dir(repo_root())
         .env("MESHER_HTTP_PORT", config.http_port.to_string())
-        .env("MESHER_WS_PORT", config.ws_port.to_string())
+        .env("MESHER_WS_PORT", config.ws_port.to_string());
+    if let Some(window_seconds) = config.rate_limit_window_seconds {
+        command.env(
+            "MESHER_RATE_LIMIT_WINDOW_SECONDS",
+            window_seconds.to_string(),
+        );
+    }
+    if let Some(max_events) = config.rate_limit_max_events {
+        command.env("MESHER_RATE_LIMIT_MAX_EVENTS", max_events.to_string());
+    }
+
+    let child = command
         .stdout(Stdio::from(stdout_file))
         .stderr(Stdio::from(stderr_file))
         .spawn()
@@ -335,6 +359,33 @@ fn query_single_row(database_url: &str, sql: &str, params: &[&str]) -> DbRow {
     let rows = query_database_rows(database_url, sql, params);
     assert_eq!(rows.len(), 1, "expected exactly one row for SQL: {sql}");
     rows.into_iter().next().unwrap()
+}
+
+fn wait_for_query_value(
+    database_url: &str,
+    sql: &str,
+    params: &[&str],
+    column: &str,
+    expected: &str,
+    description: &str,
+) -> DbRow {
+    let mut last_row = DbRow::new();
+
+    for attempt in 0..40 {
+        if attempt > 0 {
+            std::thread::sleep(Duration::from_millis(250));
+        }
+
+        let row = query_single_row(database_url, sql, params);
+        if row.get(column).map(String::as_str) == Some(expected) {
+            return row;
+        }
+        last_row = row;
+    }
+
+    panic!(
+        "timed out waiting for {description}; expected {column}={expected}, last_row={last_row:?}"
+    );
 }
 
 fn execute_database_sql(database_url: &str, sql: &str, params: &[&str]) -> i64 {
@@ -532,6 +583,9 @@ fn assert_mesher_logs(logs: &StoppedMesher, config: &MesherConfig) {
             config.http_port
         )) || logs.combined.contains(&format!(
             "HTTP server listening on 127.0.0.1:{}",
+            config.http_port
+        )) || logs.combined.contains(&format!(
+            "HTTP server listening on [::]:{}",
             config.http_port
         )) || logs
             .combined
@@ -830,6 +884,73 @@ end
 }
 
 #[test]
+fn e2e_m033_expr_uuid_update_executes() {
+    with_mesher_postgres("expr-uuid-update", || {
+        execute_database_sql(
+            MESHER_DATABASE_URL,
+            "DROP TABLE IF EXISTS m033_expr_uuid_assigns",
+            &[],
+        );
+        execute_database_sql(
+            MESHER_DATABASE_URL,
+            "CREATE TABLE m033_expr_uuid_assigns (id TEXT PRIMARY KEY, assigned_to UUID)",
+            &[],
+        );
+        execute_database_sql(
+            MESHER_DATABASE_URL,
+            "INSERT INTO m033_expr_uuid_assigns (id, assigned_to) VALUES ($1, NULL)",
+            &["row-1"],
+        );
+
+        let source = r#"
+fn main() do
+  let pool_result = Pool.open("postgres://mesh:mesh@127.0.0.1:5432/mesher", 1, 1, 5000)
+  case pool_result do
+    Err( e) -> println("pool_err:#{e}")
+    Ok( pool) -> do
+      let q = Query.from("m033_expr_uuid_assigns")
+        |> Query.where(:id, "row-1")
+      let assign_result = Repo.update_where_expr(pool,
+      "m033_expr_uuid_assigns",
+      %{"assigned_to" => Expr.value("11111111-1111-1111-1111-111111111111")},
+      q)
+      case assign_result do
+        Err( e) -> println("assign_err:#{e}")
+        Ok( row) -> do
+          println("assigned_to=#{Map.get(row, "assigned_to")}")
+          let q2 = Query.from("m033_expr_uuid_assigns")
+            |> Query.where(:id, "row-1")
+          let unassign_result = Repo.update_where_expr(pool,
+          "m033_expr_uuid_assigns",
+          %{"assigned_to" => Expr.null()},
+          q2)
+          case unassign_result do
+            Err( e) -> println("unassign_err:#{e}")
+            Ok( row2) -> println("unassigned_to=#{Map.get(row2, "assigned_to")}")
+          end
+        end
+      end
+    end
+  end
+end
+"#;
+        let output = compile_and_run_mesh(source);
+        assert!(
+            output.contains("assigned_to=11111111-1111-1111-1111-111111111111"),
+            "UUID assignment via update_where_expr failed:\n{}",
+            output
+        );
+
+        let assigned_row = query_single_row(
+            MESHER_DATABASE_URL,
+            "SELECT COALESCE(assigned_to::text, '') AS assigned_to FROM m033_expr_uuid_assigns WHERE id = $1",
+            &["row-1"],
+        );
+        assert_eq!(assigned_row.get("assigned_to").map(String::as_str), Some(""));
+    });
+}
+
+#[test]
 fn e2e_m033_mesher_mutations() {
     with_mesher_postgres("mesher-mutations", || {
         let migrate_output = run_mesher_migrations(MESHER_DATABASE_URL);
@@ -1087,6 +1208,105 @@ fn e2e_m033_mesher_mutations() {
 }
 
 #[test]
+fn e2e_m033_mesher_ingest_first_event() {
+    with_mesher_postgres("mesher-first-event", || {
+        let migrate_output = run_mesher_migrations(MESHER_DATABASE_URL);
+        assert_command_success(&migrate_output, "meshc migrate mesher up");
+
+        let build_output = build_mesher();
+        assert_command_success(&build_output, "meshc build mesher");
+        assert!(mesher_binary().exists(), "mesher binary was not built");
+
+        let config = mesher_test_config_with_rate_limit(2);
+        let spawned = spawn_mesher(config);
+
+        let test_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wait_for_mesher(&config);
+
+            let first = post_json_with_headers(
+                &config,
+                "/api/v1/events",
+                r#"{"message":"M033 first event acceptance","level":"error"}"#,
+                &[("x-sentry-auth", DEFAULT_API_KEY)],
+                202,
+            );
+            assert_eq!(first["status"].as_str(), Some("accepted"));
+
+            let row_one = query_single_row(
+                MESHER_DATABASE_URL,
+                "SELECT id::text AS id, status, event_count::text AS event_count FROM issues WHERE title = $1",
+                &["M033 first event acceptance"],
+            );
+            let issue_id = row_one.get("id").cloned().expect("issue id missing");
+            assert_eq!(
+                row_one.get("status").map(String::as_str),
+                Some("unresolved")
+            );
+            assert_eq!(row_one.get("event_count").map(String::as_str), Some("1"));
+
+            let second = post_json_with_headers(
+                &config,
+                "/api/v1/events",
+                r#"{"message":"M033 first event acceptance","level":"error"}"#,
+                &[("x-sentry-auth", DEFAULT_API_KEY)],
+                202,
+            );
+            assert_eq!(second["status"].as_str(), Some("accepted"));
+
+            let row_two = query_single_row(
+                MESHER_DATABASE_URL,
+                "SELECT id::text AS id, event_count::text AS event_count FROM issues WHERE id = $1::uuid",
+                &[&issue_id],
+            );
+            assert_eq!(
+                row_two.get("id").map(String::as_str),
+                Some(issue_id.as_str())
+            );
+            assert_eq!(row_two.get("event_count").map(String::as_str), Some("2"));
+
+            let limited = post_json_with_headers(
+                &config,
+                "/api/v1/events",
+                r#"{"message":"M033 first event acceptance","level":"error"}"#,
+                &[("x-sentry-auth", DEFAULT_API_KEY)],
+                429,
+            );
+            assert_eq!(limited["error"].as_str(), Some("rate limited"));
+
+            let row_after_limit = query_single_row(
+                MESHER_DATABASE_URL,
+                "SELECT event_count::text AS event_count FROM issues WHERE id = $1::uuid",
+                &[&issue_id],
+            );
+            assert_eq!(
+                row_after_limit.get("event_count").map(String::as_str),
+                Some("2")
+            );
+        }));
+
+        let logs = stop_mesher(spawned);
+
+        match test_result {
+            Ok(()) => {
+                assert_mesher_logs(&logs, &config);
+                assert!(
+                    logs.combined
+                        .contains("[Mesher] RateLimiter started (60s window, 2 max)"),
+                    "mesher logs never showed the configured rate limiter threshold:\n{}",
+                    logs.combined
+                );
+            }
+            Err(payload) => panic!(
+                "M033/S01 first-event ingest assertions failed: {}\nstdout:\n{}\nstderr:\n{}",
+                panic_payload_to_string(payload),
+                logs.stdout,
+                logs.stderr
+            ),
+        }
+    });
+}
+
+#[test]
 fn e2e_m033_mesher_issue_upsert() {
     with_mesher_postgres("mesher-upsert", || {
         let migrate_output = run_mesher_migrations(MESHER_DATABASE_URL);
@@ -1213,10 +1433,13 @@ fn e2e_m033_mesher_issue_upsert() {
                 "last_seen must advance after resolve regression"
             );
 
-            let event_count_row = query_single_row(
+            let event_count_row = wait_for_query_value(
                 MESHER_DATABASE_URL,
                 "SELECT count(*)::text AS count FROM events WHERE issue_id = $1::uuid",
                 &[&issue_id],
+                "count",
+                "3",
+                "StorageWriter flush for repeated issue events",
             );
             assert_eq!(event_count_row.get("count").map(String::as_str), Some("3"));
         }));

@@ -371,17 +371,25 @@ end
 # Uses expression-aware Repo.update_where_expr for both assign and unassign,
 # with Expr.null() carrying the neutral NULL assignment path.
 
-pub fn assign_issue(pool :: PoolHandle, issue_id :: String, user_id :: String) -> Int ! String do
+fn assign_issue_to_user(pool :: PoolHandle, issue_id :: String, user_id :: String) -> Int ! String do
   let q = Query.from(Issue.__table__())
     |> Query.where_raw("id = ?::uuid", [issue_id])
-  let result = if String.length(user_id) > 0 do
-    Repo.update_where_expr(pool, Issue.__table__(), %{"assigned_to" => Expr.value(user_id)}, q)
+  Repo.update_where_expr(pool, Issue.__table__(), %{"assigned_to" => Expr.value(user_id)}, q) ?
+  Ok(1)
+end
+
+fn unassign_issue(pool :: PoolHandle, issue_id :: String) -> Int ! String do
+  let q = Query.from(Issue.__table__())
+    |> Query.where_raw("id = ?::uuid", [issue_id])
+  Repo.update_where_expr(pool, Issue.__table__(), %{"assigned_to" => Expr.null()}, q) ?
+  Ok(1)
+end
+
+pub fn assign_issue(pool :: PoolHandle, issue_id :: String, user_id :: String) -> Int ! String do
+  if String.length(user_id) > 0 do
+    assign_issue_to_user(pool, issue_id, user_id)
   else
-    Repo.update_where_expr(pool, Issue.__table__(), %{"assigned_to" => Expr.null()}, q)
-  end
-  case result do
-    Ok( _) -> Ok(1)
-    Err( e) -> Err(e)
+    unassign_issue(pool, issue_id)
   end
 end
 

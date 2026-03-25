@@ -65,14 +65,14 @@ end
 
 # Helper: handle successful update_member_role result.
 
-fn update_role_success(n :: Int) do
-  HTTP.response(200, json { status : "ok", affected : n })
+fn update_role_success() do
+  HTTP.response(200, json { status : "ok" })
 end
 
 # Helper: handle successful remove_member result.
 
-fn remove_success(n :: Int) do
-  HTTP.response(200, json { status : "ok", affected : n })
+fn remove_success() do
+  HTTP.response(200, json { status : "ok" })
 end
 
 # --- API token helper functions for case arm extraction (ORG-05) ---
@@ -84,8 +84,8 @@ end
 
 # Helper: handle successful revoke_api_key result.
 
-fn revoke_key_success(n :: Int) do
-  HTTP.response(200, json { status : "ok", affected : n })
+fn revoke_key_success() do
+  HTTP.response(200, json { status : "ok" })
 end
 
 # --- Add member helper chain ---
@@ -142,7 +142,7 @@ end
 fn perform_role_update(pool :: PoolHandle, membership_id :: String, role :: String) do
   let result = update_member_role(pool, membership_id, role)
   case result do
-    Ok( n) -> update_role_success(n)
+    Ok( _) -> update_role_success()
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -234,7 +234,7 @@ pub fn handle_remove_member(request) do
   let membership_id = require_param(request, "membership_id")
   let result = remove_member(pool, membership_id)
   case result do
-    Ok( n) -> remove_success(n)
+    Ok( _) -> remove_success()
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -279,7 +279,7 @@ pub fn handle_revoke_api_key(request) do
   let key_id = require_param(request, "key_id")
   let result = revoke_api_key(pool, key_id)
   case result do
-    Ok( n) -> revoke_key_success(n)
+    Ok( _) -> revoke_key_success()
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end

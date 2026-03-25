@@ -2,101 +2,61 @@
 id: T03
 parent: S01
 milestone: M033
-provides:
-  - Partial runtime-side expression write builder support plus a repaired `mesh-rt` export surface for the still-unfinished M033/S01 slice work
 key_files:
-  - compiler/mesh-rt/src/lib.rs
-  - compiler/mesh-rt/src/db/repo.rs
-  - .gsd/milestones/M033/slices/S01/S01-PLAN.md
+  - mesher/services/rate_limiter.mpl
+  - mesher/ingestion/pipeline.mpl
+  - mesher/services/event_processor.mpl
+  - compiler/meshc/tests/e2e_m033_s01.rs
+  - .gsd/KNOWLEDGE.md
 key_decisions:
-  - Stop at the runtime layer once the context-budget warning hit instead of pushing unverified compiler and Mesher rewrites on top of a missing `e2e_m033_s01` target
-patterns_established:
-  - Expression-valued Repo writes can be built as local-placeholder `SqlExpr` fragments and renumbered when stitched into `SET` / `ON CONFLICT` SQL assembly
-observability_surfaces:
-  - none yet; the intended `compiler/meshc/tests/e2e_m033_s01.rs` and `scripts/verify-m033-s01.sh` surfaces are still missing locally
-duration: 0.75h
-verification_result: failed
-completed_at: 2026-03-24 14:39 EDT
+  - Keep Mesher’s existing 60-second / 1000-event limiter defaults, but read optional `MESHER_RATE_LIMIT_WINDOW_SECONDS` and `MESHER_RATE_LIMIT_MAX_EVENTS` env vars and always spawn the reset ticker so live threshold proofs and operators can exercise the real fixed-window limiter honestly.
+  - When a Mesh service handler updates state and returns a reply, avoid branching directly between different `(state, reply)` tuples; compute branch-local values first and return one final tuple, which stabilized both `RateLimiter.CheckLimit` and `EventProcessor.ProcessEvent` on the live ingest path.
+duration: ""
+verification_result: mixed
+completed_at: 2026-03-25T07:41:19.053Z
 blocker_discovered: false
 ---
 
-# T03: Rewrite issue upsert and close the slice with live Mesher acceptance
+# T03: Fixed clean-start Mesher ingest by stabilizing rate-limit and processor service returns and adding a live first-event rate-limit proof
 
-**Partially landed the runtime-side expression SQL builders and cleaned `mesh-rt` exports before a forced context wrap.**
+**Fixed clean-start Mesher ingest by stabilizing rate-limit and processor service returns and adding a live first-event rate-limit proof**
 
 ## What Happened
 
-I started by verifying the slice reality instead of trusting the task plan snapshot. The repo still had no `compiler/meshc/tests/e2e_m033_s01.rs`, no `scripts/verify-m033-s01.sh`, no Mesh-visible `Expr` module, and the T02-owned Mesher write families were still on raw SQL.
+I started by reproducing the task’s live Postgres-backed failure on the seeded default API key. Local reality had drifted slightly from the prior summary: the first `/api/v1/events` request was not returning a clean 429 in the harness anymore, it was crashing Mesher and yielding an empty HTTP reply. I confirmed that unauthenticated and invalid-key requests still returned 401, so the crash sat after auth on the valid ingest path.
 
-Given that gap, I only touched the runtime layer before the context-budget stop:
+I isolated the first root cause with standalone Mesh probes and live Mesher runs: `RateLimiter.CheckLimit` misbehaved when the service handler branched directly between different `(state, reply)` tuples. On a fresh limiter it returned `false` on the first call and could crash afterward, even though the same `Map.get` / `Map.put` logic worked outside the service. I rewrote `mesher/services/rate_limiter.mpl` to compute `allowed` and `next_limits` first, then return one final tuple. I also restored the intended fixed-window behavior by adding `start_rate_limiter(...)`, which spawns the reset ticker, and I wired `mesher/ingestion/pipeline.mpl` to read optional `MESHER_RATE_LIMIT_WINDOW_SECONDS` / `MESHER_RATE_LIMIT_MAX_EVENTS` env vars while preserving the existing `60s / 1000` defaults.
 
-- `compiler/mesh-rt/src/lib.rs`
-  - removed the stray duplicated/truncated tail that had corrupted the file
-  - re-exported the existing `mesh_expr_*` runtime entrypoints
-  - re-exported new planned Repo expression-write symbols (`mesh_repo_update_where_expr`, `mesh_repo_insert_or_update_expr`)
-- `compiler/mesh-rt/src/db/repo.rs`
-  - added `SqlExpr` imports and map readers for `Map<String, Ptr>` expression updates
-  - added pure SQL builders for expression-valued `UPDATE ... SET ... WHERE ... RETURNING *` and `INSERT ... ON CONFLICT ... DO UPDATE SET ... RETURNING *`
-  - added runtime entrypoints `mesh_repo_update_where_expr(...)` and `mesh_repo_insert_or_update_expr(...)`
-  - added unit tests for placeholder ordering across expression-valued `SET` / `ON CONFLICT` assembly
+Once the limiter stopped corrupting the first call, the same live repro still crashed when the route handed work to `EventProcessor.process_event(...)`. I traced that boundary with a temporary route log, then rewrote `mesher/services/event_processor.mpl` to use the same single-return service pattern: route the event through pure helpers to obtain one `String ! String` result, compute the next `processed_count`, and return one final `(new_state, result)` tuple. That removed the processor-side crash without changing the ingest semantics.
 
-I did **not** finish the compiler wiring, Mesher rewrites, live acceptance target, or verification script. The repo is left in an intentionally explicit partial state rather than a falsely “done” slice.
+With the live path stable, I extended `compiler/meshc/tests/e2e_m033_s01.rs` so the harness can inject a small real rate-limit threshold through Mesher env vars and added the focused named proof `e2e_m033_mesher_ingest_first_event`. The test now proves a freshly started Mesher instance accepts the first seeded-key event, accepts a second event while still under the configured threshold, returns HTTP 429 only on the third event once the threshold is exceeded, and leaves the DB-side `issues.event_count` unchanged on the rejected request. I also widened the existing listener-log assertion helper to accept the runtime’s `[::]:port` HTTP listener banner, which was already the real output on this machine.
+
+After the targeted gate passed, I reran the broader `mesher_mutations` slice proof as a partial slice-level smoke check. It now advances past the repaired ingest step and fails later on `/issues/:id/assign` with a non-exhaustive match inside `assign_issue`, which is a newly exposed downstream bug rather than a plan-invalidating T03 blocker.
 
 ## Verification
 
-I only ran an early repro command to confirm the slice target is still absent. I did not run the task gate or slice gate after the partial runtime edits because the context-budget stop arrived before the compiler/test layers were wired.
+Verified with `cargo test -p meshc --test e2e_m033_s01 mesher_ingest_first_event -- --nocapture`, which now passes and proves first-event acceptance plus truthful threshold-based 429 behavior on the live Mesher path. I also manually replayed seeded-key ingest against a supervised Mesher process during debugging to confirm the repaired path returned `202 Accepted` and then `429 Too Many Requests` at the configured limit. As a broader slice-level smoke check, I ran `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`; it now gets past the former clean-start ingest blocker and fails later in `assign_issue`, which confirms T03 unblocked the ingress path while surfacing the next defect.
 
 ## Verification Evidence
 
 | # | Command | Exit Code | Verdict | Duration |
 |---|---------|-----------|---------|----------|
-| 1 | `cargo test -p meshc --test e2e_m033_s01 -- --nocapture` | 101 | ❌ fail | n/a |
+| 1 | `cargo test -p meshc --test e2e_m033_s01 mesher_ingest_first_event -- --nocapture` | 0 | ✅ pass | 33200ms |
+| 2 | `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture` | 101 | ❌ fail | 28500ms |
 
-## Diagnostics
-
-Resume in this order:
-
-1. `compiler/mesh-typeck/src/infer.rs`
-   - add the `Expr` stdlib module surface (`column`, `value`, `null`, `call`, arithmetic/comparison, `case`, `coalesce`, `excluded`, `alias`)
-   - add `Repo.update_where_expr(...)` and `Repo.insert_or_update_expr(...)` signatures
-   - add `Expr` to `STDLIB_MODULE_NAMES`
-2. `compiler/mesh-codegen/src/mir/lower.rs`
-   - register `mesh_expr_*`, `mesh_repo_update_where_expr`, and `mesh_repo_insert_or_update_expr` in `known_functions`
-   - extend the builtin-name mapping table with `expr_*`, `repo_update_where_expr`, and `repo_insert_or_update_expr`
-3. `compiler/mesh-codegen/src/codegen/intrinsics.rs`
-   - declare the new `mesh_expr_*` externs plus the new Repo expression-write externs
-4. `mesher/storage/queries.mpl`
-   - rewrite the still-raw S01-owned functions onto the new surface: `revoke_api_key`, `assign_issue`, `acknowledge_alert`, `resolve_fired_alert`, `update_project_settings`, and `upsert_issue`
-   - then update the boundary comments so the raw keep-list is truthful again
-5. `compiler/meshc/tests/e2e_m033_s01.rs`
-   - create the missing target from scratch
-   - include at least: `e2e_m033_expr_*`, `expr_error_*`, `mesher_mutations*`, and `mesher_issue_upsert*`
-6. `scripts/verify-m033-s01.sh`
-   - add the repo-root closeout script after the test target exists
-   - include explicit non-zero-test-count checks per the project knowledge note
-7. After those land, rerun the full slice gate:
-   - `cargo test -p meshc --test e2e_m033_s01 -- --nocapture`
-   - `cargo test -p meshc --test e2e_m033_s01 expr_error_ -- --nocapture`
-   - `cargo run -q -p meshc -- fmt --check mesher`
-   - `cargo run -q -p meshc -- build mesher`
-   - `bash scripts/verify-m033-s01.sh`
 
 ## Deviations
 
-I did not execute the written T03 Mesher rewrite and acceptance steps. The local tree was still missing the entire compiler-visible expression surface and the `e2e_m033_s01` target, so I stopped after partial runtime work when the context-budget warning arrived.
+I added optional Mesher env-based rate-limit configuration and a rate-limiter startup helper so the live harness could prove the real threshold at a small limit instead of sending 1000+ events. I also had to repair `mesher/services/event_processor.mpl`, which was not listed in the original task plan, because once the limiter was fixed the next crash moved to the processor service-return path and still blocked truthful first-event acceptance.
 
 ## Known Issues
 
-- `compiler/mesh-typeck/src/infer.rs` is still missing the `Expr` module and the new Repo expression-write signatures.
-- `compiler/mesh-codegen/src/mir/lower.rs` and `compiler/mesh-codegen/src/codegen/intrinsics.rs` still do not know about the new runtime symbols.
-- `mesher/storage/queries.mpl` still contains the T02/T03 raw SQL families.
-- `compiler/meshc/tests/e2e_m033_s01.rs` still does not exist.
-- `scripts/verify-m033-s01.sh` still does not exist.
-- The new runtime entrypoints in `compiler/mesh-rt/src/db/repo.rs` are unverified because the compiler stack does not expose them yet.
+`cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture` now fails later on `/api/v1/issues/:id/assign` with `Mesh panic at <unknown>:0: non-exhaustive match in switch` inside `assign_issue`. The clean-start ingest blocker is fixed, but the broader mutation proof still has this downstream route/storage bug to resolve in subsequent work.
 
 ## Files Created/Modified
 
-- `compiler/mesh-rt/src/lib.rs` — repaired the corrupted export tail and re-exported the expression / Repo-expression runtime symbols
-- `compiler/mesh-rt/src/db/repo.rs` — added expression-map readers, pure SQL builders, runtime entrypoints, and unit tests for expression-valued Repo writes
-- `.gsd/milestones/M033/slices/S01/tasks/T03-SUMMARY.md` — recorded the forced wrap-up, current partial state, and exact resume order
-- `.gsd/milestones/M033/slices/S01/S01-PLAN.md` — marked T03 done on disk per the auto-mode harness requirement
+- `mesher/services/rate_limiter.mpl`
+- `mesher/ingestion/pipeline.mpl`
+- `mesher/services/event_processor.mpl`
+- `compiler/meshc/tests/e2e_m033_s01.rs`
+- `.gsd/KNOWLEDGE.md`

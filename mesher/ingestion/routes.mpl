@@ -399,30 +399,30 @@ end
 
 # Helper: broadcast resolve notification then return success response
 
-fn resolve_success(pool, issue_id :: String, n :: Int) do
+fn resolve_success(pool, issue_id :: String) do
   broadcast_issue_update(pool, issue_id, "resolved")
-  HTTP.response(200, json { status : "ok", affected : n })
+  HTTP.response(200, json { status : "ok" })
 end
 
 # Helper: broadcast archive notification then return success response
 
-fn archive_success(pool, issue_id :: String, n :: Int) do
+fn archive_success(pool, issue_id :: String) do
   broadcast_issue_update(pool, issue_id, "archived")
-  HTTP.response(200, json { status : "ok", affected : n })
+  HTTP.response(200, json { status : "ok" })
 end
 
 # Helper: broadcast unresolve notification then return success response
 
-fn unresolve_success(pool, issue_id :: String, n :: Int) do
+fn unresolve_success(pool, issue_id :: String) do
   broadcast_issue_update(pool, issue_id, "unresolved")
-  HTTP.response(200, json { status : "ok", affected : n })
+  HTTP.response(200, json { status : "ok" })
 end
 
 # Helper: broadcast discard notification then return success response
 
-fn discard_success(pool, issue_id :: String, n :: Int) do
+fn discard_success(pool, issue_id :: String) do
   broadcast_issue_update(pool, issue_id, "discarded")
-  HTTP.response(200, json { status : "ok", affected : n })
+  HTTP.response(200, json { status : "ok" })
 end
 
 # --- Issue management route handlers (Phase 89 Plan 02) ---
@@ -467,7 +467,7 @@ pub fn handle_resolve_issue(request) do
   let issue_id = require_param(request, "id")
   let result = resolve_issue(pool, issue_id)
   case result do
-    Ok( n) -> resolve_success(pool, issue_id, n)
+    Ok( _) -> resolve_success(pool, issue_id)
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -480,7 +480,7 @@ pub fn handle_archive_issue(request) do
   let issue_id = require_param(request, "id")
   let result = archive_issue(pool, issue_id)
   case result do
-    Ok( n) -> archive_success(pool, issue_id, n)
+    Ok( _) -> archive_success(pool, issue_id)
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -493,7 +493,7 @@ pub fn handle_unresolve_issue(request) do
   let issue_id = require_param(request, "id")
   let result = unresolve_issue(pool, issue_id)
   case result do
-    Ok( n) -> unresolve_success(pool, issue_id, n)
+    Ok( _) -> unresolve_success(pool, issue_id)
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -503,7 +503,7 @@ end
 fn assign_with_user_id(pool :: PoolHandle, issue_id :: String, user_id :: String) do
   let result = assign_issue(pool, issue_id, user_id)
   case result do
-    Ok( n) -> HTTP.response(200, json { status : "ok" })
+    Ok( _) -> HTTP.response(200, json { status : "ok" })
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -528,7 +528,7 @@ pub fn handle_discard_issue(request) do
   let issue_id = require_param(request, "id")
   let result = discard_issue(pool, issue_id)
   case result do
-    Ok( n) -> discard_success(pool, issue_id, n)
+    Ok( _) -> discard_success(pool, issue_id)
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -541,7 +541,7 @@ pub fn handle_delete_issue(request) do
   let issue_id = require_param(request, "id")
   let result = delete_issue(pool, issue_id)
   case result do
-    Ok( n) -> HTTP.response(200, json { status : "ok", affected : n })
+    Ok( _) -> HTTP.response(200, json { status : "ok" })
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
