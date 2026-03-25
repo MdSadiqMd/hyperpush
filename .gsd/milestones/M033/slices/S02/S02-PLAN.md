@@ -43,7 +43,7 @@
   - Do: Add cast-capable expression internals and explicit `Pg.*` constructors for JSONB/search/pgcrypto work; teach `Query` to bind expression-valued `SELECT` / `WHERE` clauses through `select_params`; add `Repo.insert_expr`; wire the new calls through type inference, MIR lowering, runtime exports, and intrinsics; then move `create_user` and `authenticate_user` onto the new helper surface. Keep the public vendor-specific API under `Pg`, not `Expr`, so R040 stays intact.
   - Verify: `cargo run -q -p meshc -- build mesher`
   - Done when: compiled Mesh code can call the new `Pg.*`, `Query.*_expr`, and `Repo.insert_expr` entrypoints end-to-end, and the auth path no longer depends on raw `crypt(...)` fragments.
-- [ ] **T02: Rewrite Mesher JSONB and search flows onto explicit Pg helpers** `est:2.5h`
+- [x] **T02: Rewrite Mesher JSONB and search flows onto explicit Pg helpers** `est:2.5h`
   - Why: The slice demo is not true until the remaining S02-owned JSONB/search helpers move off raw query fragments and onto the explicit PG surface, advancing R037 while shrinking the honest raw tail for R038.
   - Files: `mesher/storage/queries.mpl`, `mesher/storage/writer.mpl`
   - Do: Rewrite `search_events_fulltext`, `filter_events_by_tag`, `event_breakdown_by_tag`, `create_alert_rule`, `fire_alert`, `insert_event`, `get_event_alert_rules`, and `get_threshold_rules` to use `Pg.*`, `Query.select_expr`, `Query.where_expr`, and `Repo.insert_expr`. Re-evaluate `extract_event_fields`; if it still needs ordinality/scalar-subquery work, keep it raw with an explicit S03 boundary comment instead of forcing it through a fake helper.

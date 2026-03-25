@@ -478,12 +478,11 @@ end
 # This keeps the fingerprint fallback chain next to the JSONB operators it depends
 # on: custom > stacktrace frames > exception type > message.
 # Returns a Map with keys: fingerprint, title, level.
-# ORM boundary: ORM fragments cannot express CASE/jsonb_array_elements/string_agg
-# fingerprint computation chain. This is the most complex SQL query in Mesher --
-# conditional fingerprint fallback with array element iteration, string aggregation,
-# and COALESCE chains. It also keeps server-side JSONB extraction on the same raw-SQL
-# side of the boundary as Storage.Writer.insert_event(...), instead of duplicating
-# JSON parsing or fingerprint assembly in Mesh. Intentional raw SQL.
+# Honest raw S03 keep-site: this query still depends on CASE + WITH ORDINALITY +
+# jsonb_array_elements/string_agg scalar-subquery behavior for the fingerprint
+# fallback chain. S02 moves the write-side/search-side PG helpers onto explicit
+# Pg.* surfaces, but this read-side ordinality boundary remains intentionally raw
+# until S03 can collapse it without pretending the expression surface is portable.
 
 pub fn extract_event_fields(pool :: PoolHandle, event_json :: String) -> Map < String, String > ! String do
   let sql = "SELECT CASE WHEN length(COALESCE(j->>'fingerprint', '')) > 0 THEN j->>'fingerprint' WHEN j->'stacktrace' IS NOT NULL AND jsonb_typeof(j->'stacktrace') = 'array' AND jsonb_array_length(j->'stacktrace') > 0 THEN (SELECT string_agg((frame->>'filename') || '|' || (frame->>'function_name'), ';' ORDER BY ordinality) FROM jsonb_array_elements(j->'stacktrace') WITH ORDINALITY AS t(frame, ordinality)) || ':' || lower(COALESCE(replace(j->>'message', '0x', ''), '')) WHEN j->'exception' IS NOT NULL AND j->'exception'->>'type_name' IS NOT NULL THEN (j->'exception'->>'type_name') || ':' || lower(COALESCE(replace(j->'exception'->>'value', '0x', ''), '')) ELSE 'msg:' || lower(COALESCE(replace(j->>'message', '0x', ''), '')) END AS fingerprint, COALESCE(NULLIF(j->>'message', ''), 'Untitled') AS title, COALESCE(j->>'level', 'error') AS level FROM (SELECT $1::jsonb AS j) AS sub"
@@ -528,25 +527,30 @@ end
 # SEARCH-02: Full-text search on event messages using inline tsvector.
 # Uses inline to_tsvector (avoids partition complications with stored tsvector column).
 # Includes 24-hour default time range (SEARCH-04) for partition pruning.
-# Returns relevance rank for ordering.
-# ORM boundary: ts_rank() with bound parameter in SELECT expression -- select_raw takes
-# a List of column expression strings but cannot bind parameters within those expressions.
-# The $2 reference in ts_rank(to_tsvector(...), plainto_tsquery('english', $2)) requires
-# positional parameter binding inside a SELECT column. Intentional raw SQL.
+# Returns relevance rank for ordering through expression-valued SELECT/WHERE helpers.
 
 pub fn search_events_fulltext(pool :: PoolHandle,
 project_id :: String,
 search_query :: String,
 limit_str :: String) -> List < Map < String, String > > ! String do
-  let sql = "SELECT id::text, issue_id::text, level, message, received_at::text, ts_rank(to_tsvector('english', message), plainto_tsquery('english', $2))::text AS rank FROM events WHERE project_id = $1::uuid AND to_tsvector('english', message) @@ plainto_tsquery('english', $2) AND received_at > now() - interval '24 hours' ORDER BY rank DESC, received_at DESC LIMIT $3::int"
-  let rows = Repo.query_raw(pool, sql, [project_id, search_query, limit_str]) ?
-  Ok(rows)
+  let lim = parse_limit(limit_str)
+  let search_vector = Pg.to_tsvector("english", Expr.column("message"))
+  let search_terms = Pg.plainto_tsquery("english", Expr.value(search_query))
+  let q = Query.from(Event.__table__())
+    |> Query.where_expr(Expr.eq(Expr.column("project_id"), Pg.uuid(Expr.value(project_id))))
+    |> Query.where_expr(Pg.tsvector_matches(search_vector, search_terms))
+    |> Query.where_raw("received_at > now() - interval '24 hours'", [])
+    |> Query.select(["id", "issue_id", "level", "message", "received_at"])
+    |> Query.select_expr(Expr.label(Pg.ts_rank(search_vector, search_terms), "rank"))
+    |> Query.order_by_raw("rank DESC, received_at DESC")
+    |> Query.limit(lim)
+  Repo.all(pool, q)
 end
 
 # SEARCH-03: Filter events by tag key-value pair using JSONB containment.
 # Uses tags @> ?::jsonb operator which leverages existing GIN index (idx_events_tags).
 # Includes 24-hour default time range (SEARCH-04).
-# Uses ORM Query.where_raw + Query.select_raw + Query.order_by + Query.limit + Repo.all.
+# Uses expression-valued WHERE composition for the JSONB predicate.
 
 pub fn filter_events_by_tag(pool :: PoolHandle,
 project_id :: String,
@@ -554,10 +558,10 @@ tag_json :: String,
 limit_str :: String) -> List < Map < String, String > > ! String do
   let lim = parse_limit(limit_str)
   let q = Query.from(Event.__table__())
-    |> Query.where_raw("project_id = ?::uuid", [project_id])
-    |> Query.where_raw("tags @> ?::jsonb", [tag_json])
+    |> Query.where_expr(Expr.eq(Expr.column("project_id"), Pg.uuid(Expr.value(project_id))))
+    |> Query.where_expr(Pg.jsonb_contains(Expr.column("tags"), Pg.jsonb(Expr.value(tag_json))))
     |> Query.where_raw("received_at > now() - interval '24 hours'", [])
-    |> Query.select_raw(["id::text", "issue_id::text", "level", "message", "tags::text", "received_at::text"])
+    |> Query.select(["id", "issue_id", "level", "message", "tags", "received_at"])
     |> Query.order_by(:received_at, :desc)
     |> Query.limit(lim)
   Repo.all(pool, q)
@@ -634,15 +638,21 @@ pub fn top_issues_by_frequency(pool :: PoolHandle, project_id :: String, limit_s
 end
 
 # DASH-04: Event breakdown by tag key (environment, release, etc.).
-# Uses JSONB key-exists operator to filter events that have the specified tag.
-# ORM boundary: tags->>$2 with bound parameter in SELECT expression -- select_raw takes
-# a List of column expression strings but cannot bind parameters within those expressions.
-# The $2 reference in tags->>$2 requires positional parameter binding inside a SELECT column. Intentional raw SQL.
+# Uses jsonb_exists/jsonb_extract_path_text through expression-valued helpers
+# so the JSONB key filter and projection stay on the explicit PG surface.
 
 pub fn event_breakdown_by_tag(pool :: PoolHandle, project_id :: String, tag_key :: String) -> List < Map < String, String > > ! String do
-  let sql = "SELECT tags->>$2 AS tag_value, count(*)::text AS count FROM events WHERE project_id = $1::uuid AND received_at > now() - interval '24 hours' AND tags ? $2 GROUP BY tag_value ORDER BY count DESC LIMIT 20"
-  let rows = Repo.query_raw(pool, sql, [project_id, tag_key]) ?
-  Ok(rows)
+  let q = Query.from(Event.__table__())
+    |> Query.where_expr(Expr.eq(Expr.column("project_id"), Pg.uuid(Expr.value(project_id))))
+    |> Query.where_raw("received_at > now() - interval '24 hours'", [])
+    |> Query.where_expr(Expr.fn_call("jsonb_exists", [Expr.column("tags"), Expr.value(tag_key)]))
+    |> Query.select_exprs([Expr.label(Expr.fn_call("jsonb_extract_path_text",
+    [Expr.column("tags"), Expr.value(tag_key)]),
+    "tag_value"), Expr.label(Expr.fn_call("count", [Expr.column("*")]), "count")])
+    |> Query.group_by_raw("1")
+    |> Query.order_by_raw("count DESC")
+    |> Query.limit(20)
+  Repo.all(pool, q)
 end
 
 # DASH-05: Per-issue event timeline (recent events for a specific issue).
@@ -750,19 +760,19 @@ pub fn list_api_keys(pool :: PoolHandle, project_id :: String) -> List < Map < S
 end
 
 # --- Alert system queries (Phase 92) ---
-# ALERT-01: Insert alert rule from JSON body using PostgreSQL JSONB extraction.
-# ORM boundary: INSERT...SELECT with server-side JSONB extraction from parameter ($2::jsonb)
-# and COALESCE defaults. Repo.insert takes Map<String,String> of literal values but this query
-# extracts and transforms fields from a JSONB parameter server-side. Intentional raw SQL.
+# ALERT-01: Insert alert rule from JSON body using Repo.insert_expr plus
+# PostgreSQL JSONB extraction/defaulting helpers.
 
 pub fn create_alert_rule(pool :: PoolHandle, project_id :: String, body :: String) -> String ! String do
-  let sql = "INSERT INTO alert_rules (project_id, name, condition_json, action_json, cooldown_minutes) SELECT $1::uuid, COALESCE(j->>'name', 'Unnamed Rule'), COALESCE((j->'condition')::jsonb, '{}'::jsonb), COALESCE((j->'action')::jsonb, '{\"type\":\"websocket\"}'::jsonb), COALESCE((j->>'cooldown_minutes')::int, 60) FROM (SELECT $2::jsonb AS j) AS sub RETURNING id::text"
-  let rows = Repo.query_raw(pool, sql, [project_id, body]) ?
-  if List.length(rows) > 0 do
-    Ok(Map.get(List.head(rows), "id"))
-  else
-    Err("create_alert_rule: no id returned")
-  end
+  let body_json = Pg.jsonb(Expr.value(body))
+  let row = Repo.insert_expr(pool,
+  AlertRule.__table__(),
+  %{"project_id" => Pg.uuid(Expr.value(project_id)), "name" => Expr.coalesce([Expr.fn_call("jsonb_extract_path_text",
+  [body_json, Expr.value("name")]), Expr.value("Unnamed Rule")]), "condition_json" => Expr.coalesce([Expr.fn_call("jsonb_extract_path",
+  [body_json, Expr.value("condition")]), Pg.jsonb(Expr.value("{}"))]), "action_json" => Expr.coalesce([Expr.fn_call("jsonb_extract_path",
+  [body_json, Expr.value("action")]), Pg.jsonb(Expr.value("{\"type\":\"websocket\"}"))]), "cooldown_minutes" => Expr.coalesce([Pg.int(Expr.fn_call("jsonb_extract_path_text",
+  [body_json, Expr.value("cooldown_minutes")])), Pg.int(Expr.value("60"))])}) ?
+  Ok(Map.get(row, "id"))
 end
 
 # ALERT-01: List all alert rules for a project.
@@ -816,10 +826,8 @@ cooldown_str :: String) -> Bool ! String do
   end
 end
 
-# ALERT-04/05: Insert alert record, update last_fired_at atomically, return alert_id.
-# ORM boundary: INSERT with jsonb_build_object() for computed JSONB column plus follow-up
-# UPDATE of last_fired_at = now(). Could split into two-step ORM pattern but jsonb_build_object
-# in INSERT VALUES is not expressible via Repo.insert Map<String,String>. Intentional raw SQL.
+# ALERT-04/05: Insert alert record, update last_fired_at, return alert_id.
+# Uses expression-valued insert/update helpers instead of raw jsonb_build_object SQL.
 
 pub fn fire_alert(pool :: PoolHandle,
 rule_id :: String,
@@ -827,17 +835,17 @@ project_id :: String,
 message :: String,
 condition_type :: String,
 rule_name :: String) -> String ! String do
-  let sql = "INSERT INTO alerts (rule_id, project_id, status, message, condition_snapshot) VALUES ($1::uuid, $2::uuid, 'active', $3, jsonb_build_object('condition_type', $4, 'rule_name', $5)) RETURNING id::text"
-  let rows = Repo.query_raw(pool, sql, [rule_id, project_id, message, condition_type, rule_name]) ?
-  if List.length(rows) > 0 do
-    let alert_id = Map.get(List.head(rows), "id")
-    Repo.execute_raw(pool,
-    "UPDATE alert_rules SET last_fired_at = now() WHERE id = $1::uuid",
-    [rule_id])
-    Ok(alert_id)
-  else
-    Err("fire_alert: no id returned")
-  end
+  let row = Repo.insert_expr(pool,
+  Alert.__table__(),
+  %{"rule_id" => Pg.uuid(Expr.value(rule_id)), "project_id" => Pg.uuid(Expr.value(project_id)), "status" => Expr.value("active"), "message" => Expr.value(message), "condition_snapshot" => Expr.fn_call("jsonb_build_object",
+  [Expr.value("condition_type"), Expr.value(condition_type), Expr.value("rule_name"), Expr.value(rule_name)])}) ?
+  let q = Query.from(AlertRule.__table__())
+    |> Query.where_expr(Expr.eq(Expr.column("id"), Pg.uuid(Expr.value(rule_id))))
+  Repo.update_where_expr(pool,
+  AlertRule.__table__(),
+  %{"last_fired_at" => Expr.fn_call("now", [])},
+  q) ?
+  Ok(Map.get(row, "id"))
 end
 
 # ALERT-03: Check if an issue was just created (first_seen = last_seen).
@@ -852,13 +860,16 @@ pub fn check_new_issue(pool :: PoolHandle, issue_id :: String) -> Bool ! String 
 end
 
 # ALERT-03: Get enabled alert rules for event-based conditions for a project.
-# Uses ORM Query.where_raw + Query.select_raw + Repo.all instead of Repo.query_raw.
+# Uses expression-valued JSONB extraction for condition_json filtering.
 
 pub fn get_event_alert_rules(pool :: PoolHandle, project_id :: String, condition_type :: String) -> List < Map < String, String > > ! String do
   let q = Query.from(AlertRule.__table__())
-    |> Query.where_raw("project_id = ?::uuid AND enabled = true AND condition_json->>'condition_type' = ?",
-    [project_id, condition_type])
-    |> Query.select_raw(["id::text", "name", "cooldown_minutes::text"])
+    |> Query.where_expr(Expr.eq(Expr.column("project_id"), Pg.uuid(Expr.value(project_id))))
+    |> Query.where_expr(Expr.eq(Expr.column("enabled"), Pg.cast(Expr.value("true"), "boolean")))
+    |> Query.where_expr(Expr.eq(Expr.fn_call("jsonb_extract_path_text",
+    [Expr.column("condition_json"), Expr.value("condition_type")]),
+    Expr.value(condition_type)))
+    |> Query.select(["id", "name", "cooldown_minutes"])
   Repo.all(pool, q)
 end
 
@@ -916,12 +927,15 @@ pub fn list_alerts(pool :: PoolHandle, project_id :: String, status :: String) -
 end
 
 # Load all enabled threshold rules for evaluation.
-# Uses ORM Query.where_raw + Query.select_raw + Repo.all instead of Repo.query_raw.
+# Uses expression-valued JSONB extraction for the threshold condition filter.
 
 pub fn get_threshold_rules(pool :: PoolHandle) -> List < Map < String, String > > ! String do
   let q = Query.from(AlertRule.__table__())
-    |> Query.where_raw("enabled = true AND condition_json->>'condition_type' = 'threshold'", [])
-    |> Query.select_raw(["id::text", "project_id::text", "name", "condition_json::text", "cooldown_minutes::text"])
+    |> Query.where_expr(Expr.eq(Expr.column("enabled"), Pg.cast(Expr.value("true"), "boolean")))
+    |> Query.where_expr(Expr.eq(Expr.fn_call("jsonb_extract_path_text",
+    [Expr.column("condition_json"), Expr.value("condition_type")]),
+    Expr.value("threshold")))
+    |> Query.select(["id", "project_id", "name", "condition_json", "cooldown_minutes"])
   Repo.all(pool, q)
 end
 
