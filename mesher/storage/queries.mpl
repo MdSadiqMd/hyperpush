@@ -162,10 +162,7 @@ end
 pub fn revoke_api_key(pool :: PoolHandle, key_id :: String) -> Int ! String do
   let q = Query.from(ApiKey.__table__())
     |> Query.where_raw("id = ?::uuid", [key_id])
-  Repo.update_where_expr(pool,
-  ApiKey.__table__(),
-  %{"revoked_at" => Expr.fn_call("now", [])},
-  q) ?
+  Repo.update_where_expr(pool, ApiKey.__table__(), %{"revoked_at" => Expr.fn_call("now", [])}, q) ?
   Ok(1)
 end
 
@@ -310,22 +307,12 @@ project_id :: String,
 fingerprint :: String,
 title :: String,
 level :: String) -> String ! String do
-  let insert_fields = %{
-    "project_id" => project_id,
-    "fingerprint" => fingerprint,
-    "title" => title,
-    "level" => level,
-    "event_count" => "1"
-  }
-  let update_fields = %{
-    "event_count" => Expr.add(Expr.column("issues.event_count"), Expr.value("1")),
-    "last_seen" => Expr.fn_call("now", []),
-    "status" => Expr.case_when(
-      [Expr.eq(Expr.column("issues.status"), Expr.value("resolved"))],
-      [Expr.value("unresolved")],
-      Expr.column("issues.status")
-    )
-  }
+  let insert_fields = %{"project_id" => project_id, "fingerprint" => fingerprint, "title" => title, "level" => level, "event_count" => "1"}
+  let update_fields = %{"event_count" => Expr.add(Expr.column("issues.event_count"),
+  Expr.value("1")), "last_seen" => Expr.fn_call("now", []), "status" => Expr.case_when([Expr.eq(Expr.column("issues.status"),
+  Expr.value("resolved"))],
+  [Expr.value("unresolved")],
+  Expr.column("issues.status"))}
   let row = Repo.insert_or_update_expr(pool,
   Issue.__table__(),
   insert_fields,
@@ -388,15 +375,9 @@ pub fn assign_issue(pool :: PoolHandle, issue_id :: String, user_id :: String) -
   let q = Query.from(Issue.__table__())
     |> Query.where_raw("id = ?::uuid", [issue_id])
   let result = if String.length(user_id) > 0 do
-    Repo.update_where_expr(pool,
-    Issue.__table__(),
-    %{"assigned_to" => Expr.value(user_id)},
-    q)
+    Repo.update_where_expr(pool, Issue.__table__(), %{"assigned_to" => Expr.value(user_id)}, q)
   else
-    Repo.update_where_expr(pool,
-    Issue.__table__(),
-    %{"assigned_to" => Expr.null()},
-    q)
+    Repo.update_where_expr(pool, Issue.__table__(), %{"assigned_to" => Expr.null()}, q)
   end
   case result do
     Ok( _) -> Ok(1)
