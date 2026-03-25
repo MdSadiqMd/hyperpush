@@ -21,10 +21,10 @@ This file is the explicit capability and coverage contract for the project.
 - Description: The ORM and migration surfaces should keep a neutral baseline API while allowing explicit PG or SQLite extras when the underlying capability is not honestly portable.
 - Why it matters: Fake portability preserves raw SQL and hides capability boundaries instead of making them explicit.
 - Source: user
-- Primary owning slice: M033/S01 (provisional)
-- Supporting slices: M033/S02, M033/S04 (provisional)
+- Primary owning slice: M033/S01
+- Supporting slices: M033/S02, M033/S04
 - Validation: mapped
-- Notes: The immediate implementation pressure is PG-first because that is what `mesher/` actually uses now.
+- Notes: M033 proves the neutral core through a real expression DSL first, then layers PG-specific helpers on top without collapsing the boundary.
 
 ### R037 — Mesh should expose PG-specific query and migration surfaces for the cases `mesher/` actually needs today: JSONB-heavy data access, expression-heavy updates, full-text search, crypto helpers, and partition-related DDL.
 - Class: integration
@@ -32,10 +32,10 @@ This file is the explicit capability and coverage contract for the project.
 - Description: Mesh should expose PG-specific query and migration surfaces for the cases `mesher/` actually needs today: JSONB-heavy data access, expression-heavy updates, full-text search, crypto helpers, and partition-related DDL.
 - Why it matters: Mesher's current escape hatches are concentrated in real PostgreSQL features, not generic SQL.
 - Source: execution
-- Primary owning slice: M033/S02 (provisional)
-- Supporting slices: M033/S03, M033/S04 (provisional)
+- Primary owning slice: M033/S02
+- Supporting slices: M033/S03, M033/S04
 - Validation: mapped
-- Notes: This is not a mandate to eliminate every escape hatch, only to cover the honest recurring pressure points.
+- Notes: PG-specific query and migration pressure is handled explicitly through JSONB, search, crypto, and partition/schema helper slices grounded in mesher.
 
 ### R038 — After M033, `mesher/` should use stronger Mesh ORM and migration surfaces for the cases they honestly cover, while retaining only a short justified keep-list of raw SQL and DDL escape hatches.
 - Class: quality-attribute
@@ -498,8 +498,8 @@ This file is the explicit capability and coverage contract for the project.
 | R033 | constraint | out-of-scope | none | none | n/a |
 | R034 | anti-feature | out-of-scope | none | none | n/a |
 | R035 | quality-attribute | validated | M032/S01 | M032/S03, M032/S04, M032/S05, M032/S06 | Validated by the named `e2e_m032_*` proofs, `bash scripts/verify-m032-s01.sh`, Mesher fmt/build, the negative grep over stale disproven limitation phrases, the positive grep over the retained keep-sites in `mesher/ingestion/routes.mpl`, `mesher/services/stream_manager.mpl`, `mesher/services/writer.mpl`, `mesher/ingestion/pipeline.mpl`, `mesher/services/event_processor.mpl`, `mesher/ingestion/fingerprint.mpl`, `mesher/services/retention.mpl`, `mesher/api/team.mpl`, `mesher/storage/queries.mpl`, `mesher/storage/writer.mpl`, `mesher/migrations/20260216120000_create_initial_schema.mpl`, `mesher/types/event.mpl`, and `mesher/types/issue.mpl`, plus the backfilled `.gsd/milestones/M032/slices/S01/S01-UAT.md` acceptance artifact that now replays the current proof bundle instead of a placeholder. |
-| R036 | core-capability | active | M033/S01 (provisional) | M033/S02, M033/S04 (provisional) | mapped |
-| R037 | integration | active | M033/S02 (provisional) | M033/S03, M033/S04 (provisional) | mapped |
+| R036 | core-capability | active | M033/S01 | M033/S02, M033/S04 | mapped |
+| R037 | integration | active | M033/S02 | M033/S03, M033/S04 | mapped |
 | R038 | quality-attribute | active | M033/S03 (provisional) | M033/S04, M033/S05 (provisional) | mapped |
 | R039 | launchability | active | M033/S04 (provisional) | M033/S02 (provisional) | mapped |
 | R040 | constraint | active | M033/S01 (provisional) | M033/S02 (provisional) | mapped |
