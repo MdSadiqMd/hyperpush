@@ -38,7 +38,7 @@
 
 ## Tasks
 
-- [ ] **T01: Ship the neutral expression contract through compiler and runtime** `est:2.5h`
+- [x] **T01: Ship the neutral expression contract through compiler and runtime** `est:2.5h`
   - Why: R036 and R040 are blocked until Mesh has a real neutral expression surface that can represent portable computed writes without smuggling PostgreSQL syntax through raw strings.
   - Files: `compiler/mesh-rt/src/db/expr.rs`, `compiler/mesh-rt/src/db/query.rs`, `compiler/mesh-rt/src/db/repo.rs`, `compiler/mesh-rt/src/db/mod.rs`, `compiler/mesh-rt/src/lib.rs`, `compiler/mesh-typeck/src/infer.rs`, `compiler/mesh-codegen/src/mir/lower.rs`, `compiler/mesh-codegen/src/codegen/intrinsics.rs`, `compiler/meshc/tests/e2e_m033_s01.rs`
   - Do: Add a dedicated neutral expression builder and the expression-aware Query/Repo entrypoints Mesher needs for expression-valued `SELECT`, `SET`, and `ON CONFLICT` work. Cover column refs, literals/params, `NULL`, function calls, arithmetic/comparison, `CASE`, and `COALESCE`, plus whatever neutral conflict-update reference the upsert path needs. Wire the new surface through type inference, MIR lowering, runtime exports, and serializer logic, and add named `e2e_m033_expr_*` proofs for placeholder stability and portable expression rendering. Keep PG-only JSONB/search/crypto helpers out of this task.
