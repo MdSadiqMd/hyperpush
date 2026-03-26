@@ -2,6 +2,29 @@
 id: T01
 parent: S05
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["website/docs/docs/databases/index.md"]
+key_decisions: ["Reframed the public database docs around the shipped Mesh/Mesher M033 contract instead of preserving the older generic SQLite/Pg/Pool brochure.", "Documented PostgreSQL-specific behavior explicitly under `Pg.*` and called out the remaining raw escape hatches by name instead of implying zero raw SQL/DDL."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified the rewritten docs page with a full `npm --prefix website run build`, which passed after the frontmatter quoting fix. Ran a targeted `rg` truth sweep on `website/docs/docs/databases/index.md` to confirm the required public contract strings are present: `Expr.label`, `Expr.value`, `Expr.column`, `Expr.null`, `Expr.case_when`, `Expr.coalesce`, `Query.where_expr`, `Query.select_exprs`, `Repo.insert_expr`, `Repo.update_where_expr`, `Repo.insert_or_update_expr`, `Migration.create_index`, `Repo.query_raw`, `Repo.execute_raw`, `Migration.execute`, explicit `Pg.*` references, and the SQLite-later wording. Ran the slice-level acceptance command `bash scripts/verify-m033-s05.sh`; it failed with exit code 127 because the script does not exist yet, which is the expected partial state for T01 because T02 owns creation of the canonical S05 verifier."
+completed_at: 2026-03-26T00:56:26.194Z
+blocker_discovered: false
+---
+
+# T01: Rewrite the public database guide around the real Mesh/Mesher boundary and proof surface
+
+> Rewrite the public database guide around the real Mesh/Mesher boundary and proof surface
+
+## What Happened
+---
+id: T01
+parent: S05
+milestone: M033
 key_files:
   - website/docs/docs/databases/index.md
 key_decisions:
@@ -45,3 +68,10 @@ None beyond quoting the new frontmatter description after the docs build exposed
 ## Files Created/Modified
 
 - `website/docs/docs/databases/index.md`
+
+
+## Deviations
+None beyond quoting the new frontmatter description after the docs build exposed a YAML parsing issue; the planned content contract and output file stayed the same.
+
+## Known Issues
+`scripts/verify-m033-s05.sh` does not exist yet, so the slice-level acceptance command remains pending T02. Slice verification is therefore partial at the end of T01 even though the docs page itself now builds cleanly.

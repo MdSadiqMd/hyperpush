@@ -2,6 +2,31 @@
 id: T01
 parent: S01
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/mesh-rt/src/db/query.rs", "compiler/mesh-rt/src/db/repo.rs", "compiler/mesh-rt/src/lib.rs", "compiler/mesh-typeck/src/infer.rs", "compiler/mesh-codegen/src/mir/lower.rs", "compiler/mesh-codegen/src/codegen/intrinsics.rs", "compiler/meshc/tests/e2e_m033_s01.rs", ".gsd/KNOWLEDGE.md"]
+key_decisions: ["Represent structured SELECT items as internal `EXPR:` query slots plus ordered `select_params` so placeholder numbering stays stable without exposing `RAW:` to Mesh code.", "Expose `Expr.label(...)` as the Mesh-callable aliasing surface for now, while still lowering to `mesh_expr_alias`, because `Expr.alias(...)` currently collides with keyword parsing after module qualification.", "Make the M033/S01 compiler e2e helper rebuild `mesh-rt` once before temp-project compilation so new runtime ABI symbols are present in `target/debug/libmesh_rt.a` during Mesh binary linking."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Task-level verification passed with the new focused proofs: `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture` passed with `e2e_m033_expr_select_executes`, `e2e_m033_expr_repo_executes`, and both `expr_error_*` checks green; `cargo test -p mesh-rt db::repo::tests::test_select_expr_sql_renumbers_select_params_before_where_params -- --nocapture` passed to prove SQL placeholder stability in the runtime builder; and `cargo run -q -p meshc -- build mesher` passed after the compiler/runtime wiring changes.
+
+I also ran the broader slice acceptance target `cargo test -p meshc --test e2e_m033_s01 -- --nocapture` to assess slice status under recovery. That broader suite failed only in the later Mesher mutation/upsert acceptance tests because `/api/v1/events` returned HTTP 429 rate-limit responses; the expr-focused proofs and both `expr_error_*` checks inside the same run passed."
+completed_at: 2026-03-25T06:30:01.049Z
+blocker_discovered: false
+---
+
+# T01: Added Query.select_exprs with compiler/runtime wiring and expr select e2e coverage
+
+> Added Query.select_exprs with compiler/runtime wiring and expr select e2e coverage
+
+## What Happened
+---
+id: T01
+parent: S01
+milestone: M033
 key_files:
   - compiler/mesh-rt/src/db/query.rs
   - compiler/mesh-rt/src/db/repo.rs
@@ -69,3 +94,10 @@ The broader slice acceptance target `cargo test -p meshc --test e2e_m033_s01 -- 
 - `compiler/mesh-codegen/src/codegen/intrinsics.rs`
 - `compiler/meshc/tests/e2e_m033_s01.rs`
 - `.gsd/KNOWLEDGE.md`
+
+
+## Deviations
+Added a Mesh-callable `Expr.label(...)` synonym that maps to the same runtime alias intrinsic because `Expr.alias(...)` currently collides with keyword parsing in Mesh source. Also updated the `e2e_m033_s01` temp-project compile helper to rebuild `mesh-rt` once before invoking `meshc`, because new runtime ABI symbols can otherwise link against a stale `libmesh_rt.a` during compiler e2e runs.
+
+## Known Issues
+The broader slice acceptance target `cargo test -p meshc --test e2e_m033_s01 -- --nocapture` is still red in `e2e_m033_mesher_mutations` and `e2e_m033_mesher_issue_upsert`: both fail because `/api/v1/events` returns HTTP 429 from Mesher’s rate limiter. That drift is outside the focused T01 expression-core contract, but it means the full slice gate and `scripts/verify-m033-s01.sh` were not green at task close.

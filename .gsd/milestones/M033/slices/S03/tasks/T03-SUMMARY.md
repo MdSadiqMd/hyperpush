@@ -2,6 +2,29 @@
 id: T03
 parent: S03
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/meshc/tests/e2e_m033_s03.rs", ".gsd/KNOWLEDGE.md", ".gsd/DECISIONS.md"]
+key_decisions: ["Use the live Mesher HTTP/API harness for S03 composed-read proofs instead of extending the copied storage-only Mesh probe, because the probe failures were no longer an honest signal for caller-contract correctness.", "Treat the new failures as product-side caller-contract bugs in Mesher routes/alert flow rather than as more storage-probe drift; the next unit should debug route serialization and live handler behavior before changing the Rust harness again."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Ran the authoritative T03 gate after the live-harness rewrite: `cargo test -p meshc --test e2e_m033_s03 composed_reads -- --nocapture`. The test target compiled and exercised the new Mesher-backed harness, then failed on live caller-contract regressions rather than on the old storage-probe staging bugs. I did not start another verification cycle or rerun `cargo run -q -p meshc -- build mesher` after the wrap-up warning; the next unit should fix the live route/alert failures first, then rerun the composed-read gate and the build/script checks."
+completed_at: 2026-03-25T19:54:34.482Z
+blocker_discovered: true
+---
+
+# T03: Rewrite the S03 composed-read harness onto live Mesher routes and capture the remaining caller-contract regressions as the blocker
+
+> Rewrite the S03 composed-read harness onto live Mesher routes and capture the remaining caller-contract regressions as the blocker
+
+## What Happened
+---
+id: T03
+parent: S03
+milestone: M033
 key_files:
   - compiler/meshc/tests/e2e_m033_s03.rs
   - .gsd/KNOWLEDGE.md
@@ -49,3 +72,10 @@ The Mesher-backed composed-read gate still fails. `/api/v1/projects/:project_id/
 - `compiler/meshc/tests/e2e_m033_s03.rs`
 - `.gsd/KNOWLEDGE.md`
 - `.gsd/DECISIONS.md`
+
+
+## Deviations
+I did not finish the planned Mesher-backed proof surface closeout. I rewrote the composed-read harness onto live Mesher HTTP routes, but the first authoritative rerun surfaced real caller-contract regressions in Mesher itself, so I stopped in wrap-up mode instead of attempting another debugging round without enough context budget.
+
+## Known Issues
+The Mesher-backed composed-read gate still fails. `/api/v1/projects/:project_id/issues` currently returns blank `id`/`title`/`level`/`status` fields while counts/timestamps survive, `/api/v1/projects/:project_id/dashboard/volume` currently drops `bucket` values while keeping counts, `/api/v1/issues/:issue_id/events` currently crashes in `_handle_list_issue_events` with `non-exhaustive match in switch`, and the new-issue ingest path did not create the expected fresh alert for the live alert proof.

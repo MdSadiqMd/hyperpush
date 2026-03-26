@@ -2,6 +2,29 @@
 id: T04
 parent: S03
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["mesher/storage/queries.mpl"]
+key_decisions: ["Use conditional `Query` assembly plus small Mesh-side composition to retire whole-query read SQL instead of inventing a fake universal SQL abstraction.", "Stabilize the file in a compileable partial state once the context-budget warning arrived, and leave the remaining red proof families as explicit resume targets rather than starting another unfocused debug cycle."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Reproduced the live S03 regression with `cargo test -p meshc --test e2e_m033_s03 composed_reads -- --nocapture`, which failed in four named composed-read families: unresolved issue listing lost caller-visible fields, dashboard volume lost the bucket projection, `/api/v1/issues/:issue_id/events` crashed in the live handler, and the fresh new-issue alert never inserted. After stopping at the context-budget warning and fixing only the partial-pass syntax risks, reran `cargo run -q -p meshc -- build mesher`, which passed and confirmed the edited Mesh sources still compile. I did not rerun the failing test target after the partial rewrites, did not add the planned `hard_reads` proofs yet, and did not run the slice verifier script in this unit."
+completed_at: 2026-03-25T20:11:57.389Z
+blocker_discovered: false
+---
+
+# T04: Stabilized a partial T04 pass with builder-backed issue/event read rewrites and precise resume notes for the remaining S03 regressions
+
+> Stabilized a partial T04 pass with builder-backed issue/event read rewrites and precise resume notes for the remaining S03 regressions
+
+## What Happened
+---
+id: T04
+parent: S03
+milestone: M033
 key_files:
   - mesher/storage/queries.mpl
 key_decisions:
@@ -62,3 +85,10 @@ The T04 pass is incomplete. `get_event_neighbors(...)`, `evaluate_threshold_rule
 ## Files Created/Modified
 
 - `mesher/storage/queries.mpl`
+
+
+## Deviations
+Stopped at the context-budget warning before finishing the planned `get_event_neighbors(...)` / `evaluate_threshold_rule(...)` rewrites, before adding `e2e_m033_s03_hard_reads_*`, and before rerunning the red composed-read proofs. This was a controlled wrap-up for clean handoff rather than a plan change.
+
+## Known Issues
+The T04 pass is incomplete. `get_event_neighbors(...)`, `evaluate_threshold_rule(...)`, `get_event_alert_rules(...)`, and `get_threshold_rules(...)` still need the remaining T04 work. The last reproduced test run still had four failing composed-read families: unresolved issue listing, dashboard aggregates, detail/event list routing, and alert insert/cooldown behavior. `scripts/verify-m033-s03.sh` and the planned `hard_reads` proofs were not added in this unit.

@@ -2,6 +2,31 @@
 id: T01
 parent: S04
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/mesh-rt/src/db/migration.rs", "compiler/mesh-rt/src/db/pg_schema.rs", "compiler/mesh-rt/src/db/mod.rs", "compiler/mesh-rt/src/lib.rs", "compiler/mesh-typeck/src/infer.rs", "compiler/mesh-codegen/src/mir/lower.rs", "compiler/mesh-codegen/src/codegen/intrinsics.rs", "compiler/mesh-repl/src/jit.rs"]
+key_decisions: ["Keep `Migration.create_index(...)` strictly neutral by supporting only exact `name:...`, `unique:true|false`, `where:...`, and per-column `:ASC` / `:DESC`, while rejecting PG-only index method/opclass syntax with `Migration.create_index`-named errors.", "Put PostgreSQL-only schema behavior behind a dedicated `Pg` helper family implemented as explicit runtime intrinsics, and keep partition naming/date math in database-side SQL built from `current_date` rather than host-clock computation."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Task-level verification passed: `cargo test -p mesh-rt migration -- --nocapture` ran 24 migration/pg_schema unit tests successfully, and `cargo build -p meshc` completed successfully after the new runtime/typechecker/codegen/JIT wiring landed.
+
+Slice-level acceptance checks were also exercised for truthful partial status on this intermediate task. `cargo run -q -p meshc -- fmt --check mesher` passed and `cargo run -q -p meshc -- build mesher` passed, confirming the new compiler/runtime surfaces did not break Mesher formatting or compilation. The S04-specific proof target `cargo test -p meshc --test e2e_m033_s04 -- --nocapture` and the slice verifier `bash scripts/verify-m033-s04.sh` failed because those T04 acceptance artifacts do not exist yet in the working tree; this is expected slice incompleteness, not a regression introduced by T01."
+completed_at: 2026-03-25T22:47:51.387Z
+blocker_discovered: false
+---
+
+# T01: Add explicit Pg schema helpers and honest Migration.create_index support
+
+> Add explicit Pg schema helpers and honest Migration.create_index support
+
+## What Happened
+---
+id: T01
+parent: S04
+milestone: M033
 key_files:
   - compiler/mesh-rt/src/db/migration.rs
   - compiler/mesh-rt/src/db/pg_schema.rs
@@ -70,3 +95,10 @@ The slice-level S04 acceptance surfaces `compiler/meshc/tests/e2e_m033_s04.rs` a
 - `compiler/mesh-codegen/src/mir/lower.rs`
 - `compiler/mesh-codegen/src/codegen/intrinsics.rs`
 - `compiler/mesh-repl/src/jit.rs`
+
+
+## Deviations
+None.
+
+## Known Issues
+The slice-level S04 acceptance surfaces `compiler/meshc/tests/e2e_m033_s04.rs` and `scripts/verify-m033-s04.sh` are not present yet, so `cargo test -p meshc --test e2e_m033_s04 -- --nocapture` currently exits 101 and `bash scripts/verify-m033-s04.sh` exits 127 until T04 lands.

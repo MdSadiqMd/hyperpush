@@ -2,6 +2,29 @@
 id: T03
 parent: S01
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["mesher/services/rate_limiter.mpl", "mesher/ingestion/pipeline.mpl", "mesher/services/event_processor.mpl", "compiler/meshc/tests/e2e_m033_s01.rs", ".gsd/KNOWLEDGE.md"]
+key_decisions: ["Keep Mesher’s existing 60-second / 1000-event limiter defaults, but read optional `MESHER_RATE_LIMIT_WINDOW_SECONDS` and `MESHER_RATE_LIMIT_MAX_EVENTS` env vars and always spawn the reset ticker so live threshold proofs and operators can exercise the real fixed-window limiter honestly.", "When a Mesh service handler updates state and returns a reply, avoid branching directly between different `(state, reply)` tuples; compute branch-local values first and return one final tuple, which stabilized both `RateLimiter.CheckLimit` and `EventProcessor.ProcessEvent` on the live ingest path."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified with `cargo test -p meshc --test e2e_m033_s01 mesher_ingest_first_event -- --nocapture`, which now passes and proves first-event acceptance plus truthful threshold-based 429 behavior on the live Mesher path. I also manually replayed seeded-key ingest against a supervised Mesher process during debugging to confirm the repaired path returned `202 Accepted` and then `429 Too Many Requests` at the configured limit. As a broader slice-level smoke check, I ran `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`; it now gets past the former clean-start ingest blocker and fails later in `assign_issue`, which confirms T03 unblocked the ingress path while surfacing the next defect."
+completed_at: 2026-03-25T07:41:19.042Z
+blocker_discovered: false
+---
+
+# T03: Fixed clean-start Mesher ingest by stabilizing rate-limit and processor service returns and adding a live first-event rate-limit proof
+
+> Fixed clean-start Mesher ingest by stabilizing rate-limit and processor service returns and adding a live first-event rate-limit proof
+
+## What Happened
+---
+id: T03
+parent: S01
+milestone: M033
 key_files:
   - mesher/services/rate_limiter.mpl
   - mesher/ingestion/pipeline.mpl
@@ -60,3 +83,10 @@ I added optional Mesher env-based rate-limit configuration and a rate-limiter st
 - `mesher/services/event_processor.mpl`
 - `compiler/meshc/tests/e2e_m033_s01.rs`
 - `.gsd/KNOWLEDGE.md`
+
+
+## Deviations
+I added optional Mesher env-based rate-limit configuration and a rate-limiter startup helper so the live harness could prove the real threshold at a small limit instead of sending 1000+ events. I also had to repair `mesher/services/event_processor.mpl`, which was not listed in the original task plan, because once the limiter was fixed the next crash moved to the processor service-return path and still blocked truthful first-event acceptance.
+
+## Known Issues
+`cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture` now fails later on `/api/v1/issues/:id/assign` with `Mesh panic at <unknown>:0: non-exhaustive match in switch` inside `assign_issue`. The clean-start ingest blocker is fixed, but the broader mutation proof still has this downstream route/storage bug to resolve in subsequent work.

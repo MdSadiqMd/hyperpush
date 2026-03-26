@@ -2,6 +2,29 @@
 id: T01
 parent: S02
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/mesh-rt/src/db/expr.rs", "compiler/mesh-rt/src/db/query.rs", "compiler/mesh-rt/src/db/repo.rs", "compiler/mesh-rt/src/lib.rs", "compiler/mesh-typeck/src/infer.rs", "compiler/mesh-codegen/src/mir/lower.rs", "compiler/mesh-codegen/src/codegen/intrinsics.rs", "mesher/storage/queries.mpl"]
+key_decisions: ["Kept vendor-specific SQL behavior explicit under the `Pg` module and did not absorb PG-only names into the neutral `Expr` API.", "Represented PG casts as structured expression nodes so JSONB/int/regconfig-style casts serialize safely without inventing a fake universal SQL AST.", "Used structured `Query.where_expr` and `Repo.insert_expr` plumbing for the Mesher auth path so pgcrypto verification/hash generation no longer depends on raw SQL fragments."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified the new plumbing with a targeted runtime unit test and then reran the task-contract checks. `cargo test -p mesh-rt test_insert_expr_sql_preserves_expr_param_order -- --nocapture` passed, confirming expression-valued INSERT SQL preserves parameter order. `cargo run -q -p meshc -- fmt --check mesher` initially failed on formatter drift in `mesher/storage/queries.mpl`; after `cargo run -q -p meshc -- fmt mesher`, the formatter check passed. `cargo run -q -p meshc -- build mesher` initially failed because the linker consumed a stale prebuilt `libmesh_rt.a`; after `cargo build -p mesh-rt`, rerunning the Mesher build succeeded. For this intermediate task, the task-level verification bar is green (`build mesher`, `fmt --check mesher`), while the slice-level Postgres proof bundle (`cargo test -p meshc --test e2e_m033_s02 -- --nocapture` and `bash scripts/verify-m033-s02.sh`) remains owned by T03 and is therefore still pending by plan."
+completed_at: 2026-03-25T16:49:03.187Z
+blocker_discovered: false
+---
+
+# T01: Add explicit Pg auth helpers and move Mesher auth off raw pgcrypto SQL
+
+> Add explicit Pg auth helpers and move Mesher auth off raw pgcrypto SQL
+
+## What Happened
+---
+id: T01
+parent: S02
+milestone: M033
 key_files:
   - compiler/mesh-rt/src/db/expr.rs
   - compiler/mesh-rt/src/db/query.rs
@@ -62,3 +85,10 @@ None.
 - `compiler/mesh-codegen/src/mir/lower.rs`
 - `compiler/mesh-codegen/src/codegen/intrinsics.rs`
 - `mesher/storage/queries.mpl`
+
+
+## Deviations
+Needed an explicit `cargo build -p mesh-rt` before the final `meshc build mesher` rerun because the linker path consumes a prebuilt `libmesh_rt.a`, and needed one `cargo run -q -p meshc -- fmt mesher` pass to clear formatter drift before `fmt --check` would pass. No scope or API-plan deviations were introduced.
+
+## Known Issues
+None.

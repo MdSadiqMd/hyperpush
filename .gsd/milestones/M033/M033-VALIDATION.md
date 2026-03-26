@@ -39,3 +39,9 @@ remediation_round: 0
 
 ## Verdict Rationale
 All five roadmap success criteria are substantiated by the delivered slice summaries and UAT artifacts, every roadmap slice has evidence matching its claimed outcome, and the boundary-map handoffs remain consistent in the assembled design. The milestone closes the neutral expression DSL, explicit PostgreSQL extras, honest raw keep-list collapse, partition/schema helper work, public docs, and integrated verification story without pretending SQLite runtime proof was delivered. The only open item is the broader future validation of the SQLite-specific extension seam tracked by R040, but that is explicitly outside M033’s promised proof scope and is already reflected honestly in the requirement ledger and public docs. No remediation slices are needed.
+
+Operational Verification: MET.
+- The planned operational contract was: real migration apply plus runtime partition create/list/drop and retention behavior against live Postgres catalogs.
+- S04 directly met that contract through `cargo test -p meshc --test e2e_m033_s04 -- --nocapture` and `bash scripts/verify-m033-s04.sh`, which prove helper-driven migration apply, live catalog state, runtime partition create/list/drop behavior, Mesher startup partition bootstrap, and localized operational logging on a real Postgres path.
+- S05 preserved that operational proof in the final milestone replay by serially rerunning `bash scripts/verify-m033-s04.sh` inside `bash scripts/verify-m033-s05.sh` and retaining the named phase logs under `.tmp/m033-s05/verify/05-verify-m033-s04.log`.
+- This milestone therefore documents operational compliance explicitly rather than only implying it through slice completion.

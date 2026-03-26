@@ -2,6 +2,29 @@
 id: T02
 parent: S03
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/meshc/tests/e2e_m033_s03.rs", "mesher/storage/queries.mpl", ".gsd/KNOWLEDGE.md"]
+key_decisions: ["Changed `check_new_issue` and `should_fire_by_cooldown` from direct `Repo.exists(...)` returns to `Repo.all(...) ?` plus a `List.length(rows) > 0` check because the copied Mesher probe compile path breaks on the direct `Bool ! String` `Repo.exists` form.", "Treated the failing `composed_reads` storage probes as a proof-surface blocker rather than changing caller contracts or faking passing coverage; the remaining T02 proofs need a higher-level Mesher verification surface or a compiler/runtime fix."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified that the repaired baseline still works by rerunning `cargo test -p meshc --test e2e_m033_s03 basic_reads -- --nocapture` and `cargo run -q -p meshc -- build mesher`, both of which passed after the `Repo.exists` rewrite and session-probe import fix. Then ran the T02 target `cargo test -p meshc --test e2e_m033_s03 composed_reads -- --nocapture` plus narrower `joined_issue_and_team_rows` and `dashboard_aggregates` filters. Those probes failed for concrete compiler/runtime reasons: the joined/team proof hit imported struct-list/LLVM verifier failures, and the aggregate probe surfaced pointer-stringification instead of real row values. I did not proceed to the broader slice-level fmt/check/verify-script commands after that because the storage-probe blocker invalidated the current T02 proof path."
+completed_at: 2026-03-25T19:30:06.226Z
+blocker_discovered: true
+---
+
+# T02: Attempted the T02 composed-read proof expansion, fixed the probe-compatible boolean helpers, and recorded a storage-probe blocker for the remaining read families.
+
+> Attempted the T02 composed-read proof expansion, fixed the probe-compatible boolean helpers, and recorded a storage-probe blocker for the remaining read families.
+
+## What Happened
+---
+id: T02
+parent: S03
+milestone: M033
 key_files:
   - compiler/meshc/tests/e2e_m033_s03.rs
   - mesher/storage/queries.mpl
@@ -55,3 +78,10 @@ Instead of finishing the full T02 composed-read proof bundle, I stopped after is
 - `compiler/meshc/tests/e2e_m033_s03.rs`
 - `mesher/storage/queries.mpl`
 - `.gsd/KNOWLEDGE.md`
+
+
+## Deviations
+Instead of finishing the full T02 composed-read proof bundle, I stopped after isolating a proof-surface blocker in the copied storage-probe harness. I repaired the baseline harness, added partial T02 probes, and documented the blocker for replan rather than forcing more speculative probe rewrites.
+
+## Known Issues
+`compiler/meshc/tests/e2e_m033_s03.rs` now contains partial `composed_reads` work, but the remaining T02 proof path is blocked by current compiler/runtime behavior in temporary Mesher storage probes: imported `List<Issue>` / similar struct-list results can fail with LLVM verifier or runtime switch crashes, and some aggregate map rows stringify as raw pointer addresses when staged through helper bindings. The Mesher app itself still builds, but the storage-only proof strategy assumed by the task plan is not sufficient to finish T02 as written.

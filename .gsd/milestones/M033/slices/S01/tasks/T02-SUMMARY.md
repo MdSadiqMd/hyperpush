@@ -2,6 +2,29 @@
 id: T02
 parent: S01
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["mesher/storage/queries.mpl", ".gsd/KNOWLEDGE.md"]
+key_decisions: ["Do not ship a Mesher test-only rate-limit bypass without understanding the upstream 429 cause; revert the experiment and record the blocker instead.", "Treat concurrent `meshc build mesher` and `e2e_m033_s01` runs as a harness race on `mesher/mesher(.o)` outputs and serialize those checks when gathering evidence."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "`cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture` was rerun on a clean tree and consistently failed before the mutation assertions because the first live `/api/v1/events` request returned HTTP 429 from Mesher’s rate limiter. `cargo run -q -p meshc -- fmt --check mesher` passed after normalizing `mesher/storage/queries.mpl`, and `cargo run -q -p meshc -- build mesher` passed on the same clean tree. I also manually reproduced the blocker outside the Rust harness by starting Mesher against a fresh Postgres container and observing `/api/v1/projects/default/settings` succeed while `/api/v1/events` returned 429 with the seeded default API key."
+completed_at: 2026-03-25T06:57:50.683Z
+blocker_discovered: true
+---
+
+# T02: Documented the live Mesher ingest blocker after verifying the S01 mutation rewrites already exist and normalizing queries.mpl formatting.
+
+> Documented the live Mesher ingest blocker after verifying the S01 mutation rewrites already exist and normalizing queries.mpl formatting.
+
+## What Happened
+---
+id: T02
+parent: S01
+milestone: M033
 key_files:
   - mesher/storage/queries.mpl
   - .gsd/KNOWLEDGE.md
@@ -55,3 +78,10 @@ Clean-start Mesher still returns HTTP 429 on the first `/api/v1/events` request 
 
 - `mesher/storage/queries.mpl`
 - `.gsd/KNOWLEDGE.md`
+
+
+## Deviations
+The task-owned neutral write rewrites and live mutation assertions were already present in local reality (`mesher/storage/queries.mpl` and `compiler/meshc/tests/e2e_m033_s01.rs`), so execution became verification and blocker isolation rather than new feature implementation. I also reverted an unsuccessful temporary rate-limit bypass experiment instead of landing it.
+
+## Known Issues
+Clean-start Mesher still returns HTTP 429 on the first `/api/v1/events` request in `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`, which blocks the live mutation and issue-upsert proofs before any `assigned_to`, `acknowledged_at`, `resolved_at`, `retention_days`, `sample_rate`, or `revoked_at` assertions can execute. Manual standalone reproduction against a fresh Postgres container confirmed `/api/v1/projects/default/settings` returns 200 while `/api/v1/events` with the seeded default API key returns 429, so the remaining blocker is upstream in Mesher’s ingest/rate-limit path rather than in the S01 neutral write rewrites.

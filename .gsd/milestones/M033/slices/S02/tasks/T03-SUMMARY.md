@@ -2,6 +2,29 @@
 id: T03
 parent: S02
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/meshc/tests/e2e_m033_s02.rs", "scripts/verify-m033-s02.sh"]
+key_decisions: ["Scoped the direct Postgres proofs to temporary Mesh projects that copy Mesher storage/types modules so the harness can exercise real storage helpers without the S01 HTTP readiness path.", "Kept the verifier keep-list aligned to the actual S02 boundary by allowing only the shared 24-hour `Query.where_raw(...)` clauses in the owned search/tag helpers while treating `extract_event_fields` as the intentional raw S03 keep-site."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified the new verifier script’s shell syntax with `bash -n scripts/verify-m033-s02.sh`. Ran `cargo test -p meshc --test e2e_m033_s02 -- --nocapture` twice against the new harness. The first run failed at compile time with a Rust borrow checker error in the Docker cleanup helper, which was fixed locally. The second run compiled the harness, started live Postgres-backed proofs, and confirmed `e2e_m033_s02_event_ingest_defaulting` passing on the real storage path, but the overall target still failed because the search/JSONB probe templates contain over-escaped interpolation strings, the auth probe’s success-print path does not type-check yet, and the alert probe did not emit the expected `alert_id` marker. The full slice verifier `bash scripts/verify-m033-s02.sh` was not rerun after those failures because the direct test target remains red."
+completed_at: 2026-03-25T17:24:54.759Z
+blocker_discovered: false
+---
+
+# T03: Draft the S02 Postgres proof bundle and verifier script scaffolding
+
+> Draft the S02 Postgres proof bundle and verifier script scaffolding
+
+## What Happened
+---
+id: T03
+parent: S02
+milestone: M033
 key_files:
   - compiler/meshc/tests/e2e_m033_s02.rs
   - scripts/verify-m033-s02.sh
@@ -47,3 +70,10 @@ Stopped in wrap-up mode due context/time budget before fixing the first red test
 
 - `compiler/meshc/tests/e2e_m033_s02.rs`
 - `scripts/verify-m033-s02.sh`
+
+
+## Deviations
+Stopped in wrap-up mode due context/time budget before fixing the first red test pass. The implementation produced the new proof bundle and verifier script artifacts, but the task did not reach a passing verification state in this unit.
+
+## Known Issues
+`cargo test -p meshc --test e2e_m033_s02 -- --nocapture` is still failing. The current failures are local and non-blocking but unfinished: (1) the search and JSONB probe templates over-escaped inner quotes inside Mesh string interpolation (`Map.get(..., \"message\")` / `\"tag_value\"`), so those temporary probe projects fail to parse; (2) the auth probe’s `auth_ok` print path is not compiling as written and needs its field access pattern adjusted to match what the copied Mesher typechecker accepts in that probe context; (3) the alert helper proof built far enough to run but did not emit `alert_id`, so that probe needs a direct look at its stdout markers before the DB assertions can be trusted. `scripts/verify-m033-s02.sh` has only had `bash -n` syntax verification so far; the full verifier command was not rerun because the direct test target is still red.

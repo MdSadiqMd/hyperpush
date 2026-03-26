@@ -2,6 +2,29 @@
 id: T03
 parent: S04
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["mesher/storage/schema.mpl", "mesher/storage/queries.mpl", "mesher/services/retention.mpl", "mesher/main.mpl", "compiler/mesh-rt/src/db/pg_schema.rs", "compiler/meshc/tests/e2e_m033_s04.rs", "scripts/verify-m033-s04.sh"]
+key_decisions: ["Keep Mesher’s runtime partition lifecycle explicitly PostgreSQL-shaped inside `Storage.Schema` wrappers over `Pg.*` helpers instead of widening `Storage.Queries` or the generic query API.", "Allow `Pg.create_range_partitioned_table` to accept raw table-constraint entries so helper-driven partitioned migrations can express composite primary keys without falling back to raw DDL.", "Add a dedicated S04 live verifier (`e2e_m033_s04.rs` plus `verify-m033-s04.sh`) and have its migration/temp-binary paths rebuild `mesh-rt` first so verification exercises the current runtime ABI instead of a stale static archive."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified the S04 runtime boundary and the full slice acceptance path. A focused mesh-rt unit test confirmed `Pg.create_range_partitioned_table` now accepts raw table constraints needed by the Mesher migration. The new `e2e_m033_s04` integration target passed against live Postgres, proving: pgcrypto extension installation, `events` remaining range-partitioned on `received_at`, GIN/jsonb_path_ops index presence, `Storage.Schema` partition creation/list/drop behavior, and real Mesher startup partition bootstrap plus log visibility. Final acceptance commands all passed: `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s04.sh` (which reruns the S04 e2e target plus ownership/logging checks)."
+completed_at: 2026-03-25T23:26:15.944Z
+blocker_discovered: false
+---
+
+# T03: Move Mesher partition lifecycle into Storage.Schema and add live S04 verification coverage
+
+> Move Mesher partition lifecycle into Storage.Schema and add live S04 verification coverage
+
+## What Happened
+---
+id: T03
+parent: S04
+milestone: M033
 key_files:
   - mesher/storage/schema.mpl
   - mesher/storage/queries.mpl
@@ -62,3 +85,10 @@ None.
 - `compiler/mesh-rt/src/db/pg_schema.rs`
 - `compiler/meshc/tests/e2e_m033_s04.rs`
 - `scripts/verify-m033-s04.sh`
+
+
+## Deviations
+The task plan expected only the four Mesher files to change, but the checkout was missing the planned S04 acceptance artifacts and the live gate exposed a pre-existing helper bug in `compiler/mesh-rt/src/db/pg_schema.rs`. I added the missing S04 verifier assets and fixed that root-cause runtime helper regression so the slice acceptance contract could actually pass.
+
+## Known Issues
+None.

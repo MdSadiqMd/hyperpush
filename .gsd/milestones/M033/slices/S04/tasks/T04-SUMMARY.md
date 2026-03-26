@@ -2,6 +2,29 @@
 id: T04
 parent: S04
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/meshc/tests/e2e_m033_s04.rs", "scripts/verify-m033-s04.sh", "scripts/verify-m033-s03.sh"]
+key_decisions: ["Make the S04 verifier mechanically police both the initial migration and the runtime partition modules for raw-boundary regressions, so failures name the offending helper/token directly.", "Remove the S03 verifier’s temporary S04 keep-site exemption so reintroduced partition raw sites in `mesher/storage/queries.mpl` become immediate regressions."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified the authoritative S04 acceptance commands from the slice plan: `cargo test -p meshc --test e2e_m033_s04 -- --nocapture` passed with the named `e2e_m033_s04_*` proofs for migration-time catalog state, runtime partition helper lifecycle, and real Mesher startup bootstrap/logging; `cargo run -q -p meshc -- fmt --check mesher` passed; `cargo run -q -p meshc -- build mesher` passed; and `bash scripts/verify-m033-s04.sh` passed with the tighter migration/runtime raw-boundary sweep. I also ran `bash scripts/verify-m033-s03.sh` to verify the old S03 keep-list no longer masks S04 partition helpers and still passes cleanly."
+completed_at: 2026-03-25T23:37:32.438Z
+blocker_discovered: false
+---
+
+# T04: Tightened S04 live Postgres proofs and verifier sweeps for migration/runtime partition boundaries
+
+> Tightened S04 live Postgres proofs and verifier sweeps for migration/runtime partition boundaries
+
+## What Happened
+---
+id: T04
+parent: S04
+milestone: M033
 key_files:
   - compiler/meshc/tests/e2e_m033_s04.rs
   - scripts/verify-m033-s04.sh
@@ -51,3 +74,10 @@ None.
 - `compiler/meshc/tests/e2e_m033_s04.rs`
 - `scripts/verify-m033-s04.sh`
 - `scripts/verify-m033-s03.sh`
+
+
+## Deviations
+The checkout already contained `compiler/meshc/tests/e2e_m033_s04.rs` and `scripts/verify-m033-s04.sh`, so instead of creating those artifacts from scratch I tightened them to satisfy the remaining T04 contract gaps. Otherwise none.
+
+## Known Issues
+None.

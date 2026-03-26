@@ -2,6 +2,31 @@
 id: T02
 parent: S04
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["mesher/migrations/20260216120000_create_initial_schema.mpl", "compiler/meshc/src/migrate.rs", "compiler/meshc/tests/e2e.rs", ".gsd/KNOWLEDGE.md"]
+key_decisions: ["Keep the initial Mesher migration fully helper-driven by using neutral `Migration.*` helpers wherever possible and reserving `Pg.*` helpers only for the truly PostgreSQL-specific extension, partitioned-table, and GIN/opclass cases.", "Preserve Mesher's existing catalog/index names by passing explicit `name:` options on every rewritten neutral index instead of relying on derived names.", "Keep new migration compile coverage under the `e2e_migration` test-name filter so the task's authoritative `cargo test -p meshc --test e2e e2e_migration -- --nocapture` gate actually executes it."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Task-level verification passed from the final formatted state: `cargo test -p meshc --test e2e e2e_migration -- --nocapture` ran 6 migration-focused compile tests including the new PG helper coverage, `cargo run -q -p meshc -- build mesher` succeeded, and `! rg -n "Pool\.execute\(pool" mesher/migrations/20260216120000_create_initial_schema.mpl` confirmed the initial migration has no remaining raw pool execution sites. I also confirmed the exact Mesher index names still appear in the migration (`idx_projects_slug`, `idx_issues_project_last_seen`, `idx_events_tags`, `idx_alert_rules_project`, `idx_alerts_triggered`).
+
+Slice-level verification is partially green, as expected for T02: `cargo run -q -p meshc -- fmt --check mesher` and `cargo run -q -p meshc -- build mesher` both pass, while `cargo test -p meshc --test e2e_m033_s04 -- --nocapture` still fails because the `e2e_m033_s04` target has not been added yet, and `bash scripts/verify-m033-s04.sh` still fails because that slice verifier script does not exist yet. Those remaining failures are slice-incomplete T04 work, not regressions from this task."
+completed_at: 2026-03-25T22:58:05.783Z
+blocker_discovered: false
+---
+
+# T02: Rewrite Mesher's initial migration onto Migration/Pg helpers and update migration scaffolds
+
+> Rewrite Mesher's initial migration onto Migration/Pg helpers and update migration scaffolds
+
+## What Happened
+---
+id: T02
+parent: S04
+milestone: M033
 key_files:
   - mesher/migrations/20260216120000_create_initial_schema.mpl
   - compiler/meshc/src/migrate.rs
@@ -63,3 +88,10 @@ None.
 - `compiler/meshc/src/migrate.rs`
 - `compiler/meshc/tests/e2e.rs`
 - `.gsd/KNOWLEDGE.md`
+
+
+## Deviations
+None.
+
+## Known Issues
+`cargo test -p meshc --test e2e_m033_s04 -- --nocapture` still fails with `no test target named e2e_m033_s04`, and `bash scripts/verify-m033-s04.sh` still fails with `No such file or directory`, because the S04 live-proof test target and verifier script are not present yet. Those are expected until T04 lands.

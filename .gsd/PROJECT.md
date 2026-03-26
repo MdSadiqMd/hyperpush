@@ -31,8 +31,7 @@ Recent milestone state:
 - M033/S03 is now complete: Mesher's read-side query surface now covers the honest scalar/count/join/list/aggregation families plus the slice-owned hard read proofs through `compiler/meshc/tests/e2e_m033_s03.rs`, while `bash scripts/verify-m033-s03.sh` enforces the short named raw-read keep-list instead of allowing read-side SQL drift to hide again.
 - M033/S04 is now complete: Mesh ships honest neutral index-name/order migration support plus explicit `Pg` schema helpers for extensions, partitioned parents, GIN/opclass indexes, and runtime partition lifecycle; Mesher's initial migration, startup partition bootstrap, and retention cleanup now use those helpers, and `compiler/meshc/tests/e2e_m033_s04.rs` plus `bash scripts/verify-m033-s04.sh` prove the result against live Postgres catalogs and startup logs.
 - M033/S05 is now complete: the public Mesh database docs now teach the real neutral `Expr` / `Query` / `Repo` / `Migration.create_index(...)` core, explicit PostgreSQL-only `Pg.*` extras, the short named raw escape-hatch boundary, and the SQLite-later seam; `bash scripts/verify-m033-s05.sh` replays the docs build, docs-truth sweep, and the S02/S03/S04 live-Postgres verifiers serially with named logs under `.tmp/m033-s05/verify/`.
-
-M033 is now slice-complete and ready for milestone closeout / roadmap reassessment.
+- M033 is now fully closed through `.gsd/milestones/M033/M033-SUMMARY.md`: Mesh ships the neutral expression/query/migration core plus explicit PostgreSQL extras, Mesher’s honest write/read/schema pressure sites are moved onto those surfaces where truthful, the remaining raw SQL/DDL keep-list is short and named, and the public docs plus `bash scripts/verify-m033-s05.sh` now lock the neutral-vs-PG boundary in place while R040 stays active for later SQLite-specific runtime proof.
 
 ## Architecture / Key Patterns
 
@@ -53,4 +52,4 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 - [ ] M030: Tooling & Package Trust — make package, dependency, and daily-driver tooling flow credible for backend work
 - [x] M031: Language DX Audit & Rough Edge Fixes — retire real dogfood rough edges through compiler and parser fixes
 - [x] M032: Mesher Limitation Truth & Mesh Dogfood Retirement — audit workaround folklore, fix real blockers in Mesh, and dogfood those repairs back into `mesher/`
-- [ ] M033: ORM Expressiveness & Schema Extras — strengthen the neutral data layer, add PG-first extras now, and leave a clean path for SQLite extras later
+- [x] M033: ORM Expressiveness & Schema Extras — strengthen the neutral data layer, add PG-first extras now, and leave a clean path for SQLite extras later

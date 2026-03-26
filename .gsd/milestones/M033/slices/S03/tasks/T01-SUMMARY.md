@@ -2,6 +2,29 @@
 id: T01
 parent: S03
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/meshc/tests/e2e_m033_s03.rs", "mesher/storage/queries.mpl", ".gsd/KNOWLEDGE.md"]
+key_decisions: ["Kept the T01 caller contracts stable by aliasing every rewritten read projection back to the existing row keys instead of changing consumers.", "Used the S02 live-Postgres harness pattern for the new S03 proof target so later S03 tasks can extend one durable integration test file instead of inventing separate one-off probes."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Ran the task-level gate `cargo test -p meshc --test e2e_m033_s03 basic_reads -- --nocapture`. Cargo built the Rust test target successfully, but all three `basic_reads` tests failed when their temporary Mesh storage probes were compiled. The failure is a Mesh parse error inside the generated probe source, caused by literal `\"...\"` quote escapes embedded in interpolation expressions within the Rust raw-string templates. Because the wrap-up warning arrived at that point, I stopped after the first failing gate and did not start the remaining build/fmt/slice-level checks in this unit."
+completed_at: 2026-03-25T18:43:06.411Z
+blocker_discovered: false
+---
+
+# T01: Seeded the S03 harness and rewrote the basic read helpers, but the new Mesh probes still need quote cleanup
+
+> Seeded the S03 harness and rewrote the basic read helpers, but the new Mesh probes still need quote cleanup
+
+## What Happened
+---
+id: T01
+parent: S03
+milestone: M033
 key_files:
   - compiler/meshc/tests/e2e_m033_s03.rs
   - mesher/storage/queries.mpl
@@ -47,3 +70,10 @@ Stopped after the first failing task-level verification command because of the c
 - `compiler/meshc/tests/e2e_m033_s03.rs`
 - `mesher/storage/queries.mpl`
 - `.gsd/KNOWLEDGE.md`
+
+
+## Deviations
+Stopped after the first failing task-level verification command because of the context-budget wrap-up warning. I did not proceed to `cargo run -q -p meshc -- build mesher`, the full slice test target, the fmt check, or the slice verify script in this unit.
+
+## Known Issues
+`compiler/meshc/tests/e2e_m033_s03.rs` still contains literal escaped quotes (`\"...\"`) inside the Rust raw-string Mesh probe templates. Those backslashes are emitted into the temporary Mesh source and cause parse errors in all three `e2e_m033_s03_basic_reads_*` tests before the rewritten helper logic is exercised. Resume by replacing those escaped quotes with plain quotes inside the probe templates, then rerun `cargo test -p meshc --test e2e_m033_s03 basic_reads -- --nocapture` before moving on to the remaining verification commands.

@@ -2,6 +2,29 @@
 id: T02
 parent: S02
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["mesher/storage/queries.mpl", "mesher/storage/writer.mpl", ".gsd/DECISIONS.md", ".gsd/KNOWLEDGE.md"]
+key_decisions: ["Used `Expr.fn_call(...)` with PostgreSQL-native `jsonb_extract_path`, `jsonb_extract_path_text`, `jsonb_exists`, and `jsonb_build_object` alongside `Pg` casts/operators instead of widening the dedicated `Pg` helper list mid-slice.", "Kept `extract_event_fields` as the explicit S03 raw keep-site because its fingerprint fallback still depends on CASE + WITH ORDINALITY + scalar-subquery behavior, while moving the rest of the T02-owned search/JSONB/write helpers off raw whole-query strings."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "`cargo run -q -p meshc -- build mesher` passed both before and after formatting, proving the rewritten Mesher storage paths compile on the real app build. `cargo run -q -p meshc -- fmt --check mesher` initially failed because the edited Mesh files needed canonical formatting; after `cargo run -q -p meshc -- fmt mesher`, the formatter check passed. A timed raw-boundary scan over `search_events_fulltext`, `filter_events_by_tag`, `event_breakdown_by_tag`, `create_alert_rule`, `fire_alert`, `get_event_alert_rules`, `get_threshold_rules`, and `insert_event` confirmed those helpers no longer call `Repo.query_raw` or `Repo.execute_raw`, while `extract_event_fields` is still present as the named S03 raw keep-site with an explicit comment and `Repo.query_raw(pool, sql, [event_json])` line. For slice-level verification, I also ran `cargo test -p meshc --test e2e_m033_s02 -- --nocapture` and `bash scripts/verify-m033-s02.sh`; both fail for the expected T03-owned reasons because the test target and verifier script have not been added yet, so the task-level build/format bar is green while the T03 proof bundle remains pending by plan."
+completed_at: 2026-03-25T17:02:52.885Z
+blocker_discovered: false
+---
+
+# T02: Rewrite Mesher JSONB and search helpers onto explicit Pg expression surfaces
+
+> Rewrite Mesher JSONB and search helpers onto explicit Pg expression surfaces
+
+## What Happened
+---
+id: T02
+parent: S02
+milestone: M033
 key_files:
   - mesher/storage/queries.mpl
   - mesher/storage/writer.mpl
@@ -56,3 +79,10 @@ The slice-level proof surfaces are still pending T03: `cargo test -p meshc --tes
 - `mesher/storage/writer.mpl`
 - `.gsd/DECISIONS.md`
 - `.gsd/KNOWLEDGE.md`
+
+
+## Deviations
+Ran the slice-level verification commands proactively even though T03 owns the verifier surfaces; they failed for expected missing-artifact reasons (`e2e_m033_s02` target and `scripts/verify-m033-s02.sh` do not exist yet). Also needed one `cargo run -q -p meshc -- fmt mesher` pass after the edits before the required `fmt --check` would pass. No scope or architecture-plan deviation was needed.
+
+## Known Issues
+The slice-level proof surfaces are still pending T03: `cargo test -p meshc --test e2e_m033_s02 -- --nocapture` fails because the `e2e_m033_s02` target does not exist yet, and `bash scripts/verify-m033-s02.sh` fails because the verifier script is not present yet.

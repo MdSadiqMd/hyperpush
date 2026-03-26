@@ -2,6 +2,29 @@
 id: T05
 parent: S03
 milestone: M033
+provides: []
+requires: []
+affects: []
+key_files: ["compiler/meshc/tests/e2e_m033_s03.rs", "scripts/verify-m033-s03.sh", "mesher/storage/queries.mpl", "mesher/api/search.mpl", "mesher/api/dashboard.mpl", "mesher/api/detail.mpl", "mesher/api/team.mpl", "mesher/ingestion/routes.mpl", "mesher/services/event_processor.mpl", ".gsd/KNOWLEDGE.md", ".gsd/DECISIONS.md"]
+key_decisions: ["Keep the unstable live read families as explicit named raw keep-sites instead of forcing builder paths that mis-shaped or crashed the real Mesher proof surface.", "Normalize unstable Mesher row maps through concrete derived structs before emitting JSON or pagination cursors when direct `Map.get(...)` stringification blanks fields or produces raw pointer values.", "Determine event-alert cooldown eligibility inside `get_event_alert_rules(...)` and explicitly flush the writer after accepted stores so the live Postgres acceptance path stays deterministic."]
+patterns_established: []
+drill_down_paths: []
+observability_surfaces: []
+duration: ""
+verification_result: "Verified the complete S03 closeout path with the four task-plan commands. `cargo test -p meshc --test e2e_m033_s03 -- --nocapture` passed with 9/9 tests green, covering `basic_reads`, `composed_reads`, and the new `hard_reads` family on live Postgres. `cargo run -q -p meshc -- fmt --check mesher` passed after formatting `mesher/storage/queries.mpl`. `cargo run -q -p meshc -- build mesher` passed after the live-path fixes. `bash scripts/verify-m033-s03.sh` passed end-to-end, rerunning the S03 test target, Mesher fmt/build checks, and the named raw keep-list sweep that rejects unexpected whole-query raw read drift while allowing only the explicit S03 keep-sites and the S04-owned partition/catalog exclusions."
+completed_at: 2026-03-25T21:48:52.730Z
+blocker_discovered: false
+---
+
+# T05: Close S03 with a passing live Postgres verifier, hard-read coverage, and a named raw keep-list gate
+
+> Close S03 with a passing live Postgres verifier, hard-read coverage, and a named raw keep-list gate
+
+## What Happened
+---
+id: T05
+parent: S03
+milestone: M033
 key_files:
   - compiler/meshc/tests/e2e_m033_s03.rs
   - scripts/verify-m033-s03.sh
@@ -75,3 +98,10 @@ Issue-list pagination still uses the route’s current `count == limit` `has_mor
 - `mesher/services/event_processor.mpl`
 - `.gsd/KNOWLEDGE.md`
 - `.gsd/DECISIONS.md`
+
+
+## Deviations
+Added targeted Mesher runtime-path fixes outside the original read-helper/query-script focus where the live S03 acceptance harness exposed real caller/runtime drift: typed row normalization in `mesher/api/{search,dashboard,detail,team}.mpl`, explicit event-writer flush after accepted ingestion in `mesher/services/event_processor.mpl`, and selector-side cooldown filtering in `mesher/ingestion/routes.mpl` plus `mesher/storage/queries.mpl`. These were local execution adaptations needed to make the contracted live proof surface truthful; no slice replan was required.
+
+## Known Issues
+Issue-list pagination still uses the route’s current `count == limit` `has_more` rule, so a full page can advertise another cursor even when the immediately following page is empty. The new hard-read proof now walks that third-page empty case explicitly, but the route does not yet prefetch a sentinel row for exact terminal-page `has_more`.
