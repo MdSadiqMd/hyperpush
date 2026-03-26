@@ -21,7 +21,7 @@
 - [x] **S03: Hard read-side coverage and honest raw-tail collapse** `risk:medium` `depends:[S01,S02]`
   > After this: After this: Mesher’s recurring scalar-subquery, derived-table, parameterized select, and expression-heavy read paths use the new builders wherever honest, and the remaining raw query keep-list is short and named.
 
-- [ ] **S04: Schema extras and live partition lifecycle proof** `risk:medium` `depends:[S01,S02]`
+- [x] **S04: Schema extras and live partition lifecycle proof** `risk:medium` `depends:[S01,S02]`
   > After this: After this: Mesher migrations and runtime retention/schema flows create, list, and drop partitions plus related PG schema extras through first-class helpers on a live Postgres database.
 
 - [ ] **S05: Public docs and integrated Mesher acceptance** `risk:low` `depends:[S02,S03,S04]`

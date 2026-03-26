@@ -29,10 +29,11 @@ Recent milestone state:
 - M033/S01 is now complete: Mesh ships the neutral expression builder and expression-aware Query/Repo select/update/upsert surface, Mesher’s S01-owned write paths run on that core, the live ingest/rate-limit/writer blockers are retired, and `bash scripts/verify-m033-s01.sh` closes green against the Postgres-backed acceptance suite
 - M033/S02 is now complete: Mesh ships explicit PG helper usage on the live Mesher auth/search/JSONB/alert paths, the S02 proof bundle (`compiler/meshc/tests/e2e_m033_s02.rs`) passes against live Postgres, and `bash scripts/verify-m033-s02.sh` now enforces the owned keep-list plus the named S03 `extract_event_fields` raw boundary.
 - M033/S03 is now complete: Mesher's read-side query surface now covers the honest scalar/count/join/list/aggregation families plus the slice-owned hard read proofs through `compiler/meshc/tests/e2e_m033_s03.rs`, while `bash scripts/verify-m033-s03.sh` enforces the short named raw-read keep-list instead of allowing read-side SQL drift to hide again.
+- M033/S04 is now complete: Mesh ships honest neutral index-name/order migration support plus explicit `Pg` schema helpers for extensions, partitioned parents, GIN/opclass indexes, and runtime partition lifecycle; Mesher's initial migration, startup partition bootstrap, and retention cleanup now use those helpers, and `compiler/meshc/tests/e2e_m033_s04.rs` plus `bash scripts/verify-m033-s04.sh` prove the result against live Postgres catalogs and startup logs.
 
 The next planned work is M033:
-1. S04 should cover the retained partition/schema helper gap anchored by the `PARTITION BY` note while keeping SQLite-specific extras as a later vendor-specific seam instead of backing out a PG-only abstraction.
-2. S05 should document the neutral-vs-PG boundary and replay the assembled Mesher data-layer acceptance suite end to end once S04 lands.
+1. S05 should document the neutral-vs-PG boundary, the shipped helper surfaces, and the current honest keep-list through the public Mesh database docs.
+2. S05 should replay the assembled Mesher data-layer acceptance suite end to end now that the S04 schema/partition proof surface is green.
 
 ## Architecture / Key Patterns
 

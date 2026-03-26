@@ -15,28 +15,6 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: mapped
 - Notes: This sits after the backend trust baseline but is already part of the capability contract.
 
-### R036 — The ORM and migration surfaces should keep a neutral baseline API while allowing explicit PG or SQLite extras when the underlying capability is not honestly portable.
-- Class: core-capability
-- Status: active
-- Description: The ORM and migration surfaces should keep a neutral baseline API while allowing explicit PG or SQLite extras when the underlying capability is not honestly portable.
-- Why it matters: Fake portability preserves raw SQL and hides capability boundaries instead of making them explicit.
-- Source: user
-- Primary owning slice: M033/S01
-- Supporting slices: M033/S02, M033/S04
-- Validation: Evidence advanced in M033/S01 by `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_issue_upsert -- --nocapture`, and `bash scripts/verify-m033-s01.sh`.
-- Notes: Advanced by M033/S01: Mesh now ships a neutral Expr builder plus expression-aware Query/Repo select/update/upsert work on the live Mesher path, while PG-only JSONB/crypto/event-write sites stay explicit keep-sites for later slices. Full validation still depends on S02/S04 explicit vendor-extra surfaces.
-
-### R037 — Mesh should expose PG-specific query and migration surfaces for the cases `mesher/` actually needs today: JSONB-heavy data access, expression-heavy updates, full-text search, crypto helpers, and partition-related DDL.
-- Class: integration
-- Status: active
-- Description: Mesh should expose PG-specific query and migration surfaces for the cases `mesher/` actually needs today: JSONB-heavy data access, expression-heavy updates, full-text search, crypto helpers, and partition-related DDL.
-- Why it matters: Mesher's current escape hatches are concentrated in real PostgreSQL features, not generic SQL.
-- Source: execution
-- Primary owning slice: M033/S02
-- Supporting slices: M033/S03, M033/S04
-- Validation: Advanced by M033/S02 via `cargo test -p meshc --test e2e_m033_s02 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s02.sh`; final validation still depends on the S04 partition/schema-extra proof.
-- Notes: Advanced by M033/S02: Mesh now exposes explicit PG helper usage on the real Mesher path for pgcrypto auth, JSONB insert/filter/breakdown/defaulting, full-text search ranking/query binding, and alert-rule JSONB helpers, all proven by `cargo test -p meshc --test e2e_m033_s02 -- --nocapture` plus `bash scripts/verify-m033-s02.sh`. Full validation still depends on S04's partition/schema helper proof.
-
 ### R038 — After M033, `mesher/` should use stronger Mesh ORM and migration surfaces for the cases they honestly cover, while retaining only a short justified keep-list of raw SQL and DDL escape hatches.
 - Class: quality-attribute
 - Status: active
@@ -45,19 +23,8 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M033/S03 (provisional)
 - Supporting slices: M033/S04, M033/S05 (provisional)
-- Validation: Advanced by M033/S03 via `cargo test -p meshc --test e2e_m033_s03 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s03.sh`; final validation still depends on S04 schema/DDL proof and the S05 integrated acceptance replay.
-- Notes: Advanced by M033/S03: Mesher's mechanically expressible and hard read-side families now use stronger `Query` / `Expr` / `Pg` surfaces or small Mesh-side composition where that path is honest, and `bash scripts/verify-m033-s03.sh` now enforces a short named S03 raw-read keep-list while excluding the S04-owned partition/catalog raw sites. Full validation still depends on S04's schema/DDL closeout and S05's integrated replay.
-
-### R039 — Mesh migrations should cover the recurring schema and partition-management cases that force `mesher/` into raw DDL today, with explicit extras where needed.
-- Class: launchability
-- Status: active
-- Description: Mesh migrations should cover the recurring schema and partition-management cases that force `mesher/` into raw DDL today, with explicit extras where needed.
-- Why it matters: DDL gaps push real apps into hand-written SQL even when the patterns are common and stable.
-- Source: user
-- Primary owning slice: M033/S04 (provisional)
-- Supporting slices: M033/S02 (provisional)
-- Validation: mapped
-- Notes: Catalog inspection and truly dynamic DDL may still remain escape hatches if the dedicated surfaces would be dishonest or overly specific.
+- Validation: Advanced by M033/S03+S04 via `cargo test -p meshc --test e2e_m033_s03 -- --nocapture`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, `bash scripts/verify-m033-s03.sh`, and `bash scripts/verify-m033-s04.sh`; final validation still depends on the S05 integrated acceptance replay.
+- Notes: Advanced through the S03 honest raw-read keep-list plus the S04 helper-driven migration/runtime partition collapse. `scripts/verify-m033-s03.sh` no longer exempts the old S04 partition/catalog helpers, and `scripts/verify-m033-s04.sh` now mechanically bans raw DDL/query regressions in the owned migration/runtime files while requiring the expected `Pg.*` and `Storage.Schema` helper boundaries.
 
 ### R040 — The M033 data-layer design should be shaped so SQLite-specific extras can be added later without backing out a PG-only abstraction.
 - Class: constraint
@@ -67,8 +34,8 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M033/S01 (provisional)
 - Supporting slices: M033/S02 (provisional)
-- Validation: Design seam advanced in M033/S01 by the neutral Expr/Query/Repo proofs and the explicit keep-list enforced by `bash scripts/verify-m033-s01.sh`; full validation still depends on later vendor-extra slices.
-- Notes: Advanced by M033/S01: the neutral expression core stayed free of PG-only helpers, while the remaining PostgreSQL JSONB/crypto keep-sites remained explicit instead of leaking into the baseline API. SQLite-specific extras can still be added later as vendor-specific surfaces rather than backing out a PG-only abstraction.
+- Validation: Design seam advanced by the combined M033/S01+S04 proof set: `bash scripts/verify-m033-s01.sh`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s04.sh`; full validation still depends on later vendor-extra slices.
+- Notes: Further advanced by S04: the only neutral migration growth was honest index naming/order support, while PostgreSQL-only extension/index/partition behavior stayed under explicit `Pg` helpers and Mesher runtime partition ownership moved into `Storage.Schema` wrappers over those helpers. The design still leaves room for later SQLite-specific extras without backing out a fake PG-only neutral API, but SQLite runtime behavior is still not proven.
 
 ## Validated
 
@@ -314,6 +281,39 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: Validated by the named `e2e_m032_*` proofs, `bash scripts/verify-m032-s01.sh`, Mesher fmt/build, the negative grep over stale disproven limitation phrases, the positive grep over the retained keep-sites in `mesher/ingestion/routes.mpl`, `mesher/services/stream_manager.mpl`, `mesher/services/writer.mpl`, `mesher/ingestion/pipeline.mpl`, `mesher/services/event_processor.mpl`, `mesher/ingestion/fingerprint.mpl`, `mesher/services/retention.mpl`, `mesher/api/team.mpl`, `mesher/storage/queries.mpl`, `mesher/storage/writer.mpl`, `mesher/migrations/20260216120000_create_initial_schema.mpl`, `mesher/types/event.mpl`, and `mesher/types/issue.mpl`, plus the backfilled `.gsd/milestones/M032/slices/S01/S01-UAT.md` acceptance artifact that now replays the current proof bundle instead of a placeholder.
 - Notes: S01 classified the stale-vs-real workaround families, S03 and S04 retired the disproven request/handler/control-flow and module-boundary JSON folklore, S05 closed the requirement with a short retained-limit ledger plus integrated proof replay, and S06 backfilled the missing S01 acceptance artifact so the limitation-truth proof stays replayable from the slice artifacts themselves.
 
+### R036 — The ORM and migration surfaces should keep a neutral baseline API while allowing explicit PG or SQLite extras when the underlying capability is not honestly portable.
+- Class: core-capability
+- Status: validated
+- Description: The ORM and migration surfaces should keep a neutral baseline API while allowing explicit PG or SQLite extras when the underlying capability is not honestly portable.
+- Why it matters: Fake portability preserves raw SQL and hides capability boundaries instead of making them explicit.
+- Source: user
+- Primary owning slice: M033/S01
+- Supporting slices: M033/S02, M033/S04
+- Validation: Validated by the assembled M033 neutral-plus-explicit-extra proof set: `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_issue_upsert -- --nocapture`, `cargo test -p meshc --test e2e_m033_s02 -- --nocapture`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, `bash scripts/verify-m033-s01.sh`, `bash scripts/verify-m033-s02.sh`, and `bash scripts/verify-m033-s04.sh`.
+- Notes: Validated through the shipped neutral `Expr` / `Query` / `Repo` core plus explicit `Pg` query/schema helpers on the real Mesher path. Neutral `Migration.create_index(...)` only grew honest name/order/partial support, while PostgreSQL-only schema behavior (extensions, partitioned parents, GIN/opclass indexes, and runtime partition lifecycle) stayed under `Pg` instead of leaking into the baseline API.
+
+### R037 — Mesh should expose PG-specific query and migration surfaces for the cases `mesher/` actually needs today: JSONB-heavy data access, expression-heavy updates, full-text search, crypto helpers, and partition-related DDL.
+- Class: integration
+- Status: validated
+- Description: Mesh should expose PG-specific query and migration surfaces for the cases `mesher/` actually needs today: JSONB-heavy data access, expression-heavy updates, full-text search, crypto helpers, and partition-related DDL.
+- Why it matters: Mesher's current escape hatches are concentrated in real PostgreSQL features, not generic SQL.
+- Source: execution
+- Primary owning slice: M033/S02
+- Supporting slices: M033/S03, M033/S04
+- Validation: Validated by `cargo test -p meshc --test e2e_m033_s02 -- --nocapture`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, `bash scripts/verify-m033-s02.sh`, and `bash scripts/verify-m033-s04.sh`.
+- Notes: Validated by the combined S02+S04 PG-extra proof path: Mesh now exposes explicit PostgreSQL helpers on the real Mesher path for pgcrypto auth, JSONB insert/filter/breakdown/defaulting, full-text search ranking/query binding, helper-driven range-partitioned schema setup, GIN/jsonb_path_ops indexes, and runtime partition create/list/drop behavior proven against live catalogs and Mesher startup.
+
+### R039 — Mesh migrations should cover the recurring schema and partition-management cases that force `mesher/` into raw DDL today, with explicit extras where needed.
+- Class: launchability
+- Status: validated
+- Description: Mesh migrations should cover the recurring schema and partition-management cases that force `mesher/` into raw DDL today, with explicit extras where needed.
+- Why it matters: DDL gaps push real apps into hand-written SQL even when the patterns are common and stable.
+- Source: user
+- Primary owning slice: M033/S04 (provisional)
+- Supporting slices: M033/S02 (provisional)
+- Validation: Validated by `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s04.sh`.
+- Notes: Validated by the helper-driven Mesher schema path: the initial migration now uses neutral `Migration.*` helpers for honest portable cases plus explicit `Pg.*` helpers for `pgcrypto`, the partitioned `events` parent, and the `idx_events_tags` GIN/jsonb_path_ops index, while runtime retention/startup partition lifecycle moved into `Storage.Schema` over `Pg.create_daily_partitions_ahead`, `Pg.list_daily_partitions_before`, and `Pg.drop_partition`. Catalog inspection and truly dynamic DDL can still remain explicit escape hatches when a dedicated surface would be dishonest or overly specific.
+
 ## Deferred
 
 ### R012 — Mesh should continue from the reference-backend and mesher proof surfaces toward broader backend forms like long-running services, realtime systems, and distributed backends.
@@ -498,18 +498,18 @@ This file is the explicit capability and coverage contract for the project.
 | R033 | constraint | out-of-scope | none | none | n/a |
 | R034 | anti-feature | out-of-scope | none | none | n/a |
 | R035 | quality-attribute | validated | M032/S01 | M032/S03, M032/S04, M032/S05, M032/S06 | Validated by the named `e2e_m032_*` proofs, `bash scripts/verify-m032-s01.sh`, Mesher fmt/build, the negative grep over stale disproven limitation phrases, the positive grep over the retained keep-sites in `mesher/ingestion/routes.mpl`, `mesher/services/stream_manager.mpl`, `mesher/services/writer.mpl`, `mesher/ingestion/pipeline.mpl`, `mesher/services/event_processor.mpl`, `mesher/ingestion/fingerprint.mpl`, `mesher/services/retention.mpl`, `mesher/api/team.mpl`, `mesher/storage/queries.mpl`, `mesher/storage/writer.mpl`, `mesher/migrations/20260216120000_create_initial_schema.mpl`, `mesher/types/event.mpl`, and `mesher/types/issue.mpl`, plus the backfilled `.gsd/milestones/M032/slices/S01/S01-UAT.md` acceptance artifact that now replays the current proof bundle instead of a placeholder. |
-| R036 | core-capability | active | M033/S01 | M033/S02, M033/S04 | Evidence advanced in M033/S01 by `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_issue_upsert -- --nocapture`, and `bash scripts/verify-m033-s01.sh`. |
-| R037 | integration | active | M033/S02 | M033/S03, M033/S04 | Advanced by M033/S02 via `cargo test -p meshc --test e2e_m033_s02 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s02.sh`; final validation still depends on the S04 partition/schema-extra proof. |
-| R038 | quality-attribute | active | M033/S03 (provisional) | M033/S04, M033/S05 (provisional) | Advanced by M033/S03 via `cargo test -p meshc --test e2e_m033_s03 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s03.sh`; final validation still depends on S04 schema/DDL proof and the S05 integrated acceptance replay. |
-| R039 | launchability | active | M033/S04 (provisional) | M033/S02 (provisional) | mapped |
-| R040 | constraint | active | M033/S01 (provisional) | M033/S02 (provisional) | Design seam advanced in M033/S01 by the neutral Expr/Query/Repo proofs and the explicit keep-list enforced by `bash scripts/verify-m033-s01.sh`; full validation still depends on later vendor-extra slices. |
+| R036 | core-capability | validated | M033/S01 | M033/S02, M033/S04 | Validated by the assembled M033 neutral-plus-explicit-extra proof set: `cargo test -p meshc --test e2e_m033_s01 expr_ -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_mutations -- --nocapture`, `cargo test -p meshc --test e2e_m033_s01 mesher_issue_upsert -- --nocapture`, `cargo test -p meshc --test e2e_m033_s02 -- --nocapture`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, `bash scripts/verify-m033-s01.sh`, `bash scripts/verify-m033-s02.sh`, and `bash scripts/verify-m033-s04.sh`. |
+| R037 | integration | validated | M033/S02 | M033/S03, M033/S04 | Validated by `cargo test -p meshc --test e2e_m033_s02 -- --nocapture`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, `bash scripts/verify-m033-s02.sh`, and `bash scripts/verify-m033-s04.sh`. |
+| R038 | quality-attribute | active | M033/S03 (provisional) | M033/S04, M033/S05 (provisional) | Advanced by M033/S03+S04 via `cargo test -p meshc --test e2e_m033_s03 -- --nocapture`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, `bash scripts/verify-m033-s03.sh`, and `bash scripts/verify-m033-s04.sh`; final validation still depends on the S05 integrated acceptance replay. |
+| R039 | launchability | validated | M033/S04 (provisional) | M033/S02 (provisional) | Validated by `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s04.sh`. |
+| R040 | constraint | active | M033/S01 (provisional) | M033/S02 (provisional) | Design seam advanced by the combined M033/S01+S04 proof set: `bash scripts/verify-m033-s01.sh`, `cargo test -p meshc --test e2e_m033_s04 -- --nocapture`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- build mesher`, and `bash scripts/verify-m033-s04.sh`; full validation still depends on later vendor-extra slices. |
 | R041 | integration | deferred | none | none | unmapped |
 | R043 | anti-feature | out-of-scope | none | none | n/a |
 | R044 | constraint | out-of-scope | none | none | n/a |
 
 ## Coverage Summary
 
-- Active requirements: 6
-- Mapped to slices: 6
-- Validated: 22 (R001, R002, R003, R004, R005, R006, R008, R009, R010, R011, R013, R015, R016, R017, R018, R019, R023, R024, R025, R026, R027, R035)
+- Active requirements: 3
+- Mapped to slices: 3
+- Validated: 25 (R001, R002, R003, R004, R005, R006, R008, R009, R010, R011, R013, R015, R016, R017, R018, R019, R023, R024, R025, R026, R027, R035, R036, R037, R039)
 - Unmapped active requirements: 0
