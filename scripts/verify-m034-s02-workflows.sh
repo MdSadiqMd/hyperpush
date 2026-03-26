@@ -265,6 +265,140 @@ RUBY
   fi
 }
 
+run_caller_contract_check() {
+  local phase_name="caller"
+  local command_text="ruby caller workflow contract sweep ${CALLER_WORKFLOW_PATH}"
+  local log_path="$ARTIFACT_DIR/caller.log"
+
+  echo "==> [${phase_name}] ${command_text}"
+  if ! ruby - "$CALLER_WORKFLOW_PATH" >"$log_path" 2>&1 <<'RUBY'
+require "yaml"
+
+workflow_path = ARGV.fetch(0)
+workflow = YAML.load_file(workflow_path)
+raw = File.read(workflow_path)
+
+errors = []
+
+errors << "caller workflow file is missing" unless File.file?(workflow_path)
+
+on_key = if workflow.key?("on")
+  "on"
+elsif workflow.key?(true)
+  true
+else
+  "on"
+end
+on_block = workflow[on_key]
+
+errors << "workflow name must stay 'Authoritative verification'" unless workflow["name"] == "Authoritative verification"
+
+unless on_block.is_a?(Hash)
+  errors << "workflow must define an on block"
+  on_block = {}
+end
+
+expected_trigger_keys = ["pull_request", "push", "workflow_dispatch", "schedule"]
+unless on_block.keys == expected_trigger_keys
+  errors << "workflow triggers must stay pull_request, push, workflow_dispatch, and schedule"
+end
+if on_block.key?("pull_request_target")
+  errors << "workflow must not trigger on pull_request_target"
+end
+
+pull_request_block = on_block["pull_request"]
+unless pull_request_block.nil? || pull_request_block.is_a?(Hash)
+  errors << "pull_request trigger must stay unfiltered or use a mapping"
+end
+
+push_block = on_block["push"]
+unless push_block.is_a?(Hash) && push_block["branches"] == ["main"]
+  errors << "push trigger must stay limited to the main branch"
+end
+
+workflow_dispatch_block = on_block["workflow_dispatch"]
+unless workflow_dispatch_block.nil? || workflow_dispatch_block.is_a?(Hash)
+  errors << "workflow_dispatch trigger must stay present"
+end
+
+schedule_block = on_block["schedule"]
+unless schedule_block.is_a?(Array) && schedule_block.length == 1
+  errors << "workflow must keep exactly one scheduled drift-monitor run"
+end
+if schedule_block.is_a?(Array) && schedule_block.first.is_a?(Hash)
+  unless schedule_block.first["cron"] == "17 4 * * 1"
+    errors << "scheduled drift-monitor cadence drifted away from the bounded weekly run"
+  end
+end
+
+permissions = workflow["permissions"]
+unless permissions.is_a?(Hash) && permissions == { "contents" => "read" }
+  errors << "caller workflow permissions must stay read-only"
+end
+
+concurrency = workflow["concurrency"]
+unless concurrency.is_a?(Hash)
+  errors << "workflow must declare concurrency"
+  concurrency = {}
+end
+unless concurrency["group"] == "${{ github.workflow }}-${{ github.ref }}"
+  errors << "workflow concurrency group must stay keyed to github.workflow and github.ref"
+end
+unless concurrency["cancel-in-progress"] == false
+  errors << "workflow concurrency must serialize same-ref runs without canceling in-flight proofs"
+end
+
+jobs = workflow["jobs"]
+unless jobs.is_a?(Hash) && jobs.keys == ["live-proof"]
+  errors << "caller workflow must define exactly one live-proof job"
+end
+job = jobs.is_a?(Hash) ? jobs["live-proof"] : nil
+if job.is_a?(Hash)
+  errors << "caller job name must stay 'Authoritative live proof'" unless job["name"] == "Authoritative live proof"
+  unless job["uses"] == "./.github/workflows/authoritative-live-proof.yml"
+    errors << "caller must invoke the reusable workflow at ./.github/workflows/authoritative-live-proof.yml"
+  end
+
+  trust_guard = job["if"].to_s.gsub(/\s+/, " ").strip
+  unless trust_guard.include?("github.event_name != 'pull_request'")
+    errors << "caller must allow trusted non-pull_request events through the guard"
+  end
+  unless trust_guard.include?("github.event.pull_request.head.repo.full_name == github.repository")
+    errors << "caller must fail closed for fork PRs using head.repo.full_name == github.repository"
+  end
+
+  secrets = job["secrets"]
+  unless secrets.is_a?(Hash) && secrets["MESH_PUBLISH_OWNER"] == "${{ secrets.MESH_PUBLISH_OWNER }}"
+    errors << "caller must map MESH_PUBLISH_OWNER explicitly into the reusable workflow"
+  end
+  unless secrets.is_a?(Hash) && secrets["MESH_PUBLISH_TOKEN"] == "${{ secrets.MESH_PUBLISH_TOKEN }}"
+    errors << "caller must map MESH_PUBLISH_TOKEN explicitly into the reusable workflow"
+  end
+end
+
+unless raw.include?("Fork PRs stay on the repo's secret-free build/test lanes.")
+  errors << "caller workflow must explain why fork PRs skip the live proof"
+end
+
+if raw.include?("bash scripts/verify-m034-s01.sh")
+  errors << "caller workflow must not inline the live proof script"
+end
+
+if raw.scan("./.github/workflows/authoritative-live-proof.yml").length != 1
+  errors << "caller workflow must reference the reusable workflow exactly once"
+end
+
+if errors.empty?
+  puts "caller workflow contract ok"
+else
+  raise errors.join("\n")
+end
+RUBY
+  then
+    fail_with_log "$phase_name" "$command_text" "caller workflow contract drifted" "$log_path"
+  fi
+}
+
 run_full_contract_placeholder() {
   local phase_name="full-contract"
   local command_text="full slice contract preflight"
@@ -273,10 +407,9 @@ run_full_contract_placeholder() {
   echo "==> [${phase_name}] ${command_text}"
   if ! (
     run_reusable_contract_check
-    if [[ ! -f "$CALLER_WORKFLOW_PATH" ]]; then
-      echo "missing ${CALLER_WORKFLOW_PATH}; T02 caller lane not landed yet"
-      exit 1
-    fi
+    run_caller_contract_check
+    echo "release gating checks stay intentionally red until T03 wires .github/workflows/release.yml to the reusable proof"
+    exit 1
   ) >"$log_path" 2>&1; then
     fail_with_log "$phase_name" "$command_text" "slice-level workflow contract is not complete yet" "$log_path"
   fi
@@ -287,12 +420,15 @@ case "$mode" in
   reusable)
     run_reusable_contract_check
     ;;
+  caller)
+    run_caller_contract_check
+    ;;
   all)
     run_full_contract_placeholder
     ;;
   *)
     echo "unknown mode: $mode" >&2
-    echo "usage: bash scripts/verify-m034-s02-workflows.sh [reusable|all]" >&2
+    echo "usage: bash scripts/verify-m034-s02-workflows.sh [reusable|caller|all]" >&2
     exit 1
     ;;
 esac

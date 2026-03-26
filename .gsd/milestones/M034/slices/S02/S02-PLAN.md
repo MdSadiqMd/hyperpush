@@ -47,7 +47,7 @@
   - Files: .github/workflows/authoritative-live-proof.yml, scripts/verify-m034-s02-workflows.sh, scripts/verify-m034-s01.sh, .github/workflows/release.yml
   - Verify: bash scripts/verify-m034-s02-workflows.sh reusable
 ruby -e 'require "yaml"; YAML.load_file(".github/workflows/authoritative-live-proof.yml")'
-- [ ] **T02: Add the trusted-event authoritative verification lane** — Once the reusable proof exists, give the repo a named CI lane that runs it on trusted events and fails closed on fork PR secret boundaries. This workflow should cover same-repo pull requests, pushes to `main`, manual dispatch, and a bounded schedule, while explicitly avoiding `pull_request_target` and other unsafe ways to run checked-out PR code with publish secrets. Extend the local verifier so future edits cannot silently widen the trust boundary or remove the scheduled drift monitor.
+- [x] **T02: Added the trusted-event authoritative verification workflow that reuses the live proof on same-repo PRs, main pushes, manual runs, and weekly drift checks.** — Once the reusable proof exists, give the repo a named CI lane that runs it on trusted events and fails closed on fork PR secret boundaries. This workflow should cover same-repo pull requests, pushes to `main`, manual dispatch, and a bounded schedule, while explicitly avoiding `pull_request_target` and other unsafe ways to run checked-out PR code with publish secrets. Extend the local verifier so future edits cannot silently widen the trust boundary or remove the scheduled drift monitor.
 
 ## Failure Modes
 
