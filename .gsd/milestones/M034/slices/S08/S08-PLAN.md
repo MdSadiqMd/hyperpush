@@ -177,7 +177,7 @@ for workflow, ref_name in expected.items():
     assert entry['headSha'], (workflow, entry)
 PY
   - Blocker: origin/main and both remote candidate tags still point at 6979a4a17221af8e39200b574aa2209ad54bc983, while local HEAD is 5e457f3cce9b58d34be6516164b093f253047510 and GitHub returns HTTP 422 for that SHA. release.yml and deploy-services.yml therefore remain red on the stale hosted reroll.
-- [ ] **T06: Capture the authoritative `first-green` hosted-evidence bundle and validate its manifest.** — Once T05 proves the repaired candidate tags are green, preserve that truth through the repo-owned wrapper exactly once. Reconfirm that `.tmp/m034-s06/evidence/first-green/` is still unused, rerun the S05/S06 contract tests if any wrapper or workflow-contract code changed earlier in the slice, then run `scripts/verify-m034-s06-remote-evidence.sh first-green` exactly once from the authenticated repo root. Validate the archived manifest and copied verifier artifacts so milestone closeout can consume the bundle directly without another hosted query.
+- [x] **T06: Reconfirmed `first-green` is still unused and captured a fresh remote-evidence blocker showing `deploy-services.yml` and `release.yml` remain red on `v0.1.0`.** — Once T05 proves the repaired candidate tags are green, preserve that truth through the repo-owned wrapper exactly once. Reconfirm that `.tmp/m034-s06/evidence/first-green/` is still unused, rerun the S05/S06 contract tests if any wrapper or workflow-contract code changed earlier in the slice, then run `scripts/verify-m034-s06-remote-evidence.sh first-green` exactly once from the authenticated repo root. Validate the archived manifest and copied verifier artifacts so milestone closeout can consume the bundle directly without another hosted query.
 
 Steps:
 1. Confirm `first-green` is absent and that T05's `workflow-status.json` shows all required workflows green on the expected refs and `headSha`.
@@ -208,3 +208,4 @@ assert manifest['stopAfterPhase'] == 'remote-evidence'
 for entry in manifest['remoteRunsSummary']:
     assert entry['status'] == 'ok', entry
 PY
+  - Blocker: GitHub still reports `deploy-services.yml` as `completed/failure` on `v0.1.0`, and `release.yml` is also `completed/failure` on `v0.1.0`. Until those hosted candidate-tag workflows go green, T06 cannot truthfully create `.tmp/m034-s06/evidence/first-green/`.

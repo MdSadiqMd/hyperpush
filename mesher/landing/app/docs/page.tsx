@@ -316,9 +316,16 @@ export default function DocsPage() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -300, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-background border-r border-border p-6 pt-20 overflow-y-auto md:hidden"
+              className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-background border-r border-border overflow-y-auto md:hidden"
             >
-              <Sidebar onNavigate={() => setMobileNavOpen(false)} />
+              {/* Logo header — fills the space that mirrors the fixed top bar */}
+              <div className="flex items-center gap-3 px-6 h-[72px] border-b border-border shrink-0">
+                <img src="/logo-light.svg" alt="hyperpush" className="h-7" />
+                <span className="text-sm text-muted-foreground font-mono">/docs</span>
+              </div>
+              <div className="p-6">
+                <Sidebar onNavigate={() => setMobileNavOpen(false)} />
+              </div>
             </motion.div>
           </>
         )}

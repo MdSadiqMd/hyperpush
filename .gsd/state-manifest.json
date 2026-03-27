@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-03-27T16:59:37.870Z",
+  "exported_at": "2026-03-27T17:08:34.585Z",
   "milestones": [
     {
       "id": "M001",
@@ -3695,19 +3695,26 @@
       "milestone_id": "M034",
       "slice_id": "S08",
       "id": "T06",
-      "title": "Capture the authoritative `first-green` hosted-evidence bundle and validate its manifest.",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Reconfirmed `first-green` is still unused and captured a fresh remote-evidence blocker showing `deploy-services.yml` and `release.yml` remain red on `v0.1.0`.",
+      "status": "complete",
+      "one_liner": "Reconfirmed `first-green` is still unused and captured a fresh remote-evidence blocker showing `deploy-services.yml` and `release.yml` remain red on `v0.1.0`.",
+      "narrative": "Re-read the T06 contract, slice plan, wrapper, and contract tests first so the reserved `first-green` label would not be spent accidentally. Confirmed `.tmp/m034-s06/evidence/first-green/` is still absent. Because the saved T05 rollout snapshot was still red, reran the S05/S06 contract tests and then used the safe `VERIFY_M034_S05_STOP_AFTER=remote-evidence` path on `scripts/verify-m034-s05.sh` instead of calling `scripts/verify-m034-s06-remote-evidence.sh first-green`. That refreshed `.tmp/m034-s05/verify/remote-runs.json` and `.tmp/m034-s05/verify/remote-evidence.log` without consuming any archive label. The hosted preflight still fails in `remote-evidence`: `deploy.yml`, `authoritative-verification.yml`, `extension-release-proof.yml`, and `publish-extension.yml` are green, but `deploy-services.yml` and `release.yml` still conclude `completed/failure` on `v0.1.0`. Stopped there, left `first-green` untouched, and documented the blocker for slice replanning.",
+      "verification_result": "Reran `node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs` and it passed. Ran `bash -c 'set -euo pipefail; test -f .env; set -a; source .env; set +a; VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh'`; it failed in the `remote-evidence` phase and refreshed `.tmp/m034-s05/verify/remote-runs.json` / `remote-evidence.log` with the current hosted blocker state. Verified `.tmp/m034-s06/evidence/first-green/` still does not exist, so the reserved final label remains unused.",
       "duration": "",
-      "completed_at": null,
-      "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "completed_at": "2026-03-27T17:08:34.059Z",
+      "blocker_discovered": true,
+      "deviations": "Did not run `bash scripts/verify-m034-s06-remote-evidence.sh first-green` because the safe stop-after preflight was still red; consuming the reserved label would have created a dishonest or unusable final archive. This is a task-blocking upstream rollout issue, not a local wrapper-contract issue.",
+      "known_issues": "GitHub still reports `deploy-services.yml` as `completed/failure` on `v0.1.0`, and `release.yml` is also `completed/failure` on `v0.1.0`. Until those hosted candidate-tag workflows go green, T06 cannot truthfully create `.tmp/m034-s06/evidence/first-green/`.",
+      "key_files": [
+        ".tmp/m034-s05/verify/remote-runs.json",
+        ".tmp/m034-s05/verify/remote-evidence.log",
+        ".tmp/m034-s05/verify/status.txt",
+        ".gsd/milestones/M034/slices/S08/tasks/T06-SUMMARY.md"
+      ],
+      "key_decisions": [
+        "Do not run `scripts/verify-m034-s06-remote-evidence.sh first-green` while the stop-after `remote-evidence` preflight is still red; preserve the label for the first all-green hosted bundle."
+      ],
+      "full_summary_md": "---\nid: T06\nparent: S08\nmilestone: M034\nkey_files:\n  - .tmp/m034-s05/verify/remote-runs.json\n  - .tmp/m034-s05/verify/remote-evidence.log\n  - .tmp/m034-s05/verify/status.txt\n  - .gsd/milestones/M034/slices/S08/tasks/T06-SUMMARY.md\nkey_decisions:\n  - Do not run `scripts/verify-m034-s06-remote-evidence.sh first-green` while the stop-after `remote-evidence` preflight is still red; preserve the label for the first all-green hosted bundle.\nduration: \"\"\nverification_result: mixed\ncompleted_at: 2026-03-27T17:08:34.061Z\nblocker_discovered: true\n---\n\n# T06: Reconfirmed `first-green` is still unused and captured a fresh remote-evidence blocker showing `deploy-services.yml` and `release.yml` remain red on `v0.1.0`.\n\n**Reconfirmed `first-green` is still unused and captured a fresh remote-evidence blocker showing `deploy-services.yml` and `release.yml` remain red on `v0.1.0`.**\n\n## What Happened\n\nRe-read the T06 contract, slice plan, wrapper, and contract tests first so the reserved `first-green` label would not be spent accidentally. Confirmed `.tmp/m034-s06/evidence/first-green/` is still absent. Because the saved T05 rollout snapshot was still red, reran the S05/S06 contract tests and then used the safe `VERIFY_M034_S05_STOP_AFTER=remote-evidence` path on `scripts/verify-m034-s05.sh` instead of calling `scripts/verify-m034-s06-remote-evidence.sh first-green`. That refreshed `.tmp/m034-s05/verify/remote-runs.json` and `.tmp/m034-s05/verify/remote-evidence.log` without consuming any archive label. The hosted preflight still fails in `remote-evidence`: `deploy.yml`, `authoritative-verification.yml`, `extension-release-proof.yml`, and `publish-extension.yml` are green, but `deploy-services.yml` and `release.yml` still conclude `completed/failure` on `v0.1.0`. Stopped there, left `first-green` untouched, and documented the blocker for slice replanning.\n\n## Verification\n\nReran `node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs` and it passed. Ran `bash -c 'set -euo pipefail; test -f .env; set -a; source .env; set +a; VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh'`; it failed in the `remote-evidence` phase and refreshed `.tmp/m034-s05/verify/remote-runs.json` / `remote-evidence.log` with the current hosted blocker state. Verified `.tmp/m034-s06/evidence/first-green/` still does not exist, so the reserved final label remains unused.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs` | 0 | ✅ pass | 1394ms |\n| 2 | `bash -c 'set -euo pipefail; test -f .env; set -a; source .env; set +a; VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh'` | 1 | ❌ fail | 105413ms |\n| 3 | `python3 - <<'PY' ... check Path('.tmp/m034-s06/evidence/first-green').exists()` | 0 | ✅ pass | 0ms |\n\n\n## Deviations\n\nDid not run `bash scripts/verify-m034-s06-remote-evidence.sh first-green` because the safe stop-after preflight was still red; consuming the reserved label would have created a dishonest or unusable final archive. This is a task-blocking upstream rollout issue, not a local wrapper-contract issue.\n\n## Known Issues\n\nGitHub still reports `deploy-services.yml` as `completed/failure` on `v0.1.0`, and `release.yml` is also `completed/failure` on `v0.1.0`. Until those hosted candidate-tag workflows go green, T06 cannot truthfully create `.tmp/m034-s06/evidence/first-green/`.\n\n## Files Created/Modified\n\n- `.tmp/m034-s05/verify/remote-runs.json`\n- `.tmp/m034-s05/verify/remote-evidence.log`\n- `.tmp/m034-s05/verify/status.txt`\n- `.gsd/milestones/M034/slices/S08/tasks/T06-SUMMARY.md`\n",
       "description": "Once T05 proves the repaired candidate tags are green, preserve that truth through the repo-owned wrapper exactly once. Reconfirm that `.tmp/m034-s06/evidence/first-green/` is still unused, rerun the S05/S06 contract tests if any wrapper or workflow-contract code changed earlier in the slice, then run `scripts/verify-m034-s06-remote-evidence.sh first-green` exactly once from the authenticated repo root. Validate the archived manifest and copied verifier artifacts so milestone closeout can consume the bundle directly without another hosted query.\n\nSteps:\n1. Confirm `first-green` is absent and that T05's `workflow-status.json` shows all required workflows green on the expected refs and `headSha`.\n2. Rerun the S05/S06 contract tests if earlier tasks touched the wrapper or workflow-contract logic.\n3. Run the canonical wrapper once with the reserved label and validate `status.txt`, `current-phase.txt`, `phase-report.txt`, `manifest.json`, and `remote-runs.json`.\n4. Leave the archive in place as the single authoritative first-green bundle for milestone closeout.\n\nMust-haves:\n- `first-green` is claimed exactly once.\n- The wrapper stays the sole owner of the final hosted-evidence proof path.\n- The archived manifest and remote-run summary both show all required workflows green.",
       "estimate": "45m",
       "files": [
@@ -7941,6 +7948,39 @@
       "verdict": "❌ fail",
       "duration_ms": 484,
       "created_at": "2026-03-27T16:59:37.631Z"
+    },
+    {
+      "id": 275,
+      "task_id": "T06",
+      "slice_id": "S08",
+      "milestone_id": "M034",
+      "command": "node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 1394,
+      "created_at": "2026-03-27T17:08:34.059Z"
+    },
+    {
+      "id": 276,
+      "task_id": "T06",
+      "slice_id": "S08",
+      "milestone_id": "M034",
+      "command": "bash -c 'set -euo pipefail; test -f .env; set -a; source .env; set +a; VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh'",
+      "exit_code": 1,
+      "verdict": "❌ fail",
+      "duration_ms": 105413,
+      "created_at": "2026-03-27T17:08:34.059Z"
+    },
+    {
+      "id": 277,
+      "task_id": "T06",
+      "slice_id": "S08",
+      "milestone_id": "M034",
+      "command": "python3 - <<'PY' ... check Path('.tmp/m034-s06/evidence/first-green').exists()",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 0,
+      "created_at": "2026-03-27T17:08:34.059Z"
     }
   ]
 }
