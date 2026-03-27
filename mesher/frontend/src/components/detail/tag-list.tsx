@@ -12,16 +12,16 @@ export function TagList({ tags }: TagListProps) {
   const entries = Object.entries(tags);
 
   return (
-    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-px sm:grid-cols-2 bg-border rounded-lg overflow-hidden">
       {entries.map(([key, value]) => (
         <div
           key={key}
-          className="flex items-baseline gap-2 bg-muted rounded px-2 py-1 min-w-0"
+          className="flex items-baseline gap-2 bg-background px-3 py-2 min-w-0 hover:bg-card transition-colors"
         >
-          <span className="text-muted-foreground font-mono text-xs shrink-0">
+          <span className="text-[10px] font-mono text-muted-foreground shrink-0">
             {key}
           </span>
-          <span className="font-mono text-sm truncate">{value}</span>
+          <span className="font-mono text-xs truncate text-foreground">{value}</span>
         </div>
       ))}
     </div>

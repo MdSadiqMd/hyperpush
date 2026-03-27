@@ -18,7 +18,7 @@ export function PushPanelLayout({
       </div>
       {panel && (
         <div
-          className={`${panelWidth} border-l border-border overflow-auto shrink-0 transition-all duration-200`}
+          className={`${panelWidth} border-l border-border bg-card/50 backdrop-blur-sm overflow-auto shrink-0 transition-all duration-200`}
         >
           {panel}
         </div>

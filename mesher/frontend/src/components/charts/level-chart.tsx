@@ -17,15 +17,15 @@ function getLevelColor(level: string): string {
   switch (level.toLowerCase()) {
     case "error":
     case "fatal":
-      return "oklch(0.577 0.245 27.325)";
+      return "oklch(0.55 0.22 25)";
     case "warning":
-      return "oklch(0.75 0.18 85)";
+      return "oklch(0.7 0.16 80)";
     case "info":
-      return "var(--color-muted-foreground)";
+      return "oklch(0.65 0.15 200)";
     case "debug":
-      return "var(--color-muted)";
+      return "oklch(0.4 0 0)";
     default:
-      return "var(--color-muted-foreground)";
+      return "oklch(0.4 0 0)";
   }
 }
 
@@ -39,9 +39,11 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
   const item = payload[0].payload;
   return (
-    <div className="rounded-md border bg-card px-3 py-2 text-card-foreground shadow-sm">
-      <p className="text-xs capitalize text-muted-foreground">{item.level}</p>
-      <p className="text-sm font-medium tabular-nums">
+    <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg">
+      <p className="text-[10px] font-mono capitalize text-muted-foreground">
+        {item.level}
+      </p>
+      <p className="text-sm font-semibold tabular-nums text-foreground">
         {item.count.toLocaleString()} events
       </p>
     </div>
@@ -56,17 +58,17 @@ export function LevelChart({ data }: LevelChartProps) {
           dataKey="level"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+          tick={{ fill: "var(--color-muted-foreground)", fontSize: 11, fontFamily: "var(--font-mono)" }}
         />
         <YAxis
           axisLine={false}
           tickLine={false}
-          tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+          tick={{ fill: "var(--color-muted-foreground)", fontSize: 11, fontFamily: "var(--font-mono)" }}
           width={40}
         />
         <Tooltip
           content={<CustomTooltip />}
-          cursor={{ fill: "var(--color-accent)", opacity: 0.5 }}
+          cursor={{ fill: "var(--color-accent)", opacity: 0.08 }}
         />
         <Bar dataKey="count" radius={[4, 4, 0, 0]}>
           {data.map((entry) => (

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { ProjectStorage } from "@/types/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Database, RefreshCw } from "lucide-react";
@@ -54,9 +53,17 @@ export function StorageInfo({ projectId }: StorageInfoProps) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-4 max-w-lg">
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-32 rounded-xl" />
+      <div className="grid grid-cols-2 gap-px bg-border rounded-xl overflow-hidden max-w-lg">
+        <div className="bg-background p-6">
+          <Skeleton className="h-8 w-8 rounded-lg mb-3" />
+          <Skeleton className="h-8 w-24 mb-1" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+        <div className="bg-background p-6">
+          <Skeleton className="h-8 w-8 rounded-lg mb-3" />
+          <Skeleton className="h-8 w-24 mb-1" />
+          <Skeleton className="h-3 w-28" />
+        </div>
       </div>
     );
   }
@@ -67,55 +74,48 @@ export function StorageInfo({ projectId }: StorageInfoProps) {
         <Button
           variant="outline"
           size="sm"
+          className="gap-1.5 font-mono text-xs"
           onClick={handleRefresh}
           disabled={refreshing}
         >
           <RefreshCw
-            className={`size-4 ${refreshing ? "animate-spin" : ""}`}
+            className={`size-3.5 ${refreshing ? "animate-spin" : ""}`}
           />
           Refresh
         </Button>
       </div>
 
       {storage ? (
-        <div className="grid grid-cols-2 gap-4 max-w-lg">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Database className="size-3.5" />
-                Event Count
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold tabular-nums">
-                {formatNumber(storage.event_count)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total stored events
-              </p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 gap-px bg-border rounded-xl overflow-hidden max-w-lg">
+          <div className="bg-background p-6 group hover:bg-card transition-colors">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted group-hover:bg-accent/10 transition-colors mb-3">
+              <Database className="h-4 w-4 text-accent" />
+            </div>
+            <p className="text-2xl font-bold tabular-nums">
+              {formatNumber(storage.event_count)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Total stored events
+            </p>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Database className="size-3.5" />
-                Estimated Storage
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold tabular-nums">
-                {formatBytes(storage.estimated_bytes)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Approximate disk usage
-              </p>
-            </CardContent>
-          </Card>
+          <div className="bg-background p-6 group hover:bg-card transition-colors">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted group-hover:bg-accent/10 transition-colors mb-3">
+              <Database className="h-4 w-4 text-accent" />
+            </div>
+            <p className="text-2xl font-bold tabular-nums">
+              {formatBytes(storage.estimated_bytes)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Approximate disk usage
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <Database className="size-8 mb-2 opacity-50" />
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mb-4">
+            <Database className="size-7 text-muted-foreground/40" />
+          </div>
           <p className="text-sm">Unable to load storage info</p>
         </div>
       )}

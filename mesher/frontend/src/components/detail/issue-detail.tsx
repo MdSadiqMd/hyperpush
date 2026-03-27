@@ -49,8 +49,6 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch issue events (the API doesn't have a direct issue detail endpoint,
-      // so we use the events for this issue to show recent events)
       const eventsResult = await api.issues.events(issueId, { limit: 5 });
       setEvents(eventsResult.data);
     } catch (err) {
@@ -64,8 +62,6 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
     fetchData();
   }, [fetchData]);
 
-  // We receive the issue data from the parent list context via the issues API.
-  // Since we need issue metadata, let's also fetch it from the issues list endpoint.
   const [issueLoading, setIssueLoading] = useState(true);
 
   useEffect(() => {
@@ -73,23 +69,17 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
     async function fetchIssue() {
       setIssueLoading(true);
       try {
-        // Use events endpoint to get issue info, plus construct from available data
-        // The issue data comes from the list -- we re-fetch to get fresh state
         const eventsResult = await api.issues.events(issueId, { limit: 1 });
-        // We can construct a partial issue from what we know, but the events endpoint
-        // doesn't give us the issue detail. The timeline endpoint may help.
         const timelineResult = await api.issues.timeline(issueId, 1);
 
-        // Construct issue-like object from available data
         if (!cancelled) {
-          // Check if we have at least one event to derive info from
           const firstEvent = eventsResult.data[0] || timelineResult[0];
           if (firstEvent) {
             setIssue({
               id: issueId,
               title: firstEvent.message || "Unknown Issue",
               level: firstEvent.level || "error",
-              status: "unresolved", // Will be updated by state transitions
+              status: "unresolved",
               event_count: 0,
               first_seen: firstEvent.received_at || "",
               last_seen: firstEvent.received_at || "",
@@ -116,7 +106,6 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
     setActionLoading(action);
     try {
       await fn();
-      // Update local issue status
       setIssue((prev) => {
         if (!prev) return prev;
         const statusMap: Record<string, string> = {
@@ -223,7 +212,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
         <div className="p-4 space-y-5">
           {/* Status & Level */}
           <section>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
               Status
             </h3>
             <div className="flex items-center gap-2">
@@ -247,26 +236,26 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
           {/* Stats */}
           <Separator />
           <section>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
               Stats
             </h3>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Events</p>
-                <p className="text-sm font-medium tabular-nums">
+            <div className="grid grid-cols-3 gap-px bg-border rounded-lg overflow-hidden">
+              <div className="bg-background p-3">
+                <p className="text-[10px] font-mono text-muted-foreground">Events</p>
+                <p className="text-sm font-semibold tabular-nums">
                   {formatNumber(issue.event_count)}
                 </p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">First Seen</p>
+              <div className="bg-background p-3">
+                <p className="text-[10px] font-mono text-muted-foreground">First Seen</p>
                 <p className="text-sm">
                   {issue.first_seen
                     ? formatRelativeTime(issue.first_seen)
                     : "-"}
                 </p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Last Seen</p>
+              <div className="bg-background p-3">
+                <p className="text-[10px] font-mono text-muted-foreground">Last Seen</p>
                 <p className="text-sm">
                   {issue.last_seen
                     ? formatRelativeTime(issue.last_seen)
@@ -279,7 +268,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
           {/* Actions */}
           <Separator />
           <section>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
               Actions
             </h3>
             <div className="flex flex-wrap gap-2">
@@ -287,6 +276,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-7 gap-1 font-mono text-xs"
                   disabled={actionLoading !== null}
                   onClick={() =>
                     handleAction("resolve", () =>
@@ -295,9 +285,9 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                   }
                 >
                   {actionLoading === "resolve" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="size-3.5" />
+                    <CheckCircle2 className="size-3" />
                   )}
                   Resolve
                 </Button>
@@ -306,6 +296,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-7 gap-1 font-mono text-xs"
                   disabled={actionLoading !== null}
                   onClick={() =>
                     handleAction("unresolve", () =>
@@ -314,9 +305,9 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                   }
                 >
                   {actionLoading === "unresolve" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
-                    <RotateCcw className="size-3.5" />
+                    <RotateCcw className="size-3" />
                   )}
                   Unresolve
                 </Button>
@@ -325,6 +316,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-7 gap-1 font-mono text-xs"
                   disabled={actionLoading !== null}
                   onClick={() =>
                     handleAction("archive", () =>
@@ -333,9 +325,9 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                   }
                 >
                   {actionLoading === "archive" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
-                    <Archive className="size-3.5" />
+                    <Archive className="size-3" />
                   )}
                   Archive
                 </Button>
@@ -344,6 +336,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-7 gap-1 font-mono text-xs"
                   disabled={actionLoading !== null}
                   onClick={() =>
                     handleAction("unresolve", () =>
@@ -352,37 +345,37 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                   }
                 >
                   {actionLoading === "unresolve" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
-                    <RotateCcw className="size-3.5" />
+                    <RotateCcw className="size-3" />
                   )}
                   Unresolve
                 </Button>
               )}
 
-              {/* Assign */}
               <Button
                 variant="outline"
                 size="sm"
+                className="h-7 gap-1 font-mono text-xs"
                 disabled={actionLoading !== null}
                 onClick={() => setShowAssign(!showAssign)}
               >
-                <UserPlus className="size-3.5" />
+                <UserPlus className="size-3" />
                 Assign
               </Button>
 
-              {/* Delete with confirmation */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="destructive"
                     size="sm"
+                    className="h-7 gap-1 font-mono text-xs"
                     disabled={actionLoading !== null}
                   >
                     {actionLoading === "delete" ? (
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <Loader2 className="size-3 animate-spin" />
                     ) : (
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className="size-3" />
                     )}
                     Delete
                   </Button>
@@ -408,25 +401,25 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
               </AlertDialog>
             </div>
 
-            {/* Assign input */}
             {showAssign && (
               <div className="flex items-center gap-2 mt-2">
                 <Input
                   placeholder="User ID"
                   value={assignUserId}
                   onChange={(e) => setAssignUserId(e.target.value)}
-                  className="h-8 text-sm"
+                  className="h-7 text-xs font-mono bg-muted/50"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleAssign();
                   }}
                 />
                 <Button
                   size="sm"
+                  className="h-7 font-mono text-xs"
                   disabled={!assignUserId.trim() || actionLoading !== null}
                   onClick={handleAssign}
                 >
                   {actionLoading === "assign" ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
                     "Assign"
                   )}
@@ -438,7 +431,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
           {/* Recent Events */}
           <Separator />
           <section className="pb-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
               Recent Events
             </h3>
             {events.length === 0 ? (
@@ -446,12 +439,12 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                 No events found
               </p>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-px rounded-lg border border-border overflow-hidden">
                 {events.map((event) => (
                   <button
                     key={event.id}
                     type="button"
-                    className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-left hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-2 w-full bg-background px-3 py-2 text-left hover:bg-card transition-colors"
                     onClick={() => handleEventClick(event)}
                   >
                     <StatusBadge
@@ -470,7 +463,7 @@ export function IssueDetail({ issueId, onClose, onUpdate }: IssueDetailProps) {
                     <span className="text-sm truncate flex-1">
                       {event.message}
                     </span>
-                    <span className="text-xs text-muted-foreground shrink-0">
+                    <span className="text-[10px] font-mono text-muted-foreground shrink-0">
                       {formatRelativeTime(event.received_at)}
                     </span>
                   </button>

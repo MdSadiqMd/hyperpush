@@ -1,6 +1,5 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {
   hasMore: boolean;
@@ -18,27 +17,26 @@ export function Pagination({
   if (!hasMore && !hasPrevious) return null;
 
   return (
-    <div className="flex items-center justify-end gap-2">
-      <span className="text-xs text-muted-foreground mr-2">
-        Showing results
-      </span>
+    <div className="flex items-center justify-center gap-2">
       <Button
         variant="outline"
         size="sm"
+        className="h-8 gap-1 font-mono text-xs"
         onClick={onPrevious}
         disabled={!hasPrevious}
       >
-        <ChevronLeft className="size-4" />
+        <ChevronLeft className="size-3.5" />
         Previous
       </Button>
       <Button
         variant="outline"
         size="sm"
+        className="h-8 gap-1 font-mono text-xs"
         onClick={onNext}
         disabled={!hasMore}
       >
         Next
-        <ChevronRight className="size-4" />
+        <ChevronRight className="size-3.5" />
       </Button>
     </div>
   );

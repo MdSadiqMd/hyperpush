@@ -24,28 +24,31 @@ export default function SettingsPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Settings</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[10px] font-mono text-accent uppercase tracking-wider mb-1">
+          Configuration
+        </p>
+        <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+        <p className="text-sm text-muted-foreground mt-1">
           {activeProject?.name ?? activeProjectId}
         </p>
       </div>
 
       <Tabs defaultValue="project">
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="project" className="gap-1.5">
-            <Settings className="size-4" />
+        <TabsList className="w-full justify-start bg-muted/50">
+          <TabsTrigger value="project" className="gap-1.5 font-mono text-xs">
+            <Settings className="size-3.5" />
             Project
           </TabsTrigger>
-          <TabsTrigger value="team" className="gap-1.5">
-            <Users className="size-4" />
+          <TabsTrigger value="team" className="gap-1.5 font-mono text-xs">
+            <Users className="size-3.5" />
             Team
           </TabsTrigger>
-          <TabsTrigger value="api-keys" className="gap-1.5">
-            <Key className="size-4" />
+          <TabsTrigger value="api-keys" className="gap-1.5 font-mono text-xs">
+            <Key className="size-3.5" />
             API Keys
           </TabsTrigger>
-          <TabsTrigger value="storage" className="gap-1.5">
-            <Database className="size-4" />
+          <TabsTrigger value="storage" className="gap-1.5 font-mono text-xs">
+            <Database className="size-3.5" />
             Storage
           </TabsTrigger>
         </TabsList>

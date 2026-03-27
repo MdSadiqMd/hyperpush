@@ -33,20 +33,22 @@ export function EventCard({ event, onClick }: EventCardProps) {
     <button
       type="button"
       onClick={onClick}
-      className="animate-in fade-in slide-in-from-top-2 duration-200 flex w-full flex-col gap-1 rounded-md border px-3 py-2 text-left transition-colors hover:bg-accent"
+      className="animate-in fade-in slide-in-from-top-2 duration-200 flex w-full flex-col gap-1.5 rounded-lg border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-card group"
     >
       <div className="flex items-center gap-2">
         <StatusBadge variant={validLevel} />
         {issueId && (
-          <span className="max-w-[120px] truncate font-mono text-xs text-muted-foreground">
+          <span className="max-w-[120px] truncate font-mono text-[10px] text-muted-foreground">
             {issueId.slice(0, 8)}
           </span>
         )}
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+        <span className="ml-auto shrink-0 text-[10px] font-mono text-muted-foreground">
           {formatRelativeTime(timestamp)}
         </span>
       </div>
-      <p className="line-clamp-2 text-sm text-foreground/90">{message}</p>
+      <p className="line-clamp-2 text-sm text-foreground/90 group-hover:text-foreground transition-colors">
+        {message}
+      </p>
     </button>
   );
 }

@@ -30,6 +30,159 @@ use codegen::CodeGen;
 use mir::lower::lower_to_mir;
 use mir::mono::monomorphize;
 
+pub(crate) mod build_trace {
+    use std::path::{Path, PathBuf};
+
+    use serde_json::{Map, Value, json};
+
+    const TRACE_ENV: &str = "MESH_BUILD_TRACE_PATH";
+
+    fn trace_path() -> Option<PathBuf> {
+        std::env::var_os(TRACE_ENV).map(PathBuf::from)
+    }
+
+    fn read_trace(path: &Path) -> Map<String, Value> {
+        let Some(raw) = std::fs::read_to_string(path).ok() else {
+            return Map::new();
+        };
+        let Some(value) = serde_json::from_str::<Value>(&raw).ok() else {
+            return Map::new();
+        };
+        value.as_object().cloned().unwrap_or_default()
+    }
+
+    fn write_trace(path: &Path, doc: &Map<String, Value>) {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let Ok(rendered) = serde_json::to_string_pretty(doc) else {
+            return;
+        };
+        let _ = std::fs::write(path, rendered);
+    }
+
+    pub(crate) fn update<F>(mutate: F)
+    where
+        F: FnOnce(&mut Map<String, Value>),
+    {
+        let Some(path) = trace_path() else {
+            return;
+        };
+        let mut doc = read_trace(&path);
+        mutate(&mut doc);
+        write_trace(&path, &doc);
+    }
+
+    pub(crate) fn set_compile_context(output: &Path, object: &Path, target_triple: Option<&str>) {
+        update(|doc| {
+            doc.insert(
+                "buildOutputPath".to_string(),
+                json!(output.display().to_string()),
+            );
+            doc.insert("objectPath".to_string(), json!(object.display().to_string()));
+            doc.insert(
+                "requestedTargetTriple".to_string(),
+                target_triple.map(|value| json!(value)).unwrap_or(Value::Null),
+            );
+            doc.insert(
+                "llvmSys211Prefix".to_string(),
+                std::env::var("LLVM_SYS_211_PREFIX")
+                    .map(Value::from)
+                    .unwrap_or(Value::Null),
+            );
+            doc.insert(
+                "cargoTargetDir".to_string(),
+                std::env::var("CARGO_TARGET_DIR")
+                    .map(Value::from)
+                    .unwrap_or(Value::Null),
+            );
+            doc.insert("lastStage".to_string(), json!("compile-start"));
+            doc.insert("success".to_string(), json!(false));
+        });
+    }
+
+    pub(crate) fn set_stage(stage: &str) {
+        update(|doc| {
+            doc.insert("lastStage".to_string(), json!(stage));
+        });
+    }
+
+    pub(crate) fn mark_object_emission_started() {
+        update(|doc| {
+            doc.insert("lastStage".to_string(), json!("emit-object"));
+            doc.insert("objectEmissionStarted".to_string(), json!(true));
+            doc.insert("objectEmissionCompleted".to_string(), json!(false));
+        });
+    }
+
+    pub(crate) fn mark_object_emitted(object: &Path) {
+        update(|doc| {
+            doc.insert("lastStage".to_string(), json!("object-emitted"));
+            doc.insert("objectEmissionCompleted".to_string(), json!(true));
+            doc.insert(
+                "objectExistsAfterEmit".to_string(),
+                json!(object.exists()),
+            );
+        });
+    }
+
+    pub(crate) fn set_link_context(
+        display_target: &str,
+        runtime_path: Option<&Path>,
+        runtime_exists: Option<bool>,
+        linker_program: Option<&Path>,
+    ) {
+        update(|doc| {
+            doc.insert("displayTarget".to_string(), json!(display_target));
+            doc.insert(
+                "runtimeLibraryPath".to_string(),
+                runtime_path
+                    .map(|path| json!(path.display().to_string()))
+                    .unwrap_or(Value::Null),
+            );
+            doc.insert(
+                "runtimeLibraryExists".to_string(),
+                runtime_exists.map(Value::from).unwrap_or(Value::Null),
+            );
+            doc.insert(
+                "linkerProgram".to_string(),
+                linker_program
+                    .map(|path| json!(path.display().to_string()))
+                    .unwrap_or(Value::Null),
+            );
+        });
+    }
+
+    pub(crate) fn mark_link_started() {
+        update(|doc| {
+            doc.insert("lastStage".to_string(), json!("invoke-linker"));
+            doc.insert("linkStarted".to_string(), json!(true));
+            doc.insert("linkCompleted".to_string(), json!(false));
+        });
+    }
+
+    pub(crate) fn mark_link_completed() {
+        update(|doc| {
+            doc.insert("lastStage".to_string(), json!("link-completed"));
+            doc.insert("linkCompleted".to_string(), json!(true));
+        });
+    }
+
+    pub(crate) fn mark_success() {
+        update(|doc| {
+            doc.insert("lastStage".to_string(), json!("compile-succeeded"));
+            doc.insert("success".to_string(), json!(true));
+            doc.remove("error");
+        });
+    }
+
+    pub(crate) fn record_error(error: &str) {
+        update(|doc| {
+            doc.insert("error".to_string(), json!(error));
+        });
+    }
+}
+
 /// Lower a parsed and type-checked Mesh program to MIR.
 ///
 /// This runs the full MIR lowering pipeline: AST-to-MIR conversion (with
@@ -173,14 +326,43 @@ pub fn compile_to_binary(
     target_triple: Option<&str>,
     rt_lib_path: Option<&Path>,
 ) -> Result<(), String> {
-    // Generate object file to a temporary path
     let obj_path = output.with_extension("o");
-    compile_to_object(parse, typeck, &obj_path, opt_level, target_triple)?;
+    build_trace::set_compile_context(output, &obj_path, target_triple);
 
-    // Link with mesh-rt
-    link::link(&obj_path, output, target_triple, rt_lib_path)?;
+    let result: Result<(), String> = (|| -> Result<(), String> {
+        build_trace::set_stage("lower-to-mir");
+        let mir = lower_to_mir_module(parse, typeck)?;
 
-    Ok(())
+        build_trace::set_stage("create-codegen");
+        let context = Context::create();
+        let mut codegen = CodeGen::new(&context, "mesh_module", opt_level, target_triple)?;
+
+        build_trace::set_stage("compile-llvm-module");
+        codegen.compile(&mir)?;
+
+        if opt_level > 0 {
+            build_trace::set_stage("run-optimization-passes");
+            codegen.run_optimization_passes(opt_level)?;
+        }
+
+        build_trace::mark_object_emission_started();
+        codegen.emit_object(&obj_path)?;
+        build_trace::mark_object_emitted(&obj_path);
+
+        link::link(&obj_path, output, target_triple, rt_lib_path)?;
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => {
+            build_trace::mark_success();
+            Ok(())
+        }
+        Err(error) => {
+            build_trace::record_error(&error);
+            Err(error)
+        }
+    }
 }
 
 /// Compile a parsed and type-checked Mesh program (verify-only pipeline).
@@ -218,19 +400,39 @@ pub fn compile_mir_to_binary(
     rt_lib_path: Option<&Path>,
 ) -> Result<(), String> {
     let obj_path = output.with_extension("o");
+    build_trace::set_compile_context(output, &obj_path, target_triple);
 
-    let context = Context::create();
-    let mut codegen = CodeGen::new(&context, "mesh_module", opt_level, target_triple)?;
-    codegen.compile(mir)?;
+    let result: Result<(), String> = (|| -> Result<(), String> {
+        build_trace::set_stage("create-codegen");
+        let context = Context::create();
+        let mut codegen = CodeGen::new(&context, "mesh_module", opt_level, target_triple)?;
 
-    if opt_level > 0 {
-        codegen.run_optimization_passes(opt_level)?;
+        build_trace::set_stage("compile-llvm-module");
+        codegen.compile(mir)?;
+
+        if opt_level > 0 {
+            build_trace::set_stage("run-optimization-passes");
+            codegen.run_optimization_passes(opt_level)?;
+        }
+
+        build_trace::mark_object_emission_started();
+        codegen.emit_object(&obj_path)?;
+        build_trace::mark_object_emitted(&obj_path);
+
+        link::link(&obj_path, output, target_triple, rt_lib_path)?;
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => {
+            build_trace::mark_success();
+            Ok(())
+        }
+        Err(error) => {
+            build_trace::record_error(&error);
+            Err(error)
+        }
     }
-
-    codegen.emit_object(&obj_path)?;
-    link::link(&obj_path, output, target_triple, rt_lib_path)?;
-
-    Ok(())
 }
 
 /// Compile a pre-built MIR module to LLVM IR text.

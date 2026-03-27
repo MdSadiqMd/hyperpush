@@ -89,7 +89,7 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-lg">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-9 w-32" />
@@ -100,12 +100,14 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
   return (
     <div className="max-w-lg space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="retention-days">Retention Days</Label>
-        <p className="text-xs text-muted-foreground">
+        <Label htmlFor="retention-days" className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          Retention Days
+        </Label>
+        <p className="text-xs text-muted-foreground/60">
           How long to keep event data before automatic cleanup
         </p>
         <Select value={retentionDays} onValueChange={setRetentionDays}>
-          <SelectTrigger id="retention-days" className="w-full">
+          <SelectTrigger id="retention-days" className="w-full font-mono text-sm">
             <SelectValue placeholder="Select retention period" />
           </SelectTrigger>
           <SelectContent>
@@ -119,8 +121,10 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="sample-rate">Sample Rate</Label>
-        <p className="text-xs text-muted-foreground">
+        <Label htmlFor="sample-rate" className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          Sample Rate
+        </Label>
+        <p className="text-xs text-muted-foreground/60">
           1.0 = keep all events, 0.5 = keep 50%
         </p>
         <Input
@@ -135,15 +139,15 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
             validateSampleRate(e.target.value);
           }}
           aria-invalid={!!sampleRateError}
-          className="w-full"
+          className="w-full font-mono text-sm bg-muted/50"
         />
         {sampleRateError && (
-          <p className="text-sm text-destructive">{sampleRateError}</p>
+          <p className="text-xs font-mono text-destructive">{sampleRateError}</p>
         )}
       </div>
 
-      <Button onClick={handleSave} disabled={saving || !hasChanges}>
-        {saving && <Loader2 className="animate-spin" />}
+      <Button onClick={handleSave} disabled={saving || !hasChanges} className="font-mono text-xs">
+        {saving && <Loader2 className="animate-spin size-3.5" />}
         Save Settings
       </Button>
     </div>

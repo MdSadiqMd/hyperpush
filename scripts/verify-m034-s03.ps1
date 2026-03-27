@@ -15,12 +15,15 @@ $InstallScript = Join-Path $RootDir 'website/docs/public/install.ps1'
 $RepoInstallScript = Join-Path $RootDir 'tools/install/install.ps1'
 $MeshcExe = Join-Path $RootDir 'target/debug/meshc.exe'
 $MeshpkgExe = Join-Path $RootDir 'target/debug/meshpkg.exe'
+$HostedHelloBuildLog = Join-Path $RootDir '.tmp/m034-s11/t03/diag-download/windows/verify/run/07-hello-build.log'
+$SliceDiagRoot = Join-Path $RootDir '.tmp/m034-s12/t01'
 $PrebuiltReleaseDir = $env:M034_S03_PREBUILT_RELEASE_DIR
 $RunDir = Join-Path $VerifyRoot 'run'
 $ServerProcess = $null
 $LastStdoutPath = ''
 $LastStderrPath = ''
 $LastLogPath = ''
+$LastExitCode = 0
 $Version = ''
 $Target = 'x86_64-pc-windows-msvc'
 $MeshcArchive = ''
@@ -52,6 +55,34 @@ function Fail-Phase {
         Get-Content $LogPath | Select-Object -First 260 | ForEach-Object { Write-Error $_ }
     }
     exit 1
+}
+
+function Get-CommandExitCode {
+    $lastExitCodeVar = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+    if ($null -eq $lastExitCodeVar) {
+        return 0
+    }
+
+    $exitCode = $lastExitCodeVar.Value
+    if ($null -eq $exitCode) {
+        return 0
+    }
+
+    return [int]$exitCode
+}
+
+function Set-LastArtifacts {
+    param(
+        [string]$StdoutPath,
+        [string]$StderrPath,
+        [string]$LogPath,
+        [int]$ExitCode
+    )
+
+    $script:LastStdoutPath = $StdoutPath
+    $script:LastStderrPath = $StderrPath
+    $script:LastLogPath = $LogPath
+    $script:LastExitCode = $ExitCode
 }
 
 function Combine-CommandLog {
@@ -96,18 +127,10 @@ function Invoke-LoggedCommand {
 
     Write-Host "==> [$Phase] $Display"
     & $Command 1> $stdoutPath 2> $stderrPath
-    $lastExitCodeVar = Get-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
-    if ($null -eq $lastExitCodeVar) {
-        $exitCode = 0
-    } else {
-        $exitCode = $lastExitCodeVar.Value
-        if ($null -eq $exitCode) { $exitCode = 0 }
-    }
+    $exitCode = Get-CommandExitCode
 
     Combine-CommandLog -Display $Display -StdoutPath $stdoutPath -StderrPath $stderrPath -LogPath $logPath -ExitCode $exitCode
-    $script:LastStdoutPath = $stdoutPath
-    $script:LastStderrPath = $stderrPath
-    $script:LastLogPath = $logPath
+    Set-LastArtifacts -StdoutPath $stdoutPath -StderrPath $stderrPath -LogPath $logPath -ExitCode $exitCode
 
     if ($ExpectFailure) {
         if ($exitCode -eq 0) {
@@ -303,13 +326,306 @@ function Start-LocalServer {
     Fail-Phase 'server' 'local staged release server did not become ready' (Join-Path $RunDir 'http-server.stderr')
 }
 
+function Test-ObjectProperty {
+    param(
+        [object]$Object,
+        [string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $false
+    }
+
+    return $Object.PSObject.Properties.Name -contains $Name
+}
+
+function Get-LoggedCommandMetadata {
+    param([string]$LogPath)
+
+    $meta = [ordered]@{
+        exists = $false
+        valid = $false
+        logPath = $LogPath
+        display = $null
+        exitCode = $null
+        stdoutPath = $null
+        stderrPath = $null
+        missingFields = @()
+    }
+
+    if (-not (Test-Path $LogPath -PathType Leaf)) {
+        return [pscustomobject]$meta
+    }
+
+    $meta.exists = $true
+    foreach ($line in (Get-Content $LogPath)) {
+        if ($line -like 'display: *') {
+            $meta.display = $line.Substring(9)
+        } elseif ($line -like 'exit_code: *') {
+            $raw = $line.Substring(11)
+            if ($raw -match '^-?\d+$') {
+                $meta.exitCode = [int]$raw
+            }
+        } elseif ($line -like 'stdout_path: *') {
+            $meta.stdoutPath = $line.Substring(13)
+        } elseif ($line -like 'stderr_path: *') {
+            $meta.stderrPath = $line.Substring(13)
+        }
+    }
+
+    foreach ($field in @('display', 'exitCode', 'stdoutPath', 'stderrPath')) {
+        if ($null -eq $meta[$field] -or $meta[$field] -eq '') {
+            $meta.missingFields += $field
+        }
+    }
+
+    $meta.valid = ($meta.missingFields.Count -eq 0)
+    return [pscustomobject]$meta
+}
+
+function Get-BuildTraceInfo {
+    param([string]$TracePath)
+
+    $info = [ordered]@{
+        exists = $false
+        valid = $false
+        path = $TracePath
+        parseError = $null
+        data = $null
+    }
+
+    if (-not (Test-Path $TracePath -PathType Leaf)) {
+        return [pscustomobject]$info
+    }
+
+    $info.exists = $true
+    try {
+        $info.data = Get-Content $TracePath -Raw | ConvertFrom-Json
+        $info.valid = $true
+    } catch {
+        $info.parseError = $_.Exception.Message
+    }
+
+    return [pscustomobject]$info
+}
+
+function Get-InstalledBuildClassification {
+    param(
+        [int]$ExitCode,
+        [object]$TraceInfo
+    )
+
+    if ($ExitCode -eq 0) {
+        return 'success'
+    }
+
+    if (-not $TraceInfo.exists -or -not $TraceInfo.valid) {
+        return 'pre-object'
+    }
+
+    $trace = $TraceInfo.data
+    $objectEmitted = (Test-ObjectProperty -Object $trace -Name 'objectEmissionCompleted') -and [bool]$trace.objectEmissionCompleted
+    if (-not $objectEmitted) {
+        return 'pre-object'
+    }
+
+    $runtimeMissing = (Test-ObjectProperty -Object $trace -Name 'runtimeLibraryExists') -and ($trace.runtimeLibraryExists -eq $false)
+    if ($runtimeMissing) {
+        return 'runtime-lookup'
+    }
+
+    $linkAttempted = ((Test-ObjectProperty -Object $trace -Name 'linkStarted') -and [bool]$trace.linkStarted) -or ((Test-ObjectProperty -Object $trace -Name 'linkerProgram') -and $null -ne $trace.linkerProgram -and $trace.linkerProgram -ne '')
+    if ($linkAttempted) {
+        return 'link-time'
+    }
+
+    return 'pre-object'
+}
+
+function Get-DiagnosticEvidenceNote {
+    param(
+        [string]$Classification,
+        [object]$HostedInfo,
+        [object]$TraceInfo
+    )
+
+    if (-not $HostedInfo.exists) {
+        return 'Hosted S11 hello-build anchor is missing.'
+    }
+
+    if (-not $HostedInfo.valid) {
+        return "Hosted S11 hello-build anchor is malformed: $($HostedInfo.missingFields -join ', ')."
+    }
+
+    if (-not $TraceInfo.exists) {
+        return 'No local build trace was recorded, so the current classification stays at the earliest observable phase.'
+    }
+
+    if (-not $TraceInfo.valid) {
+        return "Local build trace was malformed: $($TraceInfo.parseError)."
+    }
+
+    if ($Classification -eq 'link-time') {
+        return 'Object emission completed and the linker boundary was reached.'
+    }
+
+    if ($Classification -eq 'runtime-lookup') {
+        return 'Object emission completed, but runtime discovery stayed unresolved before linker invocation.'
+    }
+
+    if ($Classification -eq 'success') {
+        return 'Installed build completed successfully with full trace coverage.'
+    }
+
+    return 'The current evidence does not show completed object emission.'
+}
+
+function Write-InstalledBuildContextLog {
+    param(
+        [string]$Path,
+        [string]$InstalledMeshcPath,
+        [string]$InstalledMeshpkgPath,
+        [string]$TracePath,
+        [string]$HelloExePath
+    )
+
+    $llvmPrefix = $env:LLVM_SYS_211_PREFIX
+    if (-not $llvmPrefix) {
+        $llvmPrefix = 'unset'
+    }
+    $cargoTargetDir = $env:CARGO_TARGET_DIR
+    if (-not $cargoTargetDir) {
+        $cargoTargetDir = 'unset'
+    }
+
+    Set-Content -Path $Path -Value @(
+        "installed_meshc=$InstalledMeshcPath",
+        "installed_meshpkg=$InstalledMeshpkgPath",
+        "trace_path=$TracePath",
+        "output_path=$HelloExePath",
+        "llvm_sys_211_prefix=$llvmPrefix",
+        "cargo_target_dir=$cargoTargetDir"
+    )
+}
+
+function Write-InstalledBuildDiagnosticSummary {
+    param(
+        [string]$SummaryPath,
+        [string]$BuildLogPath,
+        [string]$StdoutPath,
+        [string]$StderrPath,
+        [string]$TracePath,
+        [string]$BuildContextLogPath,
+        [string]$InstalledMeshcPath,
+        [string]$InstalledMeshpkgPath,
+        [string]$HostedLogPath
+    )
+
+    $buildInfo = Get-LoggedCommandMetadata -LogPath $BuildLogPath
+    $hostedInfo = Get-LoggedCommandMetadata -LogPath $HostedLogPath
+    $traceInfo = Get-BuildTraceInfo -TracePath $TracePath
+    $classification = Get-InstalledBuildClassification -ExitCode ($buildInfo.exitCode ?? -1) -TraceInfo $traceInfo
+    $evidenceNote = Get-DiagnosticEvidenceNote -Classification $classification -HostedInfo $hostedInfo -TraceInfo $traceInfo
+
+    $summaryDir = Split-Path -Parent $SummaryPath
+    if ($summaryDir) {
+        New-Item -ItemType Directory -Path $summaryDir -Force | Out-Null
+    }
+
+    $traceData = $null
+    if ($traceInfo.valid) {
+        $traceData = $traceInfo.data
+    }
+
+    $payload = [ordered]@{
+        generatedAt = [DateTimeOffset]::UtcNow.ToString('o')
+        build = [ordered]@{
+            classification = $classification
+            exitCode = $buildInfo.exitCode
+            buildLogPath = $BuildLogPath
+            stdoutPath = $StdoutPath
+            stderrPath = $StderrPath
+            tracePath = $TracePath
+            traceExists = $traceInfo.exists
+            traceValid = $traceInfo.valid
+            traceParseError = $traceInfo.parseError
+            buildContextLogPath = $BuildContextLogPath
+            installedMeshcPath = $InstalledMeshcPath
+            installedMeshpkgPath = $InstalledMeshpkgPath
+            llvmSys211Prefix = $env:LLVM_SYS_211_PREFIX
+            cargoTargetDir = $env:CARGO_TARGET_DIR
+            lastStage = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'lastStage')) { $traceData.lastStage } else { $null }
+            objectEmissionStarted = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'objectEmissionStarted')) { $traceData.objectEmissionStarted } else { $null }
+            objectEmissionCompleted = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'objectEmissionCompleted')) { $traceData.objectEmissionCompleted } else { $null }
+            objectExistsAfterEmit = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'objectExistsAfterEmit')) { $traceData.objectExistsAfterEmit } else { $null }
+            runtimeLibraryPath = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'runtimeLibraryPath')) { $traceData.runtimeLibraryPath } else { $null }
+            runtimeLibraryExists = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'runtimeLibraryExists')) { $traceData.runtimeLibraryExists } else { $null }
+            linkerProgram = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'linkerProgram')) { $traceData.linkerProgram } else { $null }
+            linkStarted = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'linkStarted')) { $traceData.linkStarted } else { $null }
+            linkCompleted = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'linkCompleted')) { $traceData.linkCompleted } else { $null }
+            traceError = if ($traceData -and (Test-ObjectProperty -Object $traceData -Name 'error')) { $traceData.error } else { $null }
+        }
+        hostedAnchor = [ordered]@{
+            logPath = $HostedLogPath
+            exists = $hostedInfo.exists
+            valid = $hostedInfo.valid
+            exitCode = $hostedInfo.exitCode
+            missingFields = $hostedInfo.missingFields
+        }
+        evidenceNote = $evidenceNote
+    }
+
+    $payload | ConvertTo-Json -Depth 10 | Set-Content -Path $SummaryPath
+    return [pscustomobject]$payload
+}
+
+function Invoke-InstalledBuildCommand {
+    param(
+        [string]$Phase,
+        [string]$Label,
+        [string]$Display,
+        [scriptblock]$Command,
+        [string]$TracePath,
+        [string]$SummaryPath,
+        [string]$BuildContextLogPath,
+        [string]$InstalledMeshcPath,
+        [string]$InstalledMeshpkgPath,
+        [string]$HostedLogPath
+    )
+
+    $stdoutPath = Join-Path $script:RunDir "$Label.stdout"
+    $stderrPath = Join-Path $script:RunDir "$Label.stderr"
+    $logPath = Join-Path $script:RunDir "$Label.log"
+
+    New-Item -ItemType Directory -Path (Split-Path -Parent $TracePath) -Force | Out-Null
+    Remove-Item $TracePath -Force -ErrorAction SilentlyContinue
+    $env:MESH_BUILD_TRACE_PATH = $TracePath
+
+    Write-Host "==> [$Phase] $Display"
+    try {
+        & $Command 1> $stdoutPath 2> $stderrPath
+        $exitCode = Get-CommandExitCode
+    } finally {
+        Remove-Item Env:MESH_BUILD_TRACE_PATH -ErrorAction SilentlyContinue
+    }
+
+    Combine-CommandLog -Display $Display -StdoutPath $stdoutPath -StderrPath $stderrPath -LogPath $logPath -ExitCode $exitCode
+    Set-LastArtifacts -StdoutPath $stdoutPath -StderrPath $stderrPath -LogPath $logPath -ExitCode $exitCode
+    Write-InstalledBuildDiagnosticSummary -SummaryPath $SummaryPath -BuildLogPath $logPath -StdoutPath $stdoutPath -StderrPath $stderrPath -TracePath $TracePath -BuildContextLogPath $BuildContextLogPath -InstalledMeshcPath $InstalledMeshcPath -InstalledMeshpkgPath $InstalledMeshpkgPath -HostedLogPath $HostedLogPath | Out-Null
+
+    if ($exitCode -ne 0) {
+        Fail-Phase $Phase "$Display failed" $logPath
+    }
+}
+
 if ($env:M034_S03_LIB_ONLY -eq '1') {
     return
 }
 
 try {
     Remove-Item -Recurse -Force $TmpRoot -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Path $RunDir, $StageRoot, $HomeRoot, $WorkRoot -Force | Out-Null
+    Remove-Item -Recurse -Force $SliceDiagRoot -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $RunDir, $StageRoot, $HomeRoot, $WorkRoot, $SliceDiagRoot -Force | Out-Null
 
     $script:RunDir = $RunDir
     $script:ServerRoot = $ServerRoot
@@ -396,10 +712,15 @@ try {
     Copy-Item (Join-Path $FixtureDir 'mesh.toml') (Join-Path $smokeDir 'mesh.toml') -Force
     Copy-Item (Join-Path $FixtureDir 'main.mpl') (Join-Path $smokeDir 'main.mpl') -Force
     $helloExe = Join-Path $RunDir 'installer-smoke.exe'
+    $helloTrace = Join-Path $RunDir '07-hello-build.trace.json'
+    $helloContext = Join-Path $RunDir '07-hello-build.context.log'
+    $helloSummary = Join-Path $SliceDiagRoot 'diagnostic-summary.json'
 
-    Invoke-LoggedCommand -Phase 'build' -Label '07-hello-build' -Display 'installed meshc.exe build installer smoke fixture' -Command {
+    Write-InstalledBuildContextLog -Path $helloContext -InstalledMeshcPath $installedMeshc -InstalledMeshpkgPath $installedMeshpkg -TracePath $helloTrace -HelloExePath $helloExe
+    Invoke-InstalledBuildCommand -Phase 'build' -Label '07-hello-build' -Display 'installed meshc.exe build installer smoke fixture' -Command {
         & $installedMeshc build $smokeDir --output $helloExe --no-color
-    }
+    } -TracePath $helloTrace -SummaryPath $helloSummary -BuildContextLogPath $helloContext -InstalledMeshcPath $installedMeshc -InstalledMeshpkgPath $installedMeshpkg -HostedLogPath $HostedHelloBuildLog
+
     Invoke-LoggedCommand -Phase 'runtime' -Label '08-hello-run' -Display 'run installed hello binary' -Command {
         & $helloExe
     }

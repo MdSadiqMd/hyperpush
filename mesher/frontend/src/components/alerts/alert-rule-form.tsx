@@ -113,23 +113,28 @@ export function AlertRuleForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="rule-name">Name</Label>
+        <Label htmlFor="rule-name" className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          Name
+        </Label>
         <Input
           id="rule-name"
           placeholder="e.g. High error volume"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          className="font-mono text-sm bg-muted/50"
           aria-invalid={!!errors.name}
         />
         {errors.name && (
-          <p className="text-sm text-destructive">{errors.name}</p>
+          <p className="text-xs font-mono text-destructive">{errors.name}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="condition-type">Condition Type</Label>
+        <Label htmlFor="condition-type" className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          Condition Type
+        </Label>
         <Select value={conditionType} onValueChange={setConditionType}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full font-mono text-sm">
             <SelectValue placeholder="Select condition type" />
           </SelectTrigger>
           <SelectContent>
@@ -145,32 +150,38 @@ export function AlertRuleForm({
       {conditionType === "threshold" && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="threshold">Threshold (event count)</Label>
+            <Label htmlFor="threshold" className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+              Threshold (event count)
+            </Label>
             <Input
               id="threshold"
               type="number"
               min={1}
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
+              className="font-mono text-sm bg-muted/50"
               aria-invalid={!!errors.threshold}
             />
             {errors.threshold && (
-              <p className="text-sm text-destructive">{errors.threshold}</p>
+              <p className="text-xs font-mono text-destructive">{errors.threshold}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="window-minutes">Window (minutes)</Label>
+            <Label htmlFor="window-minutes" className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+              Window (minutes)
+            </Label>
             <Input
               id="window-minutes"
               type="number"
               min={1}
               value={windowMinutes}
               onChange={(e) => setWindowMinutes(e.target.value)}
+              className="font-mono text-sm bg-muted/50"
               aria-invalid={!!errors.windowMinutes}
             />
             {errors.windowMinutes && (
-              <p className="text-sm text-destructive">
+              <p className="text-xs font-mono text-destructive">
                 {errors.windowMinutes}
               </p>
             )}
@@ -179,31 +190,34 @@ export function AlertRuleForm({
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="cooldown-minutes">Cooldown (minutes)</Label>
+        <Label htmlFor="cooldown-minutes" className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          Cooldown (minutes)
+        </Label>
         <Input
           id="cooldown-minutes"
           type="number"
           min={1}
           value={cooldownMinutes}
           onChange={(e) => setCooldownMinutes(e.target.value)}
+          className="font-mono text-sm bg-muted/50"
           aria-invalid={!!errors.cooldownMinutes}
         />
         {errors.cooldownMinutes && (
-          <p className="text-sm text-destructive">
+          <p className="text-xs font-mono text-destructive">
             {errors.cooldownMinutes}
           </p>
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[10px] font-mono text-muted-foreground/60">
           Minimum minutes between repeated alerts for this rule
         </p>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" className="font-mono text-xs" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="animate-spin" />}
+        <Button type="submit" className="font-mono text-xs" disabled={isSubmitting}>
+          {isSubmitting && <Loader2 className="animate-spin size-3.5" />}
           Create Rule
         </Button>
       </div>

@@ -14,7 +14,6 @@ import { LevelChart } from "@/components/charts/level-chart";
 import { HealthStats } from "@/components/charts/health-chart";
 import { IssueRow } from "@/components/shared/issue-row";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -41,7 +40,6 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("24h");
 
-  // Track last WS event to avoid re-processing
   const lastProcessedRef = useRef<unknown>(null);
   const timeRangeRef = useRef<TimeRange>(timeRange);
   timeRangeRef.current = timeRange;
@@ -73,23 +71,19 @@ export default function DashboardPage() {
     [activeProjectId]
   );
 
-  // Fetch on mount and when project or time range changes
   useEffect(() => {
     fetchDashboard(timeRange);
   }, [fetchDashboard, timeRange]);
 
-  // Periodic 60-second refresh for data accuracy
   useEffect(() => {
     const interval = setInterval(() => {
-      // Skip refresh if page is not visible
       if (document.hidden) return;
       fetchDashboard(timeRangeRef.current, false);
     }, REFRESH_INTERVAL_MS);
-
     return () => clearInterval(interval);
   }, [fetchDashboard]);
 
-  // WebSocket live updates -- optimistic state mutations
+  // WebSocket live updates
   useEffect(() => {
     if (!lastEvent || lastEvent === lastProcessedRef.current) return;
     lastProcessedRef.current = lastEvent;
@@ -97,7 +91,6 @@ export default function DashboardPage() {
     setData((prev) => {
       if (!prev) return prev;
 
-      // When a new event arrives, bump the latest volume bucket count
       if (lastEvent.type === "event") {
         const updatedVolume = [...prev.volume];
         if (updatedVolume.length > 0) {
@@ -108,30 +101,19 @@ export default function DashboardPage() {
         return {
           ...prev,
           volume: updatedVolume,
-          health: {
-            ...prev.health,
-            events_24h: prev.health.events_24h + 1,
-          },
+          health: { ...prev.health, events_24h: prev.health.events_24h + 1 },
         };
       }
 
-      // When issue_count message arrives, update unresolved_count
       if (lastEvent.type === "issue_count") {
         return {
           ...prev,
-          health: {
-            ...prev.health,
-            unresolved_count: lastEvent.count,
-          },
+          health: { ...prev.health, unresolved_count: lastEvent.count },
         };
       }
 
-      // When an issue action happens, update the top issues list visually
       if (lastEvent.type === "issue") {
-        if (
-          lastEvent.action === "resolved" ||
-          lastEvent.action === "archived"
-        ) {
+        if (lastEvent.action === "resolved" || lastEvent.action === "archived") {
           const updatedIssues = prev.topIssues.map((issue) =>
             issue.id === lastEvent.issue_id
               ? { ...issue, status: lastEvent.action }
@@ -145,7 +127,6 @@ export default function DashboardPage() {
     });
   }, [lastEvent]);
 
-  // Sync ws-store unresolvedCount into dashboard health immediately
   useEffect(() => {
     if (wsUnresolvedCount === null) return;
     setData((prev) => {
@@ -162,11 +143,11 @@ export default function DashboardPage() {
     return (
       <div className="flex h-full items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-sm text-destructive">{error}</p>
+          <p className="text-sm text-destructive font-mono">{error}</p>
           <button
             type="button"
             onClick={() => fetchDashboard(timeRange)}
-            className="mt-2 text-sm text-muted-foreground underline hover:text-foreground"
+            className="mt-2 text-sm text-accent hover:text-accent/80 transition-colors"
           >
             Retry
           </button>
@@ -194,7 +175,7 @@ export default function DashboardPage() {
             Last 7 days
           </TimeRangeButton>
           {wsEventCount > 0 && (
-            <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+            <span className="ml-auto text-[10px] font-mono tabular-nums text-muted-foreground">
               {wsEventCount} event{wsEventCount !== 1 ? "s" : ""} this session
             </span>
           )}
@@ -202,9 +183,13 @@ export default function DashboardPage() {
 
         {/* Health stat cards */}
         {loading ? (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-px bg-border rounded-xl overflow-hidden">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[88px] rounded-xl" />
+              <div key={i} className="bg-background p-6">
+                <Skeleton className="h-8 w-8 rounded-lg mb-3" />
+                <Skeleton className="h-7 w-20 mb-1" />
+                <Skeleton className="h-3 w-24" />
+              </div>
             ))}
           </div>
         ) : data ? (
@@ -212,13 +197,16 @@ export default function DashboardPage() {
         ) : null}
 
         {/* Volume chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <div className="rounded-xl border border-border bg-background overflow-hidden">
+          <div className="px-6 pt-5 pb-2">
+            <p className="text-[10px] font-mono text-accent uppercase tracking-wider mb-1">
+              Volume
+            </p>
+            <h3 className="text-sm font-medium text-muted-foreground">
               Event Volume
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h3>
+          </div>
+          <div className="px-4 pb-4">
             {loading ? (
               <Skeleton className="h-[240px] w-full" />
             ) : data ? (
@@ -227,62 +215,72 @@ export default function DashboardPage() {
                 bucket={timeRange === "24h" ? "hour" : "day"}
               />
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Level breakdown chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+        <div className="rounded-xl border border-border bg-background overflow-hidden">
+          <div className="px-6 pt-5 pb-2">
+            <p className="text-[10px] font-mono text-accent uppercase tracking-wider mb-1">
+              Breakdown
+            </p>
+            <h3 className="text-sm font-medium text-muted-foreground">
               Error Levels
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h3>
+          </div>
+          <div className="px-4 pb-4">
             {loading ? (
               <Skeleton className="h-[200px] w-full" />
             ) : data ? (
               <LevelChart data={data.levels} />
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Right panel: Issue list */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex w-[380px] flex-col shrink-0">
         <div className="mb-4 flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Issues</h2>
+          <p className="text-[10px] font-mono text-accent uppercase tracking-wider">
+            Issues
+          </p>
           {data && (
-            <Badge variant="secondary" className="text-xs tabular-nums">
+            <Badge
+              variant="outline"
+              className="h-5 rounded-sm border-accent/20 bg-accent/10 px-1.5 text-[10px] font-mono text-accent tabular-nums"
+            >
               {data.health.unresolved_count}
             </Badge>
           )}
         </div>
 
-        {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
-        ) : data && data.topIssues.length > 0 ? (
-          <ScrollArea className="flex-1">
-            <div className="space-y-0.5">
-              {data.topIssues.map((issue) => (
-                <IssueRow
-                  key={issue.id}
-                  issue={issue}
-                  onClick={() =>
-                    openDetail({ type: "issue", id: issue.id })
-                  }
-                />
+        <div className="rounded-xl border border-border bg-background overflow-hidden flex-1 flex flex-col">
+          {loading ? (
+            <div className="space-y-px p-1">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-md" />
               ))}
             </div>
-          </ScrollArea>
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-muted-foreground">No issues found</p>
-          </div>
-        )}
+          ) : data && data.topIssues.length > 0 ? (
+            <ScrollArea className="flex-1">
+              <div className="space-y-px p-1">
+                {data.topIssues.map((issue) => (
+                  <IssueRow
+                    key={issue.id}
+                    issue={issue}
+                    onClick={() =>
+                      openDetail({ type: "issue", id: issue.id })
+                    }
+                  />
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <p className="text-sm text-muted-foreground">No issues found</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -301,10 +299,10 @@ function TimeRangeButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`rounded-md px-3 py-1.5 text-xs font-mono transition-colors ${
         active
-          ? "bg-primary text-primary-foreground"
-          : "bg-secondary text-secondary-foreground hover:bg-accent"
+          ? "bg-accent/10 text-accent"
+          : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-muted"
       }`}
     >
       {children}

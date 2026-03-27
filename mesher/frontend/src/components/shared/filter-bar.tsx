@@ -60,7 +60,6 @@ export function FilterBar({
     [search, status, level, environment, onFilterChange]
   );
 
-  // Emit default filters on mount (e.g., default 'unresolved' status)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -103,13 +102,13 @@ export function FilterBar({
             placeholder="Search..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="h-8 w-[200px] pl-8 text-sm"
+            className="h-8 w-[220px] pl-8 text-sm font-mono bg-muted/50 border-border placeholder:text-muted-foreground/50"
           />
         </div>
       )}
       {showStatus && (
         <Select value={status} onValueChange={handleStatusChange}>
-          <SelectTrigger size="sm" className="w-[130px]">
+          <SelectTrigger size="sm" className="w-[130px] font-mono text-xs">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -122,7 +121,7 @@ export function FilterBar({
       )}
       {showLevel && (
         <Select value={level} onValueChange={handleLevelChange}>
-          <SelectTrigger size="sm" className="w-[110px]">
+          <SelectTrigger size="sm" className="w-[110px] font-mono text-xs">
             <SelectValue placeholder="Level" />
           </SelectTrigger>
           <SelectContent>
@@ -140,7 +139,7 @@ export function FilterBar({
             placeholder="Environment"
             value={environment}
             onChange={(e) => handleEnvironmentChange(e.target.value)}
-            className="h-8 w-[140px] text-sm"
+            className="h-8 w-[140px] text-sm font-mono bg-muted/50 border-border placeholder:text-muted-foreground/50"
           />
         </div>
       )}

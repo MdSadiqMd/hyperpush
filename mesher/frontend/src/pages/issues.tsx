@@ -52,7 +52,7 @@ const issueColumns: ColumnDef<Issue, unknown>[] = [
     accessorKey: "event_count",
     header: "Events",
     cell: ({ row }) => (
-      <span className="tabular-nums text-muted-foreground">
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">
         {formatNumber(row.getValue("event_count") as number)}
       </span>
     ),
@@ -61,7 +61,7 @@ const issueColumns: ColumnDef<Issue, unknown>[] = [
     accessorKey: "last_seen",
     header: "Last Seen",
     cell: ({ row }) => (
-      <span className="text-muted-foreground">
+      <span className="font-mono text-xs text-muted-foreground">
         {formatRelativeTime(row.getValue("last_seen") as string)}
       </span>
     ),
@@ -119,7 +119,6 @@ export default function IssuesPage() {
     [activeProjectId]
   );
 
-  // Fetch on mount handled by FilterBar emitting default filters
   const handleFilterChange = useCallback(
     (filters: FilterState) => {
       filtersRef.current = filters;
@@ -131,7 +130,6 @@ export default function IssuesPage() {
 
   const handleNext = () => {
     if (!cursor || !cursorId) return;
-    // Push current position onto stack for "Previous"
     setCursorStack((prev) => [
       ...prev,
       { cursor: cursor, cursorId: cursorId },
@@ -141,7 +139,7 @@ export default function IssuesPage() {
 
   const handlePrevious = () => {
     const stack = [...cursorStack];
-    stack.pop(); // Remove current
+    stack.pop();
     const prev = stack.length > 0 ? stack[stack.length - 1] : null;
     setCursorStack(stack);
     if (prev) {
@@ -155,7 +153,6 @@ export default function IssuesPage() {
     openDetail({ type: "issue", id: issue.id });
   };
 
-  // Re-fetch when project changes
   useEffect(() => {
     if (activeProjectId) {
       setCursorStack([]);
@@ -185,7 +182,10 @@ export default function IssuesPage() {
     <PushPanelLayout panel={panel}>
       <div className="flex flex-col h-full">
         <div className="p-6 pb-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Issues</h1>
+          <p className="text-[10px] font-mono text-accent uppercase tracking-wider mb-1">
+            Tracking
+          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Issues</h1>
           <FilterBar
             onFilterChange={handleFilterChange}
             showSearch={true}

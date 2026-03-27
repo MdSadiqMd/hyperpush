@@ -5,6 +5,11 @@ import { useTheme } from "@/hooks/use-theme";
 import { useWsStore } from "@/stores/ws-store";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const routeTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -24,10 +29,10 @@ export function Header() {
 
   const statusColor =
     wsStatus === "connected"
-      ? "bg-green-500"
+      ? "bg-accent"
       : wsStatus === "connecting"
-        ? "bg-yellow-500"
-        : "bg-red-500";
+        ? "bg-chart-4"
+        : "bg-destructive";
 
   const statusLabel =
     wsStatus === "connected"
@@ -37,34 +42,48 @@ export function Header() {
         : "Disconnected";
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background/80 backdrop-blur-sm px-4">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 !h-4" />
-      <h1 className="text-sm font-medium">{title}</h1>
+      <h1 className="text-sm font-medium tracking-tight">{title}</h1>
 
       <div className="ml-auto flex items-center gap-3">
-        <div className="flex items-center gap-1.5" title={statusLabel}>
-          <div
-            className={`h-2 w-2 rounded-full ${statusColor}`}
-          />
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            {statusLabel}
-          </span>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5">
+              <div className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
+              <span className="text-[10px] font-mono text-muted-foreground hidden sm:inline">
+                {statusLabel}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p className="text-xs">WebSocket: {statusLabel}</p>
+          </TooltipContent>
+        </Tooltip>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </Button>
+        <Separator orientation="vertical" className="!h-4" />
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p className="text-xs">Toggle theme</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
     </header>
   );

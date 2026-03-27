@@ -18,17 +18,17 @@ export function IssueRow({ issue, onClick }: IssueRowProps) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-card group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       style={{ cursor: onClick ? "pointer" : "default" }}
     >
       <StatusBadge variant={variant} />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground group-hover:text-foreground/90">
         {issue.title}
       </span>
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+      <span className="shrink-0 text-[10px] font-mono tabular-nums text-muted-foreground">
         {issue.event_count.toLocaleString()}
       </span>
-      <span className="shrink-0 text-xs text-muted-foreground">
+      <span className="shrink-0 text-[10px] font-mono text-muted-foreground">
         {formatRelativeTime(issue.last_seen)}
       </span>
     </button>

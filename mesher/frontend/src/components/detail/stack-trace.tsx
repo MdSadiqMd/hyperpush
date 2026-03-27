@@ -39,7 +39,7 @@ export function StackTrace({ stacktrace }: StackTraceProps) {
   }
 
   return (
-    <div className="rounded-md border border-border overflow-hidden">
+    <div className="rounded-lg border border-border overflow-hidden">
       {frames.map((frame, i) => (
         <StackFrameRow
           key={i}
@@ -70,30 +70,30 @@ function StackFrameRow({
     : "";
 
   return (
-    <div className={cn(!isLast && "border-b border-border")}>
+    <div className={cn(!isLast && "border-b border-border/50")}>
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-card transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <ChevronRight
           className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform",
+            "size-3 shrink-0 text-muted-foreground transition-transform",
             expanded && "rotate-90"
           )}
         />
-        <span className="font-mono text-sm font-semibold truncate">
+        <span className="font-mono text-xs font-semibold truncate">
           {fnName}
         </span>
         {location && (
-          <span className="font-mono text-xs text-muted-foreground truncate ml-auto">
+          <span className="font-mono text-[10px] text-muted-foreground truncate ml-auto">
             {location}
           </span>
         )}
       </button>
       {expanded && hasContext && (
-        <div className="bg-muted px-3 py-2 overflow-x-auto">
-          <pre className="font-mono text-xs leading-5">
+        <div className="bg-muted/50 px-3 py-2 overflow-x-auto">
+          <pre className="font-mono text-[11px] leading-5">
             {frame.pre_context?.map((line, j) => {
               const lineNum =
                 frame.lineno != null
@@ -102,7 +102,7 @@ function StackFrameRow({
               return (
                 <div key={`pre-${j}`} className="text-muted-foreground">
                   {lineNum != null && (
-                    <span className="inline-block w-10 text-right mr-3 select-none text-muted-foreground/60">
+                    <span className="inline-block w-10 text-right mr-3 select-none text-muted-foreground/40 tabular-nums">
                       {lineNum}
                     </span>
                   )}
@@ -111,9 +111,9 @@ function StackFrameRow({
               );
             })}
             {frame.context_line != null && (
-              <div className="bg-primary/10 -mx-3 px-3 text-foreground font-medium">
+              <div className="bg-accent/10 -mx-3 px-3 text-foreground font-medium">
                 {frame.lineno != null && (
-                  <span className="inline-block w-10 text-right mr-3 select-none text-primary/60">
+                  <span className="inline-block w-10 text-right mr-3 select-none text-accent/60 tabular-nums">
                     {frame.lineno}
                   </span>
                 )}
@@ -126,7 +126,7 @@ function StackFrameRow({
               return (
                 <div key={`post-${j}`} className="text-muted-foreground">
                   {lineNum != null && (
-                    <span className="inline-block w-10 text-right mr-3 select-none text-muted-foreground/60">
+                    <span className="inline-block w-10 text-right mr-3 select-none text-muted-foreground/40 tabular-nums">
                       {lineNum}
                     </span>
                   )}

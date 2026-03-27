@@ -107,12 +107,11 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
                 : "info"
             }
           />
-          <span className="font-mono text-xs text-muted-foreground truncate">
+          <span className="font-mono text-[10px] text-muted-foreground truncate">
             {event.id.slice(0, 12)}
           </span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {/* Prev / Next navigation */}
           <Button
             variant="ghost"
             size="icon-xs"
@@ -146,7 +145,7 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
         <div className="p-4 space-y-5">
           {/* Message */}
           <section>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-1">
               Message
             </h3>
             <p className="text-sm font-medium break-words">{event.message}</p>
@@ -157,11 +156,11 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
             <>
               <Separator />
               <section>
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-1">
                   Exception
                 </h3>
                 {exception.type && (
-                  <p className="text-sm font-mono font-semibold">
+                  <p className="text-sm font-mono font-semibold text-destructive">
                     {exception.type}
                   </p>
                 )}
@@ -177,7 +176,7 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
           {/* Stack Trace */}
           <Separator />
           <section>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
               Stack Trace
             </h3>
             <StackTrace stacktrace={event.stacktrace} />
@@ -186,7 +185,7 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
           {/* Breadcrumbs */}
           <Separator />
           <section>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
               Breadcrumbs
             </h3>
             <Breadcrumbs breadcrumbs={event.breadcrumbs} />
@@ -195,7 +194,7 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
           {/* Tags */}
           <Separator />
           <section>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
               Tags
             </h3>
             <TagList tags={event.tags} />
@@ -207,32 +206,32 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
               <>
                 <Separator />
                 <section>
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                  <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-2">
                     User
                   </h3>
-                  <div className="rounded-md border border-border p-3 space-y-1">
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
                     {userCtx.id != null && (
                       <div className="flex items-baseline gap-2 text-sm">
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-[10px] font-mono text-muted-foreground">
                           ID
                         </span>
-                        <span className="font-mono">{String(userCtx.id)}</span>
+                        <span className="font-mono text-xs">{String(userCtx.id)}</span>
                       </div>
                     )}
                     {userCtx.email != null && (
                       <div className="flex items-baseline gap-2 text-sm">
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-[10px] font-mono text-muted-foreground">
                           Email
                         </span>
-                        <span>{String(userCtx.email)}</span>
+                        <span className="text-xs">{String(userCtx.email)}</span>
                       </div>
                     )}
                     {userCtx.username != null && (
                       <div className="flex items-baseline gap-2 text-sm">
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-[10px] font-mono text-muted-foreground">
                           Username
                         </span>
-                        <span>{String(userCtx.username)}</span>
+                        <span className="text-xs">{String(userCtx.username)}</span>
                       </div>
                     )}
                   </div>
@@ -245,10 +244,10 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
             <>
               <Separator />
               <section>
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-1">
                   SDK
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm font-mono text-muted-foreground">
                   {event.sdk_name}
                   {event.sdk_version && ` v${event.sdk_version}`}
                 </p>
@@ -259,20 +258,20 @@ export function EventDetail({ eventId, onClose }: EventDetailProps) {
           {/* Metadata */}
           <Separator />
           <section className="pb-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-accent mb-1">
               Metadata
             </h3>
-            <div className="space-y-1 text-sm">
+            <div className="space-y-1.5 text-sm">
               <div className="flex items-baseline gap-2">
-                <span className="text-muted-foreground text-xs">Received</span>
-                <span>{formatRelativeTime(event.received_at)}</span>
+                <span className="text-[10px] font-mono text-muted-foreground">Received</span>
+                <span className="text-xs">{formatRelativeTime(event.received_at)}</span>
               </div>
               {event.fingerprint && (
                 <div className="flex items-baseline gap-2">
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-[10px] font-mono text-muted-foreground">
                     Fingerprint
                   </span>
-                  <span className="font-mono text-xs truncate">
+                  <span className="font-mono text-[10px] truncate text-muted-foreground">
                     {event.fingerprint}
                   </span>
                 </div>

@@ -8,6 +8,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::build_trace;
+
 /// Link an object file with the Mesh runtime to produce a native executable.
 ///
 /// # Arguments
@@ -28,23 +30,41 @@ pub fn link(
     rt_lib_path: Option<&Path>,
 ) -> Result<(), String> {
     let target = LinkTarget::detect(target_triple)?;
+    build_trace::set_stage("resolve-runtime-library");
 
     let rt_path = match rt_lib_path {
         Some(path) => path.to_path_buf(),
-        None => find_mesh_rt(&target)?,
+        None => match find_mesh_rt(&target) {
+            Ok(path) => path,
+            Err(error) => {
+                build_trace::set_link_context(&target.display_triple(), None, Some(false), None);
+                build_trace::record_error(&error);
+                return Err(error);
+            }
+        },
     };
 
-    if !rt_path.exists() {
-        return Err(format!(
+    let runtime_exists = rt_path.exists();
+    let linker_program = target.linker_program();
+    build_trace::set_link_context(
+        &target.display_triple(),
+        Some(&rt_path),
+        Some(runtime_exists),
+        Some(&linker_program),
+    );
+
+    if !runtime_exists {
+        let error = format!(
             "Mesh runtime static library not found at '{}'. Expected {} for target '{}'. Run `cargo build -p mesh-rt{}` first.",
             rt_path.display(),
             target.runtime_filename(),
             target.display_triple(),
             target.cargo_build_hint(),
-        ));
+        );
+        build_trace::record_error(&error);
+        return Err(error);
     }
 
-    let linker_program = target.linker_program();
     let mut cmd = Command::new(&linker_program);
     cmd.arg(object_path);
 
@@ -61,14 +81,20 @@ pub fn link(
         cmd.arg("-framework").arg("Security");
     }
 
-    let output = cmd.output().map_err(|error| {
-        format!(
-            "Failed to invoke linker '{}': {}.{}",
-            linker_program.display(),
-            error,
-            target.linker_help_suffix(),
-        )
-    })?;
+    build_trace::mark_link_started();
+    let output = match cmd.output() {
+        Ok(output) => output,
+        Err(error) => {
+            let error = format!(
+                "Failed to invoke linker '{}': {}.{}",
+                linker_program.display(),
+                error,
+                target.linker_help_suffix(),
+            );
+            build_trace::record_error(&error);
+            return Err(error);
+        }
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -81,15 +107,18 @@ pub fn link(
             format!("linker exited with status {} without emitting output", output.status)
         };
 
-        return Err(format!(
+        let error = format!(
             "Linking failed for target '{}'.\nlinker: {}\nruntime: {}\n{}",
             target.display_triple(),
             linker_program.display(),
             rt_path.display(),
             detail,
-        ));
+        );
+        build_trace::record_error(&error);
+        return Err(error);
     }
 
+    build_trace::mark_link_completed();
     std::fs::remove_file(object_path).ok();
     Ok(())
 }

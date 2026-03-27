@@ -36,11 +36,11 @@ function CustomTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-md border bg-card px-3 py-2 text-card-foreground shadow-sm">
-      <p className="text-xs text-muted-foreground">
+    <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg">
+      <p className="text-[10px] font-mono text-muted-foreground">
         {formatBucketLabel(label ?? "", bucket)}
       </p>
-      <p className="text-sm font-medium tabular-nums">
+      <p className="text-sm font-semibold tabular-nums text-foreground">
         {payload[0].value.toLocaleString()} events
       </p>
     </div>
@@ -53,8 +53,8 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
       <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id="volumeFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(var(--muted))" stopOpacity={0.6} />
-            <stop offset="100%" stopColor="oklch(var(--muted))" stopOpacity={0.05} />
+            <stop offset="0%" stopColor="oklch(0.75 0.18 160)" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="oklch(0.75 0.18 160)" stopOpacity={0.02} />
           </linearGradient>
         </defs>
         <CartesianGrid
@@ -66,13 +66,13 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
           dataKey="bucket"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+          tick={{ fill: "var(--color-muted-foreground)", fontSize: 11, fontFamily: "var(--font-mono)" }}
           tickFormatter={(v: string) => formatBucketLabel(v, bucket)}
         />
         <YAxis
           axisLine={false}
           tickLine={false}
-          tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }}
+          tick={{ fill: "var(--color-muted-foreground)", fontSize: 11, fontFamily: "var(--font-mono)" }}
           width={40}
         />
         <Tooltip
@@ -82,7 +82,7 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
         <Area
           type="monotone"
           dataKey="count"
-          stroke="var(--color-foreground)"
+          stroke="oklch(0.75 0.18 160)"
           strokeWidth={1.5}
           fill="url(#volumeFill)"
         />

@@ -18,14 +18,14 @@ interface StatusBadgeProps {
 
 const variantStyles: Record<StatusVariant, string> = {
   error:
-    "border-transparent bg-[oklch(0.577_0.245_27.325)] text-white dark:bg-[oklch(0.577_0.245_27.325)]/80",
+    "border-destructive/30 bg-destructive/10 text-destructive",
   warning:
-    "border-transparent bg-[oklch(0.75_0.18_85)] text-[oklch(0.25_0.05_85)] dark:text-[oklch(0.15_0.05_85)]",
-  info: "border-border bg-secondary text-secondary-foreground",
+    "border-chart-4/30 bg-chart-4/10 text-chart-4",
+  info: "border-chart-2/30 bg-chart-2/10 text-chart-2",
   debug: "border-border bg-muted text-muted-foreground",
-  resolved: "border-border bg-secondary text-muted-foreground",
+  resolved: "border-accent/30 bg-accent/10 text-accent",
   archived: "border-border bg-muted text-muted-foreground",
-  unresolved: "border-border bg-secondary text-secondary-foreground",
+  unresolved: "border-destructive/30 bg-destructive/10 text-destructive",
 };
 
 const variantLabels: Record<StatusVariant, string> = {
@@ -43,7 +43,7 @@ export function StatusBadge({ variant, className, children }: StatusBadgeProps) 
     <Badge
       variant="outline"
       className={cn(
-        "rounded-sm px-1.5 py-0 text-[10px] font-medium leading-5",
+        "rounded-sm px-1.5 py-0 text-[10px] font-mono font-medium leading-5",
         variantStyles[variant],
         className
       )}
