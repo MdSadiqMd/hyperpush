@@ -5,4 +5,4 @@ description = "Consumes the real registry proof package for M034 S01"
 license = "MIT"
 
 [dependencies]
-"snowdamiz/mesh-registry-proof" = "0.34.0-20260326213540-36652"
+"snowdamiz/mesh-registry-proof" = "0.34.0-20260327092325-61550"
