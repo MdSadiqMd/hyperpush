@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-03-27T20:51:17.517Z",
+  "exported_at": "2026-03-27T21:50:28.425Z",
   "milestones": [
     {
       "id": "M001",
@@ -1082,16 +1082,16 @@
       "milestone_id": "M034",
       "id": "S10",
       "title": "Hosted verification blocker remediation",
-      "status": "pending",
+      "status": "complete",
       "risk": "high",
       "depends": [
         "S09"
       ],
       "demo": "`authoritative-verification.yml` and `release.yml` are green on the current rollout SHA, with blocker artifacts and local regressions updated to match the repaired hosted behavior.",
       "created_at": "2026-03-27T19:46:49.420Z",
-      "completed_at": null,
-      "full_summary_md": "",
-      "full_uat_md": "",
+      "completed_at": "2026-03-27T21:33:13.220Z",
+      "full_summary_md": "---\nid: S10\nparent: M034\nmilestone: M034\nprovides:\n  - Monotonic registry latest-version truth for metadata/search callers, target-aware Windows MSVC runtime/linker selection in `mesh-codegen`, and refreshed hosted evidence showing the release tag lane as the sole remaining blocker.\nrequires:\n  - slice: S09\n    provides: the approved rollout-target mechanism plus freshness-aware remote-evidence surfaces anchored to one concrete SHA\naffects:\n  - S11\nkey_files:\n  - registry/src/db/packages.rs\n  - registry/src/routes/metadata.rs\n  - registry/src/routes/search.rs\n  - compiler/mesh-codegen/src/link.rs\n  - compiler/mesh-codegen/src/lib.rs\n  - scripts/verify-m034-s03.ps1\n  - .tmp/m034-s05/verify/remote-runs.json\n  - .tmp/m034-s09/rollout/workflow-status.json\n  - .gsd/PROJECT.md\nkey_decisions:\n  - D104: Recompute `packages.latest_version` from committed `versions` rows under a per-package row lock so package-level latest cannot move backward under overlapping publishes.\n  - D105: Use target-aware linker selection and pass the resolved runtime static library path directly to the linker; keep Unix on `cc` + `libmesh_rt.a` and use `clang(.exe)` + `mesh_rt.lib` on Windows MSVC.\n  - D106: Prefer `gh run rerun --failed` on the existing correct-head workflow run before dispatching a new run, so hosted blocker evidence stays attributable to the already-approved rollout target.\npatterns_established:\n  - Derive mutable package latest pointers from committed version rows instead of request order when concurrent publishes can race.\n  - Treat hosted workflow freshness (`headSha` matches target) as a separate signal from hosted workflow health so a red run on the correct SHA stays attributable instead of being misread as staleness.\n  - When platform-specific smoke fails, keep the verifier’s phase logs structured enough to point directly at the failing command and artifact paths.\nobservability_surfaces:\n  - `.tmp/m034-s05/verify/remote-runs.json` now records expected vs observed `headSha` plus per-workflow status so stale-green runs cannot masquerade as current proof.\n  - `.tmp/m034-s09/rollout/workflow-status.json` provides the concise authoritative-success / release-failure view for the current rollout target.\n  - `scripts/verify-m034-s03.ps1` command logs now record display text, exit code, and stdout/stderr artifact paths for staged Windows smoke commands.\n  - `.tmp/m034-s03/windows/verify/run/07-hello-build.log` remains the first trustworthy local diagnostic for Windows installed-compiler regressions.\ndrill_down_paths:\n  - .gsd/milestones/M034/slices/S10/tasks/T01-SUMMARY.md\n  - .gsd/milestones/M034/slices/S10/tasks/T02-SUMMARY.md\n  - .gsd/milestones/M034/slices/S10/tasks/T03-SUMMARY.md\nduration: \"\"\nverification_result: passed\ncompleted_at: 2026-03-27T21:33:13.228Z\nblocker_discovered: false\n---\n\n# S10: Hosted verification blocker remediation\n\n**Registry latest-version ordering and Windows MSVC runtime linking were repaired locally, and the refreshed hosted evidence now shows `authoritative-verification.yml` green while the release tag lane remains the only live blocker.**\n\n## What Happened\n\nS10 retired two real local blockers instead of papering over them. First, the registry stopped trusting request/update order for `packages.latest_version`: publish now re-derives package latest from committed `versions` rows under a per-package lock, while metadata and search/list fail closed if the latest-version join goes missing. That moved the source of truth to the data that actually commits and gave the package-manager proof path monotonic latest semantics even under overlapping publishes.\n\nSecond, `mesh-codegen` stopped assuming Unix linker/runtime rules everywhere. The linker path is now target-aware, preserving direct `libmesh_rt.a` linking on Unix-like hosts and switching Windows MSVC to explicit `mesh_rt.lib` discovery plus `clang(.exe)`. The staged PowerShell verifier was tightened at the same time so hosted Windows failures retain command text, exit code, and stdout/stderr artifact paths instead of collapsing into a thin phase failure.\n\nThe slice did not fully clear the hosted blocker the roadmap hoped to retire, but it did make that blocker honest. Focused local verification passed for the registry race repair, the linker/runtime fix, the staged PowerShell helper, and the release-workflow contract. Then the remote-evidence refresh was replayed against the current rollout target `e59f18203a30951af5288791bf9aed5b53a24a2a` with expected-failure wrappers that only pass if the blocker shape is exact. The resulting state is now precise: `authoritative-verification.yml` is green on the rollout SHA, `release.yml` is still red on that same SHA, and the remaining failure is concentrated in the Windows staged installer smoke path rather than in registry latest drift or stale workflow freshness.\n\n## Verification\n\nPassed the local slice verifiers directly: `DATABASE_URL='postgres://postgres:postgres@127.0.0.1:55433/postgres' cargo test --manifest-path registry/Cargo.toml latest -- --nocapture`, `bash scripts/tests/verify-m034-s01-fetch-retry.sh`, `cargo test -p mesh-codegen link -- --nocapture`, `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1`, and `bash scripts/verify-m034-s02-workflows.sh` all succeeded. Then refreshed the hosted evidence with expected-failure wrappers that only pass if the blocker shape is exact: `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh` rebuilt `.tmp/m034-s05/verify/remote-runs.json` and confirmed `authoritative-verification.yml` is `ok` while `release.yml` is `failed` on rollout SHA `e59f18203a30951af5288791bf9aed5b53a24a2a`; `python3 .tmp/m034-s09/rollout/monitor_workflows.py` rebuilt `.tmp/m034-s09/rollout/workflow-status.json` and confirmed the same authoritative-success / release-failure split on that same SHA.\n\n## Requirements Advanced\n\n- R007 — S10 hardened the real registry publish/install trust path by making package-level `latest` monotonic across overlapping publishes and by keeping metadata/search aligned with committed version data instead of last-writer-wins package state.\n\n## Requirements Validated\n\nNone.\n\n## New Requirements Surfaced\n\nNone.\n\n## Requirements Invalidated or Re-scoped\n\nNone.\n\n## Deviations\n\nT03 invalidated the slice’s original closure assumption. The local code repairs landed and held under focused verification, but the hosted refresh did not converge to both lanes green. Instead, the refreshed evidence proved a narrower state: `authoritative-verification.yml` recovered, while `release.yml` remained red on the rollout target. By closeout, the active rollout target had also moved to the workflow-only synthetic commit `e59f18203a30951af5288791bf9aed5b53a24a2a`, so the final slice verification had to refresh remote evidence against that newer target instead of the earlier `8e6d49dacc4f4cd64824b032078ae45aabfe9635` state recorded in the task narrative.\n\n## Known Limitations\n\n`release.yml` is still red on the current rollout target `e59f18203a30951af5288791bf9aed5b53a24a2a`, specifically at the Windows staged installer smoke step (`installed meshc.exe build installer smoke fixture failed`). The current remote target is only a workflow-only synthetic commit, so a green `authoritative-verification.yml` run there is not enough evidence that the full local S10 code surface has been exercised on the release tag lane. `.tmp/m034-s06/evidence/first-green/` must remain absent until both lanes are green on the same target SHA.\n\n## Follow-ups\n\n1. Roll the full local S10 code surface onto the release tag lane instead of trusting the workflow-only synthetic commit evidence.\n2. Re-run `release.yml` on the current rollout target and inspect the Windows staged installer smoke diagnostics first, especially `.tmp/m034-s03/windows/verify/run/07-hello-build.log` and the hosted failed-job log under `.tmp/m034-s10/release-artifact-rerun/` or the latest release failure bundle.\n3. After the release lane is green on the same `headSha` as authoritative verification, rerun `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh` and capture `.tmp/m034-s06/evidence/first-green/` exactly once for S11.\n\n## Files Created/Modified\n\n- `registry/src/db/packages.rs` — Replaced last-writer-wins `latest_version` updates with monotonic recomputation from committed `versions` rows under a per-package lock.\n- `registry/src/routes/metadata.rs` — Made package metadata fail closed when the latest-version join is missing and added latest-version regression coverage.\n- `registry/src/routes/search.rs` — Aligned package list/search latest-version semantics with metadata and added malformed-latest join regression coverage.\n- `compiler/mesh-codegen/src/link.rs` — Added target-aware linker/runtime discovery so Unix keeps direct `libmesh_rt.a` linking while Windows MSVC resolves `mesh_rt.lib` and `clang(.exe)` explicitly.\n- `compiler/mesh-codegen/src/lib.rs` — Threaded the requested target triple into the codegen link path so `meshc build` uses the repaired linker behavior.\n- `scripts/verify-m034-s03.ps1` — Persisted PowerShell staged-smoke command logs with display text, exit code, and stdout/stderr artifact paths so hosted Windows failures stay attributable.\n- `.tmp/m034-s05/verify/remote-runs.json` — Refreshed canonical hosted-workflow evidence against the current rollout target and recorded expected-vs-observed `headSha` values for each lane.\n- `.tmp/m034-s09/rollout/workflow-status.json` — Refreshed rollout workflow status so the authoritative-success / release-failure split is visible on the current target SHA.\n",
+      "full_uat_md": "# S10: Hosted verification blocker remediation — UAT\n\n**Milestone:** M034\n**Written:** 2026-03-27T21:33:13.230Z\n\n# S10: Hosted verification blocker remediation — UAT\n\n**Milestone:** M034\n**Written:** 2026-03-28\n\n## UAT Type\n\n- UAT mode: mixed\n- Why this mode is sufficient: S10 changed both code paths and hosted-proof attribution. The honest acceptance surface is a mix of focused local regressions plus refreshed hosted evidence on the current rollout target.\n\n## Preconditions\n\n- Run from the repo root.\n- Local Docker Postgres for registry tests is reachable at `postgres://postgres:postgres@127.0.0.1:55433/postgres`.\n- `gh` is authenticated for read-only workflow inspection.\n- `.env` exists so `scripts/verify-m034-s05.sh` can load the secrets it expects for remote-evidence replay.\n\n## Smoke Test\n\nRun:\n\n1. `DATABASE_URL='postgres://postgres:postgres@127.0.0.1:55433/postgres' cargo test --manifest-path registry/Cargo.toml latest -- --nocapture`\n2. **Expected:** all `latest`-focused registry tests pass, including the out-of-order publish regression and the metadata/search malformed-latest failure tests.\n\n## Test Cases\n\n### 1. Registry latest-version stays monotonic under overlapping publishes\n\n1. Run `DATABASE_URL='postgres://postgres:postgres@127.0.0.1:55433/postgres' cargo test --manifest-path registry/Cargo.toml latest -- --nocapture`.\n2. Confirm the output includes:\n   - `db::packages::tests::latest_version_stays_monotonic_for_out_of_order_publishes ... ok`\n   - `routes::metadata::tests::package_document_uses_highest_latest_version ... ok`\n   - `routes::search::tests::package_list_and_search_share_monotonic_latest_version ... ok`\n3. **Expected:** package-level latest never regresses to an older version even when version inserts complete out of order.\n\n### 2. Metadata/search fail closed when latest-version joins drift\n\n1. Reuse the same registry test run from Test Case 1.\n2. Confirm the output includes:\n   - `routes::metadata::tests::package_document_fails_when_latest_version_row_is_missing ... ok`\n   - `routes::search::tests::package_list_and_search_fail_when_latest_join_is_missing ... ok`\n3. **Expected:** the handlers reject malformed latest-version state instead of fabricating empty or stale package metadata.\n\n### 3. Windows MSVC runtime discovery is target-aware and verifier logs stay actionable\n\n1. Run `cargo test -p mesh-codegen link -- --nocapture`.\n2. Confirm the output includes the Windows-runtime-path regression tests:\n   - `mesh_rt_candidates_should_use_windows_runtime_name_inside_target_subdir ... ok`\n   - `find_mesh_rt_in_should_report_target_specific_runtime_name_when_missing ... ok`\n3. Run `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1`.\n4. **Expected:** both commands pass, proving that Windows MSVC now searches for `mesh_rt.lib` / `clang(.exe)` explicitly and that staged PowerShell logs retain command text, exit code, and artifact paths.\n\n### 4. Release workflow contract still points at the real staged smoke steps\n\n1. Run `bash scripts/verify-m034-s02-workflows.sh`.\n2. **Expected:** the workflow-contract verifier passes without exemptions, confirming `release.yml` still runs the real staged installer/build smoke path instead of a weakened placeholder.\n\n### 5. Hosted blocker evidence refreshes to the current rollout target and isolates only the release lane\n\n1. Run:\n   `set -a; source .env; set +a; VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh`\n2. Expect the command itself to exit non-zero because `release.yml` is still red.\n3. Open `.tmp/m034-s05/verify/remote-runs.json` and confirm:\n   - `authoritative-verification.yml.status == \"ok\"`\n   - `authoritative-verification.yml.observedHeadSha == .tmp/m034-s09/rollout/target-sha.txt`\n   - `release.yml.status == \"failed\"`\n   - `release.yml.freshnessStatus == \"ok\"`\n   - `release.yml.observedHeadSha == .tmp/m034-s09/rollout/target-sha.txt`\n4. Run `python3 .tmp/m034-s09/rollout/monitor_workflows.py`.\n5. Expect that command to exit non-zero for the same reason.\n6. Open `.tmp/m034-s09/rollout/workflow-status.json` and confirm:\n   - `authoritative-verification.yml.conclusion == \"success\"`\n   - `release.yml.conclusion == \"failure\"`\n   - both workflows point at the same rollout SHA from `.tmp/m034-s09/rollout/target-sha.txt`.\n7. **Expected:** the hosted state is fresh and attributable, with `release.yml` as the only failing lane on the current target.\n\n## Edge Cases\n\n### Missing latest-version row for the recorded package latest\n\n1. Use the registry regression suite from Test Case 1.\n2. **Expected:** the metadata/search malformed-latest tests pass by returning explicit handler failure instead of an empty document or downgraded latest version.\n\n### Workflow freshness is correct but health is not\n\n1. Inspect `.tmp/m034-s05/verify/remote-runs.json` after Test Case 5.\n2. **Expected:** `release.yml` shows `freshnessStatus: ok` and a matching `observedHeadSha`, while still remaining `status: failed`. This proves the blocker is a real hosted failure, not stale rollout evidence.\n\n## Failure Signals\n\n- `cargo test --manifest-path registry/Cargo.toml latest -- --nocapture` reports any `latest_*` test failure.\n- `cargo test -p mesh-codegen link -- --nocapture` stops finding `mesh_rt.lib` / `clang(.exe)` on Windows-target cases or regresses Unix runtime-path selection.\n- `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1` no longer sees exit-code/stdout/stderr metadata in the PowerShell command logs.\n- `.tmp/m034-s05/verify/remote-runs.json` shows `authoritative-verification.yml` red again, or `release.yml` points at a different SHA than `.tmp/m034-s09/rollout/target-sha.txt`.\n- `.tmp/m034-s09/rollout/workflow-status.json` shows more than one failing workflow, or shows stale `headSha` values.\n\n## Requirements Proved By This UAT\n\n- R007 — The real package workflow keeps a truthful package-level latest version across overlapping publishes, and the hosted authoritative proof lane now reflects that repaired registry behavior.\n\n## Not Proven By This UAT\n\n- This UAT does not prove that `release.yml` is green; it proves that the remaining blocker is isolated to that lane on the current rollout SHA.\n- This UAT does not prove that the workflow-only synthetic commit contains the full local S10 code surface on the release tag lane.\n- This UAT does not produce the first-green hosted archive for `.tmp/m034-s06/evidence/first-green/`.\n\n## Notes for Tester\n\nTreat the non-zero exits from the stop-after `remote-evidence` replay and `monitor_workflows.py` as expected only when the JSON outputs show the exact blocker shape above. A different failure mode means the hosted state widened again and S11 should not proceed.\n",
       "goal": "Repair the two remaining truthful hosted blockers on the current rollout SHA by fixing registry latest-version ordering at the source, making the installed Windows compiler/runtime link path MSVC-safe, and then refreshing hosted evidence on that same SHA.",
       "success_criteria": "## Must-Haves\n\n- Registry package metadata, search, and named-install latest resolution stay monotonic under overlapping publishes for the same package; the fix lands at the registry source of truth rather than weakening the verifier.\n- The installed Windows compiler can build the staged installer smoke fixture through the real MSVC/runtime path, and the staged verifier/workflow contract keep actionable diagnostics if that path regresses again.\n- After explicit user confirmation for any outward GitHub action, `authoritative-verification.yml` and `release.yml` are green on the rollout SHA already recorded under `.tmp/m034-s09/rollout/target-sha.txt`, and the refreshed evidence bundle matches that SHA.\n\n## Threat Surface\n\n- **Abuse**: concurrent publishes for the same package name must not let an older proof version win the package-level `latest` pointer; hosted release proof must not silently skip or misreport a failed Windows build step.\n- **Data exposure**: registry publish/install and hosted workflow artifacts touch package metadata, checksums, and release logs, but the slice must not emit secrets or auth material into new diagnostics.\n- **Input trust**: package names, versions, publish timing, workflow JSON, and release archives are untrusted inputs until validated against the DB, checksums, and expected rollout SHA.\n\n## Requirement Impact\n\n- **Requirements touched**: no formal `R###` IDs were preloaded for this unit; this slice advances the M034 hosted-proof trust contract for authoritative verification, release smoke, and stop-after `remote-evidence`.\n- **Re-verify**: package metadata/search latest behavior, named-install latest resolution, Windows staged installer smoke, `bash scripts/verify-m034-s02-workflows.sh`, and `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh`.\n- **Decisions revisited**: preserve S09’s decision to fix truthful source surfaces instead of weakening hosted proof gates or skipping real build steps.\n\n## Proof Level\n\n- This slice proves: operational\n- Real runtime required: yes\n- Human/UAT required: no\n\n## Verification\n\n- `cargo test --manifest-path registry/Cargo.toml latest -- --nocapture` covers the new registry latest-version regression surface in `registry/src/db/packages.rs` and any route-level assertions needed to prove metadata/search alignment.\n- `cargo test -p mesh-codegen link -- --nocapture` covers target-aware runtime-library discovery / linker-argument selection in `compiler/mesh-codegen/src/link.rs`.\n- `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1` keeps the PowerShell verifier helper honest while T02 changes the Windows smoke contract.\n- `bash scripts/verify-m034-s02-workflows.sh` proves the release-workflow contract still matches the repaired staged smoke path.\n- After user-confirmed hosted reruns: `gh run list -R snowdamiz/mesh-lang --workflow authoritative-verification.yml --limit 1 --json databaseId,status,conclusion,headSha,url` and `gh run list -R snowdamiz/mesh-lang --workflow release.yml --limit 1 --json databaseId,status,conclusion,headSha,url` must both report `completed/success` on the rollout SHA from `.tmp/m034-s09/rollout/target-sha.txt`, and `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh` must exit 0.\n\n## Observability / Diagnostics\n\n- Runtime signals: registry latest-version state must be derivable from committed version data or an explicitly refreshed canonical pointer; Windows smoke failures must keep phase-scoped stdout/stderr artifacts instead of empty failure bundles.\n- Inspection surfaces: registry regression tests, `scripts/verify-m034-s03.ps1` artifact tree under `.tmp/m034-s03/`, `.tmp/m034-s05/verify/remote-runs.json`, and the refreshed hosted logs under `.tmp/m034-s10/hosted-refresh/`.\n- Failure visibility: package-latest drift, runtime-library discovery failure, linker invocation failure, workflow `headSha`, and first failing verifier phase remain explicit and attributable.\n- Redaction constraints: never persist registry tokens, auth headers, or secret env values into `.tmp/` artifacts.\n\n## Integration Closure\n\n- Upstream surfaces consumed: `registry/src/db/packages.rs`, `registry/src/routes/{metadata,search}.rs`, `compiler/mesh-codegen/src/link.rs`, `scripts/verify-m034-s03.ps1`, `scripts/verify-m034-s02-workflows.sh`, `.github/workflows/release.yml`, and the S09 rollout artifacts under `.tmp/m034-s09/rollout/`.\n- New wiring introduced in this slice: repaired registry latest selection feeds metadata/search/named installs, target-aware runtime lookup feeds installed `meshc` on Windows, and refreshed hosted evidence is written back into the canonical remote-evidence artifact set.\n- What remains before the milestone is truly usable end-to-end: S11 can only archive `first-green` and rerun the full public assembly once these two hosted blocker lanes are green on the current rollout SHA.",
       "proof_level": "operational hosted proof with real runtime and remote-evidence closure",
@@ -1114,11 +1114,11 @@
       "completed_at": null,
       "full_summary_md": "",
       "full_uat_md": "",
-      "goal": "",
-      "success_criteria": "",
-      "proof_level": "",
-      "integration_closure": "",
-      "observability_impact": "",
+      "goal": "Retire the remaining hosted release-lane blocker on the approved rollout refs, then capture the one-shot `first-green` archive and finish a fresh full S05 assembly replay for milestone revalidation.",
+      "success_criteria": "## Must-Haves\n\n- The local Windows staged-smoke workflow patch and its repo-local contract check stay aligned, with `bash scripts/verify-m034-s02-workflows.sh` green before any rollout mutation.\n- The approved hosted rollout refs include the repaired release workflow and the S10 blocker fixes needed for `release.yml` to turn green, without retargeting `ext-v0.3.0` unless extension files actually changed.\n- `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh` exits 0 with every entry in `.tmp/m034-s05/verify/remote-runs.json` at `status: ok` on its expected ref/head SHA.\n- `.tmp/m034-s06/evidence/first-green/manifest.json` is created exactly once, records `s05Status: ok`, and stops at `stopped-after-remote-evidence` without drifting into later S05 phases.\n- A fresh `.env`-backed `bash scripts/verify-m034-s05.sh` replay finishes with `.tmp/m034-s05/verify/status.txt = ok`, `.tmp/m034-s05/verify/current-phase.txt = complete`, and passed `remote-evidence`, `public-http`, and `s01-live-proof` phases.\n\n## Threat Surface\n\n- **Abuse**: accidental push/tag mutation to the wrong SHA, spending the one-shot `first-green` label before the stop-after gate is actually green, or rerunning the wrong hosted workflow and mistaking stale green evidence for current truth.\n- **Data exposure**: repo `.env` values, publish tokens, and GitHub credentials can leak through shell logs or hosted diagnostics if commands echo env state instead of only recording artifact paths and status fields.\n- **Input trust**: GitHub workflow responses, remote ref state, local `.tmp` evidence trees, and package-site/public-surface responses are untrusted until the plan re-verifies head SHAs, expected refs, and fresh artifact timestamps.\n\n## Requirement Impact\n\n- **Requirements touched**: R007.\n- **Re-verify**: package latest/search/install truth through `authoritative-verification.yml`, the hosted `release.yml` smoke lane, `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh`, and the full `.env`-backed `bash scripts/verify-m034-s05.sh` replay.\n- **Decisions revisited**: D104, D105, D106.\n\n## Verification\n\n- `node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs`\n- `bash scripts/verify-m034-s02-workflows.sh`\n- `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh`\n- `bash scripts/verify-m034-s06-remote-evidence.sh first-green`\n- `set -euo pipefail; test -f .env; set -a; source .env; set +a; bash scripts/verify-m034-s05.sh`",
+      "proof_level": "- This slice proves: final-assembly\n- Real runtime required: yes\n- Human/UAT required: no",
+      "integration_closure": "- Upstream surfaces consumed: `scripts/verify-m034-s05.sh`, `scripts/verify-m034-s06-remote-evidence.sh`, `.github/workflows/release.yml`, `scripts/verify-m034-s02-workflows.sh`, `.tmp/m034-s09/rollout/target-sha.txt`, `.env`.\n- New wiring introduced in this slice: rollout refs must include the repaired release workflow before hosted reruns and `first-green` capture are treated as valid milestone evidence; no new product runtime wiring is introduced.\n- What remains before the milestone is truly usable end-to-end: nothing once the stop-after gate, one-shot archive, and full S05 replay are all green on the expected refs.",
+      "observability_impact": "- Runtime signals: `.tmp/m034-s05/verify/status.txt`, `.tmp/m034-s05/verify/current-phase.txt`, `.tmp/m034-s05/verify/phase-report.txt`, `.tmp/m034-s05/verify/remote-runs.json`, and `.tmp/m034-s06/evidence/first-green/manifest.json` are the closeout truth surfaces.\n- Inspection surfaces: `bash scripts/verify-m034-s05.sh`, `bash scripts/verify-m034-s06-remote-evidence.sh first-green`, hosted workflow URLs/logs, and repo-local `.tmp/m034-s11/` summaries.\n- Failure visibility: wrong-SHA hosted runs, `first-green` label reuse, and failing S05 phases all fail closed with artifact paths.\n- Redaction constraints: never print `.env` values, publish tokens, or GitHub secrets; report only key names, refs, workflow IDs, and artifact paths.",
       "sequence": 0,
       "replan_triggered_at": null
     }
@@ -4299,6 +4299,152 @@
       "observability_impact": "Refreshes the canonical remote-evidence JSON plus a dedicated `.tmp/m034-s10/hosted-refresh/` bundle so the exact hosted rerun state, URLs, and `headSha` checks remain inspectable for S11.",
       "full_plan_md": "",
       "sequence": 0
+    },
+    {
+      "milestone_id": "M034",
+      "slice_id": "S11",
+      "id": "T01",
+      "title": "Proved the Windows release-smoke workflow patch is already aligned locally and captured fresh T01 verifier logs for the rollout handoff.",
+      "status": "complete",
+      "one_liner": "Proved the Windows release-smoke workflow patch is already aligned locally and captured fresh T01 verifier logs for the rollout handoff.",
+      "narrative": "I compared the current local workflow state against the existing hosted evidence instead of forcing a speculative patch. The current tree already contains the intended Windows release-smoke additions in .github/workflows/release.yml, and scripts/verify-m034-s02-workflows.sh already asserts that exact contract. Replaying the repo-local workflow contract, the PowerShell LASTEXITCODE regression guard, the Unix verifier syntax check, and the slice-local contract tests all passed cleanly, so there was no evidence that scripts/verify-m034-s03.ps1 or the workflow still needed code changes. I left the source files unchanged and captured fresh logs under .tmp/m034-s11/t01/ so T02 can treat the remaining blocker as hosted rollout freshness rather than repo-local drift.",
+      "verification_result": "Verified the repo-owned seam with bash scripts/verify-m034-s02-workflows.sh, pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1, and bash -n scripts/verify-m034-s03.sh; all passed. Also ran node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs as a local slice-level contract check; it passed. Saved fresh outputs and durations to .tmp/m034-s11/t01/ plus .tmp/m034-s11/t01/verification-summary.json.",
+      "duration": "",
+      "completed_at": "2026-03-27T21:50:27.749Z",
+      "blocker_discovered": false,
+      "deviations": "No source edits were required. The plan assumed the Windows workflow patch might still need finalization, but the current local tree already matched the intended workflow, verifier, and PowerShell helper contract, so the task became proof capture and handoff evidence.",
+      "known_issues": "Hosted release.yml evidence is still red in .tmp/m034-s05/verify/remote-runs.json until T02 rolls the approved refs and refreshes remote evidence. This task only proved that the remaining blocker is not repo-local drift.",
+      "key_files": [
+        ".tmp/m034-s11/t01/release-workflow-contract.log",
+        ".tmp/m034-s11/t01/verify-m034-s03-last-exitcode.log",
+        ".tmp/m034-s11/t01/verify-m034-s03-shell-syntax.log",
+        ".tmp/m034-s11/t01/slice-local-contract-tests.log",
+        ".tmp/m034-s11/t01/verification-summary.json",
+        ".gsd/milestones/M034/slices/S11/tasks/T01-SUMMARY.md"
+      ],
+      "key_decisions": [
+        "Left .github/workflows/release.yml, scripts/verify-m034-s02-workflows.sh, and scripts/verify-m034-s03.ps1 unchanged because replayed local proofs showed the Windows smoke patch was already fully present."
+      ],
+      "full_summary_md": "---\nid: T01\nparent: S11\nmilestone: M034\nkey_files:\n  - .tmp/m034-s11/t01/release-workflow-contract.log\n  - .tmp/m034-s11/t01/verify-m034-s03-last-exitcode.log\n  - .tmp/m034-s11/t01/verify-m034-s03-shell-syntax.log\n  - .tmp/m034-s11/t01/slice-local-contract-tests.log\n  - .tmp/m034-s11/t01/verification-summary.json\n  - .gsd/milestones/M034/slices/S11/tasks/T01-SUMMARY.md\nkey_decisions:\n  - Left .github/workflows/release.yml, scripts/verify-m034-s02-workflows.sh, and scripts/verify-m034-s03.ps1 unchanged because replayed local proofs showed the Windows smoke patch was already fully present.\nduration: \"\"\nverification_result: passed\ncompleted_at: 2026-03-27T21:50:27.750Z\nblocker_discovered: false\n---\n\n# T01: Proved the Windows release-smoke workflow patch is already aligned locally and captured fresh T01 verifier logs for the rollout handoff.\n\n**Proved the Windows release-smoke workflow patch is already aligned locally and captured fresh T01 verifier logs for the rollout handoff.**\n\n## What Happened\n\nI compared the current local workflow state against the existing hosted evidence instead of forcing a speculative patch. The current tree already contains the intended Windows release-smoke additions in .github/workflows/release.yml, and scripts/verify-m034-s02-workflows.sh already asserts that exact contract. Replaying the repo-local workflow contract, the PowerShell LASTEXITCODE regression guard, the Unix verifier syntax check, and the slice-local contract tests all passed cleanly, so there was no evidence that scripts/verify-m034-s03.ps1 or the workflow still needed code changes. I left the source files unchanged and captured fresh logs under .tmp/m034-s11/t01/ so T02 can treat the remaining blocker as hosted rollout freshness rather than repo-local drift.\n\n## Verification\n\nVerified the repo-owned seam with bash scripts/verify-m034-s02-workflows.sh, pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1, and bash -n scripts/verify-m034-s03.sh; all passed. Also ran node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs as a local slice-level contract check; it passed. Saved fresh outputs and durations to .tmp/m034-s11/t01/ plus .tmp/m034-s11/t01/verification-summary.json.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `bash scripts/verify-m034-s02-workflows.sh` | 0 | ✅ pass | 1457ms |\n| 2 | `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1` | 0 | ✅ pass | 3225ms |\n| 3 | `bash -n scripts/verify-m034-s03.sh` | 0 | ✅ pass | 28ms |\n| 4 | `node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs` | 0 | ✅ pass | 1997ms |\n\n\n## Deviations\n\nNo source edits were required. The plan assumed the Windows workflow patch might still need finalization, but the current local tree already matched the intended workflow, verifier, and PowerShell helper contract, so the task became proof capture and handoff evidence.\n\n## Known Issues\n\nHosted release.yml evidence is still red in .tmp/m034-s05/verify/remote-runs.json until T02 rolls the approved refs and refreshes remote evidence. This task only proved that the remaining blocker is not repo-local drift.\n\n## Files Created/Modified\n\n- `.tmp/m034-s11/t01/release-workflow-contract.log`\n- `.tmp/m034-s11/t01/verify-m034-s03-last-exitcode.log`\n- `.tmp/m034-s11/t01/verify-m034-s03-shell-syntax.log`\n- `.tmp/m034-s11/t01/slice-local-contract-tests.log`\n- `.tmp/m034-s11/t01/verification-summary.json`\n- `.gsd/milestones/M034/slices/S11/tasks/T01-SUMMARY.md`\n",
+      "description": "Why: S11 cannot get a truthful hosted green `release.yml` lane until the only remaining repo-local drift — the Windows smoke-toolchain steps in `.github/workflows/release.yml` and the matching assertions in `scripts/verify-m034-s02-workflows.sh` — is finished and re-proven locally.\n\nFiles: `.github/workflows/release.yml`, `scripts/verify-m034-s02-workflows.sh`, `scripts/verify-m034-s03.ps1`, `scripts/tests/verify-m034-s03-last-exitcode.ps1`.\n\nDo:\n- Reproduce the current local release-workflow diff and keep the workflow and contract verifier aligned on the Windows smoke-toolchain steps.\n- Touch `scripts/verify-m034-s03.ps1` only if replayed diagnostics show a deeper Windows staged-smoke contract gap than the current workflow patch.\n- Re-run the local workflow-contract and PowerShell helper proofs, and preserve fresh T01 logs under `.tmp/m034-s11/t01/` so T02 can distinguish local drift from rollout-only blockers.\n\nDone when: the intended release-workflow patch is present locally, `bash scripts/verify-m034-s02-workflows.sh` is green, and the remaining blocker surface is isolated to hosted rollout rather than stale repo-local workflow drift.",
+      "estimate": "1h",
+      "files": [
+        ".github/workflows/release.yml",
+        "scripts/verify-m034-s02-workflows.sh",
+        "scripts/verify-m034-s03.ps1",
+        "scripts/tests/verify-m034-s03-last-exitcode.ps1",
+        ".tmp/m034-s05/verify/remote-runs.json"
+      ],
+      "verify": "bash scripts/verify-m034-s02-workflows.sh\npwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1\nbash -n scripts/verify-m034-s03.sh",
+      "inputs": [
+        ".github/workflows/release.yml",
+        "scripts/verify-m034-s02-workflows.sh",
+        "scripts/verify-m034-s03.ps1",
+        "scripts/tests/verify-m034-s03-last-exitcode.ps1",
+        ".tmp/m034-s05/verify/remote-runs.json"
+      ],
+      "expected_output": [
+        ".github/workflows/release.yml",
+        "scripts/verify-m034-s02-workflows.sh",
+        ".tmp/m034-s11/t01/release-workflow-contract.log"
+      ],
+      "observability_impact": "Keeps the release workflow and the repo-local verifier in lockstep, with fresh `.tmp/m034-s11/t01/` logs that make the next blocker attributable before any hosted mutation.",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M034",
+      "slice_id": "S11",
+      "id": "T02",
+      "title": "Roll the approved release fixes onto the hosted refs and capture `first-green` exactly once",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Why: R007 and the slice demo depend on fresh hosted proof, not stale local passes. This task rolls the repaired release lane onto the expected refs, refreshes `remote-evidence`, and spends the one-shot `first-green` label only after the canonical stop-after gate is actually green.\n\nFiles: `.github/workflows/release.yml`, `scripts/verify-m034-s05.sh`, `scripts/verify-m034-s06-remote-evidence.sh`, `.tmp/m034-s05/verify/remote-runs.json`, `.tmp/m034-s06/evidence/first-green/manifest.json`, `.tmp/m034-s09/rollout/target-sha.txt`.\n\nDo:\n- Inspect local/remote ref drift and prepare the exact outward-action summary for the user; get explicit confirmation before any push, tag update, or hosted workflow rerun.\n- After approval, roll forward only the refs that S05 actually gates on; keep the split binary vs extension tag model intact unless extension files changed.\n- Replay `VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh` until `.tmp/m034-s05/verify/remote-runs.json` shows every workflow at `status: ok` on its expected ref, then run `bash scripts/verify-m034-s06-remote-evidence.sh first-green` exactly once.\n- Preserve refreshed hosted logs and a local summary under `.tmp/m034-s11/t02/` so T03 can trust the archive without re-reading GitHub manually.\n\nDone when: `first-green` exists with `s05Status: ok`, `currentPhase: stopped-after-remote-evidence`, no later S05 phases ran, and every remote-run summary is green on the expected head SHA/ref.",
+      "estimate": "1h 30m",
+      "files": [
+        ".github/workflows/release.yml",
+        "scripts/verify-m034-s05.sh",
+        "scripts/verify-m034-s06-remote-evidence.sh",
+        ".tmp/m034-s05/verify/remote-runs.json",
+        ".tmp/m034-s06/evidence/first-green/manifest.json",
+        ".tmp/m034-s09/rollout/target-sha.txt",
+        ".tmp/m034-s09/rollout/workflow-status.json"
+      ],
+      "verify": "VERIFY_M034_S05_STOP_AFTER=remote-evidence bash scripts/verify-m034-s05.sh\nbash scripts/verify-m034-s06-remote-evidence.sh first-green",
+      "inputs": [
+        ".github/workflows/release.yml",
+        "scripts/verify-m034-s05.sh",
+        "scripts/verify-m034-s06-remote-evidence.sh",
+        ".tmp/m034-s05/verify/remote-runs.json",
+        ".tmp/m034-s09/rollout/target-sha.txt",
+        ".tmp/m034-s09/rollout/workflow-status.json",
+        "README.md",
+        "website/docs/docs/tooling/index.md"
+      ],
+      "expected_output": [
+        ".tmp/m034-s05/verify/remote-runs.json",
+        ".tmp/m034-s05/verify/candidate-tags.json",
+        ".tmp/m034-s06/evidence/first-green/manifest.json",
+        ".tmp/m034-s11/t02/hosted-rollout-summary.json"
+      ],
+      "observability_impact": "Refreshes the canonical remote-evidence artifacts and records the hosted run URLs/head SHAs in `.tmp/m034-s11/t02/`, so stale-green or wrong-ref evidence is visible before the final replay.",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M034",
+      "slice_id": "S11",
+      "id": "T03",
+      "title": "Run the full S05 assembly replay and seal the final closeout evidence",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Why: `first-green` only proves hosted freshness through `remote-evidence`. Milestone revalidation still needs the full public-surface and live publish/install replay to finish green from a fresh verify root.\n\nFiles: `scripts/verify-m034-s05.sh`, `.env`, `.tmp/m034-s05/verify/status.txt`, `.tmp/m034-s05/verify/current-phase.txt`, `.tmp/m034-s05/verify/phase-report.txt`, `.tmp/m034-s06/evidence/first-green/manifest.json`.\n\nDo:\n- Confirm the `first-green` manifest exists and still matches the expected binary and extension refs before the full replay.\n- Source `.env` in-process and run the full blocking `bash scripts/verify-m034-s05.sh` path; use the fresh phase artifacts rather than async wrappers so the evidence stays authoritative.\n- Assert `.tmp/m034-s05/verify/status.txt = ok`, `.tmp/m034-s05/verify/current-phase.txt = complete`, and passed `remote-evidence`, `public-http`, and `s01-live-proof` entries in `.tmp/m034-s05/verify/phase-report.txt`.\n- Write a compact closeout summary under `.tmp/m034-s11/t03/` linking the `first-green` manifest to the final S05 verify root and stop red if any phase regresses.\n\nDone when: the full S05 replay finishes green from a clean verify root and the final summary ties the milestone-closeout proof back to the one-shot `first-green` archive.",
+      "estimate": "45m",
+      "files": [
+        "scripts/verify-m034-s05.sh",
+        ".env",
+        ".tmp/m034-s05/verify/status.txt",
+        ".tmp/m034-s05/verify/current-phase.txt",
+        ".tmp/m034-s05/verify/phase-report.txt",
+        ".tmp/m034-s06/evidence/first-green/manifest.json"
+      ],
+      "verify": "set -euo pipefail; test -f .env; set -a; source .env; set +a; bash scripts/verify-m034-s05.sh\ngrep -Fxq 'ok' .tmp/m034-s05/verify/status.txt\ngrep -Fxq 'complete' .tmp/m034-s05/verify/current-phase.txt\ngrep -Fxq $'remote-evidence\tpassed' .tmp/m034-s05/verify/phase-report.txt\ngrep -Fxq $'public-http\tpassed' .tmp/m034-s05/verify/phase-report.txt\ngrep -Fxq $'s01-live-proof\tpassed' .tmp/m034-s05/verify/phase-report.txt",
+      "inputs": [
+        "scripts/verify-m034-s05.sh",
+        ".env",
+        ".tmp/m034-s06/evidence/first-green/manifest.json",
+        ".tmp/m034-s05/verify/remote-runs.json",
+        ".tmp/m034-s11/t02/hosted-rollout-summary.json"
+      ],
+      "expected_output": [
+        ".tmp/m034-s05/verify/status.txt",
+        ".tmp/m034-s05/verify/current-phase.txt",
+        ".tmp/m034-s05/verify/phase-report.txt",
+        ".tmp/m034-s11/t03/final-assembly-summary.json"
+      ],
+      "observability_impact": "Turns the S05 verify root into the final milestone-closeout truth surface, with a compact `.tmp/m034-s11/t03/` summary that points future agents straight at the last fresh green replay.",
+      "full_plan_md": "",
+      "sequence": 0
     }
   ],
   "decisions": [
@@ -5558,6 +5704,18 @@
       "decision": "How mesh-codegen should link the Mesh runtime on Windows MSVC versus Unix hosts",
       "choice": "Use target-aware linker selection and pass the resolved runtime static library path directly to the linker; keep `cc` + `libmesh_rt.a` on Unix and use `clang.exe`/`clang` with `mesh_rt.lib` on Windows MSVC.",
       "rationale": "Cargo emits different static-library names across target families, so the old Unix-only `cc -lmesh_rt` flow could not find or describe the Windows MSVC runtime correctly. Passing the resolved runtime file path avoids platform-specific `-l` naming assumptions, keeps Unix behavior intact, and makes Windows failures name the expected artifact and linker driver explicitly.",
+      "revisable": "Yes",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 3415,
+      "id": "D106",
+      "when_context": "M034/S10/T03",
+      "scope": "verification",
+      "decision": "Hosted blocker refresh strategy on an already-correct rollout SHA",
+      "choice": "Prefer `gh run rerun --failed` on the existing workflow run when the lane already has a completed run on the correct `headSha`; only dispatch a new run if no correct-head run exists.",
+      "rationale": "S10/T03 needed fresh hosted evidence without widening mutation surface. Reusing the existing rollout-SHA runs preserved a one-to-one link between blocker evidence and the already-approved rollout target, avoided creating parallel runs on different refs, and kept the refreshed authoritative/release verdict attributable to the same hosted state.",
       "revisable": "Yes",
       "made_by": "agent",
       "superseded_by": null
@@ -8984,6 +9142,50 @@
       "verdict": "❌ fail",
       "duration_ms": 17039,
       "created_at": "2026-03-27T20:51:16.523Z"
+    },
+    {
+      "id": 312,
+      "task_id": "T01",
+      "slice_id": "S11",
+      "milestone_id": "M034",
+      "command": "bash scripts/verify-m034-s02-workflows.sh",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 1457,
+      "created_at": "2026-03-27T21:50:27.749Z"
+    },
+    {
+      "id": 313,
+      "task_id": "T01",
+      "slice_id": "S11",
+      "milestone_id": "M034",
+      "command": "pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3225,
+      "created_at": "2026-03-27T21:50:27.749Z"
+    },
+    {
+      "id": 314,
+      "task_id": "T01",
+      "slice_id": "S11",
+      "milestone_id": "M034",
+      "command": "bash -n scripts/verify-m034-s03.sh",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 28,
+      "created_at": "2026-03-27T21:50:27.749Z"
+    },
+    {
+      "id": 315,
+      "task_id": "T01",
+      "slice_id": "S11",
+      "milestone_id": "M034",
+      "command": "node --test scripts/tests/verify-m034-s05-contract.test.mjs scripts/tests/verify-m034-s06-contract.test.mjs",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 1997,
+      "created_at": "2026-03-27T21:50:27.749Z"
     }
   ]
 }

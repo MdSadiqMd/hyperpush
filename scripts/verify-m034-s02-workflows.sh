@@ -657,6 +657,31 @@ if verify_release_assets.is_a?(Hash)
     errors << "verify-release-assets job must install Rust before building mesh-rt for the staged smoke"
   end
 
+  install_windows_llvm = verify_find_step.call("Install LLVM 21 for Windows smoke verifier")
+  if install_windows_llvm.is_a?(Hash)
+    unless install_windows_llvm["if"].to_s.include?("runner.os == 'Windows'")
+      errors << "verify-release-assets Windows LLVM smoke step must stay Windows only"
+    end
+    run_text = install_windows_llvm["run"].to_s
+    unless install_windows_llvm["shell"] == "pwsh" && run_text.include?("$LLVM_VERSION = \"21.1.8\"") && run_text.include?("clang.exe") && run_text.include?("Invoke-WebRequest") && run_text.include?("Rename-Item")
+      errors << "verify-release-assets Windows LLVM smoke step must install the clang+llvm toolchain when clang.exe is absent"
+    end
+  else
+    errors << "verify-release-assets job must install LLVM for the Windows staged smoke"
+  end
+
+  set_windows_llvm_prefix = verify_find_step.call("Set LLVM prefix for Windows smoke verifier")
+  if set_windows_llvm_prefix.is_a?(Hash)
+    unless set_windows_llvm_prefix["if"].to_s.include?("runner.os == 'Windows'")
+      errors << "verify-release-assets Windows LLVM prefix step must stay Windows only"
+    end
+    unless set_windows_llvm_prefix["shell"] == "pwsh" && set_windows_llvm_prefix["run"].to_s.include?("LLVM_SYS_211_PREFIX=$env:USERPROFILE\\llvm")
+      errors << "verify-release-assets Windows LLVM prefix step must export LLVM_SYS_211_PREFIX from the smoke verifier toolchain"
+    end
+  else
+    errors << "verify-release-assets job must export LLVM_SYS_211_PREFIX for the Windows staged smoke"
+  end
+
   build_mesh_rt = verify_find_step.call("Build mesh-rt for smoke verifier")
   unless build_mesh_rt.is_a?(Hash) && build_mesh_rt["run"].to_s.strip == "cargo build -q -p mesh-rt"
     errors << "verify-release-assets job must build mesh-rt so the staged smoke can find the target-aware runtime static library"
