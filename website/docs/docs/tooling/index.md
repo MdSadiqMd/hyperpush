@@ -5,9 +5,77 @@ description: Formatter, REPL, package manager, LSP, and editor support for Mesh
 
 # Developer Tools
 
-Mesh ships with a complete developer toolchain built into the `meshc` binary. Everything you need for productive development -- formatting, interactive exploration, project management, and editor integration -- is available out of the box.
+Mesh ships a developer toolchain centered on the `meshc` compiler plus the companion `meshpkg` package CLI. The verified public install path uses the documentation-served installer pair `https://meshlang.dev/install.sh` and `https://meshlang.dev/install.ps1` to place both binaries on your PATH before you configure formatting, testing, registry workflows, or editor integration.
 
 > **Production backend proof:** This page documents the tools individually. For the named backend proof commands that tie `meshc fmt`, `meshc test`, staged deploy smoke, and doc-truth verification together, start with [Production Backend Proof](/docs/production-backend-proof/) and `reference-backend/README.md`.
+
+## Install the CLI tools
+
+The staged release proof covers that installer pair for both `meshc` and `meshpkg` on these targets:
+
+- macOS `x86_64` and `arm64`
+- Linux `x86_64` and `arm64` (GNU libc)
+- Windows `x86_64`
+
+**macOS and Linux:**
+
+```bash
+curl -sSf https://meshlang.dev/install.sh | sh
+```
+
+**Windows x86_64 (PowerShell):**
+
+```powershell
+irm https://meshlang.dev/install.ps1 | iex
+```
+
+Verify the installed binaries before using the tooling below:
+
+```bash
+meshc --version
+meshpkg --version
+```
+
+For the named backend proof behind this public install contract, see [Production Backend Proof](/docs/production-backend-proof/) and `reference-backend/README.md`.
+
+If you are contributing to Mesh or need an unsupported target, build from source instead; treat that as an alternative workflow, not the primary public install contract.
+
+## Release Assembly Runbook
+
+When you need the full public-release acceptance flow instead of an individual tool check, run the assembled verifier from the repo root with the repo `.env` loaded:
+
+```bash
+set -a && source .env && set +a && bash scripts/verify-m034-s05.sh
+```
+
+The candidate identity stays split on purpose:
+
+- Binary release candidate tag: `v<Cargo version>` from `compiler/meshc/Cargo.toml` and `compiler/meshpkg/Cargo.toml`
+- VS Code extension release candidate tag: `ext-v<extension version>` from `tools/editors/vscode-mesh/package.json`
+
+Hosted rollout evidence must exist for these exact workflows:
+
+- `deploy.yml`
+- `deploy-services.yml`
+- `authoritative-verification.yml`
+- `release.yml`
+- `extension-release-proof.yml`
+- `publish-extension.yml`
+
+The runbook stays tied to these exact public URLs:
+
+- `https://meshlang.dev/install.sh`
+- `https://meshlang.dev/install.ps1`
+- `https://meshlang.dev/docs/getting-started/`
+- `https://meshlang.dev/docs/tooling/`
+- `https://packages.meshlang.dev/packages/snowdamiz/mesh-registry-proof`
+- `https://packages.meshlang.dev/search?q=snowdamiz%2Fmesh-registry-proof`
+- `https://api.packages.meshlang.dev/api/v1/packages?search=snowdamiz%2Fmesh-registry-proof`
+
+The verifier persists the candidate and hosted-run evidence under:
+
+- `.tmp/m034-s05/verify/candidate-tags.json`
+- `.tmp/m034-s05/verify/remote-runs.json`
 
 ## Formatter
 
@@ -310,17 +378,16 @@ The official Mesh extension for VS Code provides syntax highlighting plus the `m
 
 #### Installation
 
-To build and install the current packaged extension from source:
+Install Mesh first with the same verified public installer pair above so `meshc lsp` is already on your PATH, then build the current packaged extension from source:
 
 ```bash
 cd tools/editors/vscode-mesh
 npm install
 npm run compile
 npm run package
-code --install-extension mesh-lang-0.3.0.vsix
 ```
 
-For repeat local installs, you can also run:
+The package step writes `dist/mesh-lang-<version>.vsix`. To install that freshly built artifact into your local VS Code profile, run:
 
 ```bash
 npm run install-local

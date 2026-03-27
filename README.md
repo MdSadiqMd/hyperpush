@@ -47,14 +47,42 @@ Mesh compiles directly to a standalone native binary—no virtual machine to ins
 
 ## Quick Start
 
-### 1. Installation
+### 1. Install Mesh
 
-**From Source (Rust required):**
+The verified public install path uses the documentation-served installer pair `https://meshlang.dev/install.sh` and `https://meshlang.dev/install.ps1` to install both `meshc` and `meshpkg`. The staged release proof covers these installer targets:
+
+- macOS `x86_64` and `arm64`
+- Linux `x86_64` and `arm64` (GNU libc)
+- Windows `x86_64`
+
+**macOS and Linux:**
 
 ```bash
-git clone https://github.com/mesh-lang/mesh.git
-cd mesh
+curl -sSf https://meshlang.dev/install.sh | sh
+```
+
+**Windows x86_64 (PowerShell):**
+
+```powershell
+irm https://meshlang.dev/install.ps1 | iex
+```
+
+Verify the installed binaries:
+
+```bash
+meshc --version
+meshpkg --version
+```
+
+**Alternative: build from source (contributors / unsupported targets; Rust + LLVM required):**
+
+Source builds are still supported, but they are an explicit alternative workflow rather than the public install path proven by the release process.
+
+```bash
+git clone https://github.com/snowdamiz/mesh-lang.git
+cd mesh-lang
 cargo install --path compiler/meshc
+cargo install --path compiler/meshpkg
 ```
 
 ### 2. Optional: Scaffold a Project
@@ -120,6 +148,43 @@ The quick-start examples above are intentionally small. If you want the real bac
 - [Production Backend Proof](https://meshlang.dev/docs/production-backend-proof/) — public map of the named build, deploy, supervision, and documentation-proof checks
 - [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md) — the deepest repo runbook with the authoritative backend commands and proof targets
 
+## Public Release Candidate Runbook
+
+When you need the assembled public-release proof instead of subsystem-local checks, run the canonical S05 verifier from the repo root:
+
+```bash
+set -a && source .env && set +a && bash scripts/verify-m034-s05.sh
+```
+
+The release candidate identity is intentionally split instead of pretending Mesh ships on one unified tag:
+
+- Binary candidate tag: `v<Cargo version>` derived from `compiler/meshc/Cargo.toml` and `compiler/meshpkg/Cargo.toml` (those Cargo versions must stay aligned)
+- VS Code extension candidate tag: `ext-v<extension version>` derived from `tools/editors/vscode-mesh/package.json`
+
+Hosted rollout evidence must exist for these exact workflows before the release is considered public-ready:
+
+- `deploy.yml`
+- `deploy-services.yml`
+- `authoritative-verification.yml`
+- `release.yml`
+- `extension-release-proof.yml`
+- `publish-extension.yml`
+
+The assembled proof command also checks these exact public URLs:
+
+- `https://meshlang.dev/install.sh`
+- `https://meshlang.dev/install.ps1`
+- `https://meshlang.dev/docs/getting-started/`
+- `https://meshlang.dev/docs/tooling/`
+- `https://packages.meshlang.dev/packages/snowdamiz/mesh-registry-proof`
+- `https://packages.meshlang.dev/search?q=snowdamiz%2Fmesh-registry-proof`
+- `https://api.packages.meshlang.dev/api/v1/packages?search=snowdamiz%2Fmesh-registry-proof`
+
+After every run, inspect these proof artifacts before calling the candidate public-ready:
+
+- `.tmp/m034-s05/verify/candidate-tags.json`
+- `.tmp/m034-s05/verify/remote-runs.json`
+
 ## Performance
 
 Measured on dedicated Fly.io `performance-2x` VMs (2 vCPU, 4 GB RAM), each server running alone (isolated), load generator in the same region over Fly.io's private WireGuard network. 100 concurrent connections, 30 s timed runs × 4 (run 1 excluded, runs 2–5 averaged).
@@ -156,6 +221,12 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
 ## License

@@ -3,6 +3,10 @@ src/**
 **/*.ts
 !**/*.d.ts
 
+# Local packaging helpers and artifacts
+scripts/**
+dist/**
+
 # Config files
 tsconfig.json
 .vscode/**
@@ -10,10 +14,21 @@ tsconfig.json
 .gitignore
 
 # Dev artifacts
-node_modules/**
 out/**/*.map
-**/*.test.js
-**/*.spec.js
+**/*.test.*
+**/*.spec.*
+
+# Runtime dependency clutter
+node_modules/.bin/**
+node_modules/**/src/**
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/.github/**
+node_modules/**/.vscode/**
+node_modules/**/tsconfig*.json
+node_modules/**/*.ts
+node_modules/**/*.d.ts
+node_modules/**/*.map
 
 # Package manager
 package-lock.json

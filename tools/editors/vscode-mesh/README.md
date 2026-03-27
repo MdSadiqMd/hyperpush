@@ -19,16 +19,38 @@ The current transport-level regression suite exercises the LSP path over real st
 
 ## Installation
 
-Build and install the current packaged extension from source:
+Install Mesh first with the verified public installer pair `https://meshlang.dev/install.sh` and `https://meshlang.dev/install.ps1`. The public installers place both `meshc` and `meshpkg` on your PATH; the extension itself uses `meshc lsp`.
+
+**macOS and Linux:**
+
+```sh
+curl -sSf https://meshlang.dev/install.sh | sh
+```
+
+**Windows x86_64 (PowerShell):**
+
+```powershell
+irm https://meshlang.dev/install.ps1 | iex
+```
+
+Verify the installed binaries:
+
+```sh
+meshc --version
+meshpkg --version
+```
+
+For the named backend proof behind this public install contract, see [Production Backend Proof](https://meshlang.dev/docs/production-backend-proof/) and [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md).
+
+Then build the current packaged extension from source:
 
 ```sh
 npm install
 npm run compile
 npm run package
-code --install-extension mesh-lang-0.3.0.vsix
 ```
 
-For repeat local installs, you can also run:
+The package step writes the current versioned artifact to `dist/mesh-lang-<version>.vsix`. To install that freshly built artifact into VS Code, run:
 
 ```sh
 npm run install-local
@@ -36,13 +58,7 @@ npm run install-local
 
 ## Requirements
 
-The Mesh compiler (`meshc`) must be installed and available in your PATH. The extension connects to the built-in language server provided by `meshc`.
-
-**Install meshc:**
-
-```sh
-curl -sSf https://meshlang.dev/install.sh | sh
-```
+The Mesh compiler (`meshc`) must be installed and available in your PATH. The verified public installers at `https://meshlang.dev/install.sh` and `https://meshlang.dev/install.ps1` install both `meshc` and `meshpkg`; this extension connects to the built-in language server provided by `meshc`.
 
 ## Extension Settings
 

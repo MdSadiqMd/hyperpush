@@ -39,6 +39,20 @@ fn file_uri(path: &Path) -> String {
     format!("file://{}", path.to_string_lossy())
 }
 
+fn source_position(source: &str, needle: &str, occurrence: usize) -> (u64, u64) {
+    let (byte_index, _) = source.match_indices(needle).nth(occurrence).unwrap_or_else(|| {
+        panic!("could not find occurrence {} of {:?} in source", occurrence, needle)
+    });
+    let prefix = &source[..byte_index];
+    let line = prefix.bytes().filter(|byte| *byte == b'\n').count() as u64;
+    let character = prefix
+        .rsplit('\n')
+        .next()
+        .map(|segment| segment.chars().count())
+        .unwrap_or_else(|| prefix.chars().count()) as u64;
+    (line, character)
+}
+
 fn read_json_rpc_message(reader: &mut impl BufRead) -> Option<Value> {
     let mut content_length = None;
 
@@ -340,11 +354,27 @@ fn lsp_json_rpc_reference_backend_flow() {
         jobs_open_diagnostics
     );
 
+    let create_job_call = "create_job_response(job, body)";
+    let (create_job_call_line, create_job_call_character) =
+        source_position(&jobs_source, create_job_call, 0);
+    let create_job_definition = "fn create_job_response(job :: Job, payload :: String) do";
+    let (create_job_definition_line, _) = source_position(&jobs_source, create_job_definition, 0);
+    let log_create_success_call = "log_create_success(job, payload)";
+    let (log_create_success_line, log_create_success_character) =
+        source_position(&jobs_source, log_create_success_call, 0);
+    let log_create_success_active_param = log_create_success_character
+        + log_create_success_call
+            .find("payload")
+            .expect("log_create_success call should mention payload") as u64;
+
     let hover = session.request(
         "textDocument/hover",
         json!({
             "textDocument": { "uri": jobs_uri },
-            "position": { "line": 64, "character": 17 },
+            "position": {
+                "line": create_job_call_line,
+                "character": create_job_call_character,
+            },
         }),
     );
     let hover_contents = hover["result"]["contents"]["value"]
@@ -361,7 +391,10 @@ fn lsp_json_rpc_reference_backend_flow() {
         "textDocument/definition",
         json!({
             "textDocument": { "uri": jobs_uri },
-            "position": { "line": 64, "character": 17 },
+            "position": {
+                "line": create_job_call_line,
+                "character": create_job_call_character,
+            },
         }),
     );
     assert_eq!(
@@ -371,7 +404,7 @@ fn lsp_json_rpc_reference_backend_flow() {
     );
     assert_eq!(
         definition["result"]["range"]["start"]["line"].as_u64(),
-        Some(35),
+        Some(create_job_definition_line),
         "definition should jump to create_job_response definition, got: {definition:?}"
     );
 
@@ -379,7 +412,10 @@ fn lsp_json_rpc_reference_backend_flow() {
         "textDocument/signatureHelp",
         json!({
             "textDocument": { "uri": jobs_uri },
-            "position": { "line": 36, "character": 39 },
+            "position": {
+                "line": log_create_success_line,
+                "character": log_create_success_active_param,
+            },
         }),
     );
     let signature_label = signature_help["result"]["signatures"][0]["label"]

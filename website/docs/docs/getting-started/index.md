@@ -21,25 +21,49 @@ Key properties of Mesh:
 
 ## Installation
 
-Today the verified install path is building `meshc` from source:
+Use the documented installer scripts to install both `meshc` and `meshpkg`. The staged release proof covers these installer targets:
+
+- macOS `x86_64` and `arm64`
+- Linux `x86_64` and `arm64` (GNU libc)
+- Windows `x86_64`
+
+**macOS and Linux:**
+
+```bash
+curl -sSf https://meshlang.dev/install.sh | sh
+```
+
+**Windows x86_64 (PowerShell):**
+
+```powershell
+irm https://meshlang.dev/install.ps1 | iex
+```
+
+The installers place both binaries in `~/.mesh/bin` on Unix-like systems and `~\.mesh\bin` on Windows.
+
+### Verifying Installation
+
+After installing, verify both binaries are available:
+
+```bash
+meshc --version
+meshpkg --version
+```
+
+For the named backend proof behind this public install contract, see [Production Backend Proof](/docs/production-backend-proof/) and the repo runbook at `reference-backend/README.md`.
+
+You should see the Mesh version number printed for each command.
+
+### Alternative: Build from Source
+
+If you are contributing to Mesh or targeting an environment outside the public installer coverage, build from source instead. Treat this as an alternative workflow, not the primary public install path:
 
 ```bash
 git clone https://github.com/snowdamiz/mesh-lang.git
 cd mesh-lang
 cargo install --path compiler/meshc
+cargo install --path compiler/meshpkg
 ```
-
-This installs the current `meshc` binary into Cargo's bin directory so you can use the same toolchain the repo and proof surfaces exercise.
-
-### Verifying Installation
-
-After installing, verify the compiler is available:
-
-```bash
-meshc --version
-```
-
-You should see the Mesh version number printed to the terminal.
 
 ## Hello World
 

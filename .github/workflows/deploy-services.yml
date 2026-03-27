@@ -5,6 +5,9 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-fly-${{ github.ref_name }}
   cancel-in-progress: false
@@ -13,6 +16,7 @@ jobs:
   deploy-registry:
     name: Deploy mesh-registry
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,6 +33,7 @@ jobs:
   deploy-packages-website:
     name: Deploy mesh-packages website
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,21 +51,14 @@ jobs:
     name: Post-deploy health checks
     needs: [deploy-registry, deploy-packages-website]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Check registry API
-        run: |
-          curl -sf --retry 5 --retry-delay 10 --retry-connrefused \
-            https://api.packages.meshlang.dev/api/v1/packages > /dev/null && \
-            echo "Registry API: OK"
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Check packages website
+      - name: Verify public surface contract
+        shell: bash
+        timeout-minutes: 8
         run: |
-          curl -sf --retry 5 --retry-delay 10 --retry-connrefused \
-            https://packages.meshlang.dev > /dev/null && \
-            echo "Packages website: OK"
-
-      - name: Check docs site
-        run: |
-          curl -sf --retry 3 --retry-delay 5 \
-            https://meshlang.dev > /dev/null && \
-            echo "Docs site: OK"
+          set -euo pipefail
+          python3 scripts/lib/m034_public_surface_contract.py public-http --root "$GITHUB_WORKSPACE" --artifact-dir "$RUNNER_TEMP/m034-public-surface-contract"

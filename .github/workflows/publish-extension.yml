@@ -1,5 +1,5 @@
 # Publish Mesh VS Code extension to VS Code Marketplace and Open VSX
-# Trigger: git tag ext-v0.2.0 && git push origin ext-v0.2.0
+# Trigger: git tag ext-vX.Y.Z && git push origin ext-vX.Y.Z
 # Requires secrets: VS_MARKETPLACE_TOKEN, OPEN_VSX_TOKEN
 
 name: Publish Extension
@@ -13,40 +13,41 @@ permissions:
   contents: read
 
 jobs:
+  proof:
+    name: Verify extension release proof
+    uses: ./.github/workflows/extension-release-proof.yml
+
   publish:
+    name: Publish verified extension
+    needs:
+      - proof
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Download verified VSIX
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
+          name: ${{ needs.proof.outputs.verified_vsix_artifact_name }}
+          path: tools/editors/vscode-mesh/dist/
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: tools/editors/vscode-mesh
-
-      - name: Compile TypeScript
-        run: npm run compile
-        working-directory: tools/editors/vscode-mesh
-
-      - name: Package VSIX
-        id: package
+      - name: Confirm verified VSIX handoff
+        shell: bash
+        env:
+          VERIFIED_VSIX_PATH: ${{ needs.proof.outputs.verified_vsix_path }}
         run: |
-          npx vsce package --no-dependencies
-          echo "vsix_path=$(ls *.vsix)" >> "$GITHUB_OUTPUT"
-        working-directory: tools/editors/vscode-mesh
+          test -n "$VERIFIED_VSIX_PATH"
+          test -f "$VERIFIED_VSIX_PATH"
+          echo "Publishing verified VSIX: $VERIFIED_VSIX_PATH"
 
       - name: Publish to Open VSX Registry
         uses: HaaLeo/publish-vscode-extension@v2
-        continue-on-error: true
         with:
           pat: ${{ secrets.OPEN_VSX_TOKEN }}
-          extensionFile: tools/editors/vscode-mesh/${{ steps.package.outputs.vsix_path }}
+          extensionFile: ${{ needs.proof.outputs.verified_vsix_path }}
 
       - name: Publish to Visual Studio Marketplace
         uses: HaaLeo/publish-vscode-extension@v2
         with:
           pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
           registryUrl: https://marketplace.visualstudio.com
-          extensionFile: tools/editors/vscode-mesh/${{ steps.package.outputs.vsix_path }}
+          extensionFile: ${{ needs.proof.outputs.verified_vsix_path }}

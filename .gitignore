@@ -4,7 +4,8 @@
 # Insta snapshot review files
 *.snap.new
 
-editors/vscode-mesh/node_modules/
+tools/editors/vscode-mesh/node_modules/
+tools/editors/vscode-mesh/*.vsix
 
 # Root
 /node_modules/
@@ -24,11 +25,26 @@ mesher/mesher
 benchmarks/*/benchmark
 
 # Temp probe/scratch directories (created during debugging)
+/.tmp/
 .tmp_*/
 .tmp_fmt_probe*/
 
 # Background shell state
 .bg-shell/
+
+# GSD runtime/state (system-managed)
+/.gsd/STATE.md
+/.gsd/activity/
+/.gsd/runtime/
+/.gsd/journal/
+/.gsd/gsd.db
+/.gsd/gsd.db-shm
+/.gsd/gsd.db-wal
+/.gsd/doctor-history.jsonl
+/.gsd/event-log.jsonl
+/.gsd/state-manifest.json
+/.gsd/metrics.json
+/.gsd/completed-units.json
 
 # ── GSD baseline (auto-generated) ──
 .DS_Store

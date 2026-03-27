@@ -453,8 +453,8 @@ unless permissions.is_a?(Hash) && permissions == { "contents" => "read" }
 end
 
 jobs = workflow["jobs"]
-unless jobs.is_a?(Hash) && jobs.keys == ["build", "build-meshpkg", "authoritative-live-proof", "release"]
-  errors << "release workflow must define build, build-meshpkg, authoritative-live-proof, and release jobs"
+unless jobs.is_a?(Hash) && jobs.keys == ["build", "build-meshpkg", "authoritative-live-proof", "verify-release-assets", "release"]
+  errors << "release workflow must define build, build-meshpkg, authoritative-live-proof, verify-release-assets, and release jobs"
 end
 
 build = jobs.is_a?(Hash) ? jobs["build"] : nil
@@ -472,6 +472,59 @@ if build_meshpkg.is_a?(Hash)
   build_meshpkg_permissions = build_meshpkg["permissions"]
   if build_meshpkg_permissions.is_a?(Hash) && build_meshpkg_permissions["contents"] == "write"
     errors << "build-meshpkg job must not request contents: write"
+  end
+
+  meshpkg_matrix = build_meshpkg.dig("strategy", "matrix", "include")
+  expected_meshpkg_matrix = {
+    "x86_64-apple-darwin" => { "os" => "macos-15-intel", "archive_ext" => "tar.gz" },
+    "aarch64-apple-darwin" => { "os" => "macos-14", "archive_ext" => "tar.gz" },
+    "x86_64-unknown-linux-gnu" => { "os" => "ubuntu-24.04", "archive_ext" => "tar.gz" },
+    "aarch64-unknown-linux-gnu" => { "os" => "ubuntu-24.04-arm", "archive_ext" => "tar.gz" },
+    "x86_64-pc-windows-msvc" => { "os" => "windows-latest", "archive_ext" => "zip" },
+  }
+  actual_meshpkg_matrix = {}
+  if meshpkg_matrix.is_a?(Array)
+    meshpkg_matrix.each do |entry|
+      next unless entry.is_a?(Hash)
+      actual_meshpkg_matrix[entry["target"]] = {
+        "os" => entry["os"],
+        "archive_ext" => entry["archive_ext"],
+      }
+    end
+  end
+  unless actual_meshpkg_matrix == expected_meshpkg_matrix
+    errors << "build-meshpkg matrix must cover all Unix targets plus x86_64-pc-windows-msvc with the expected archive extensions"
+  end
+
+  build_meshpkg_steps = build_meshpkg["steps"]
+  unless build_meshpkg_steps.is_a?(Array)
+    errors << "build-meshpkg job must define steps"
+    build_meshpkg_steps = []
+  end
+  build_meshpkg_find_step = lambda do |name|
+    build_meshpkg_steps.find { |step| step.is_a?(Hash) && step["name"] == name }
+  end
+
+  strip_step = build_meshpkg_find_step.call("Strip binary")
+  unless strip_step.is_a?(Hash) && strip_step["if"].to_s.include?("runner.os != 'Windows'")
+    errors << "build-meshpkg strip step must skip Windows"
+  end
+
+  package_zip = build_meshpkg_find_step.call("Package (zip)")
+  if package_zip.is_a?(Hash)
+    unless package_zip["if"].to_s.include?("matrix.archive_ext == 'zip'")
+      errors << "build-meshpkg zip packaging step must stay matrix-gated"
+    end
+    unless package_zip["run"].to_s.include?("Compress-Archive") && package_zip["run"].to_s.include?("meshpkg.exe")
+      errors << "build-meshpkg zip packaging step must package meshpkg.exe with Compress-Archive"
+    end
+  else
+    errors << "build-meshpkg job must package the Windows meshpkg zip"
+  end
+
+  upload = build_meshpkg_find_step.call("Upload artifact")
+  unless upload.is_a?(Hash) && upload.dig("with", "path") == "meshpkg-v${{ steps.version.outputs.version }}-${{ matrix.target }}.${{ matrix.archive_ext }}"
+    errors << "build-meshpkg upload must publish the matrix archive extension"
   end
 else
   errors << "release workflow must keep the build-meshpkg job"
@@ -503,6 +556,146 @@ else
   errors << "release workflow must define the authoritative-live-proof job"
 end
 
+verify_release_assets = jobs.is_a?(Hash) ? jobs["verify-release-assets"] : nil
+if verify_release_assets.is_a?(Hash)
+  errors << "verify-release-assets job name must stay 'Verify release assets (${{ matrix.target }})'" unless verify_release_assets["name"] == "Verify release assets (${{ matrix.target }})"
+  verify_needs = verify_release_assets["needs"]
+  unless verify_needs.is_a?(Array) && verify_needs.sort == %w[build build-meshpkg].sort
+    errors << "verify-release-assets job must depend on build and build-meshpkg"
+  end
+
+  verify_permissions = verify_release_assets["permissions"]
+  if verify_permissions.is_a?(Hash) && verify_permissions["contents"] == "write"
+    errors << "verify-release-assets job must not request contents: write"
+  end
+
+  verify_strategy = verify_release_assets["strategy"]
+  unless verify_strategy.is_a?(Hash) && verify_strategy["fail-fast"] == false
+    errors << "verify-release-assets job must keep fail-fast disabled"
+  end
+
+  verify_matrix = verify_release_assets.dig("strategy", "matrix", "include")
+  expected_verify_matrix = {
+    "x86_64-apple-darwin" => { "os" => "macos-15-intel", "archive_ext" => "tar.gz" },
+    "aarch64-apple-darwin" => { "os" => "macos-14", "archive_ext" => "tar.gz" },
+    "x86_64-unknown-linux-gnu" => { "os" => "ubuntu-24.04", "archive_ext" => "tar.gz" },
+    "aarch64-unknown-linux-gnu" => { "os" => "ubuntu-24.04-arm", "archive_ext" => "tar.gz" },
+    "x86_64-pc-windows-msvc" => { "os" => "windows-latest", "archive_ext" => "zip" },
+  }
+  actual_verify_matrix = {}
+  if verify_matrix.is_a?(Array)
+    verify_matrix.each do |entry|
+      next unless entry.is_a?(Hash)
+      actual_verify_matrix[entry["target"]] = {
+        "os" => entry["os"],
+        "archive_ext" => entry["archive_ext"],
+      }
+    end
+  end
+  unless actual_verify_matrix == expected_verify_matrix
+    errors << "verify-release-assets matrix must smoke each released host target with the expected archive extension"
+  end
+
+  verify_steps = verify_release_assets["steps"]
+  unless verify_steps.is_a?(Array)
+    errors << "verify-release-assets job must define steps"
+    verify_steps = []
+  end
+  verify_find_step = lambda do |name|
+    verify_steps.find { |step| step.is_a?(Hash) && step["name"] == name }
+  end
+
+  checkout = verify_find_step.call("Checkout")
+  unless checkout.is_a?(Hash) && checkout["uses"] == "actions/checkout@v4"
+    errors << "verify-release-assets job must checkout the repo before running verifier scripts"
+  end
+
+  download_meshc = verify_find_step.call("Download meshc artifact")
+  unless download_meshc.is_a?(Hash) && download_meshc["uses"] == "actions/download-artifact@v4" && download_meshc.dig("with", "name") == "meshc-${{ matrix.target }}" && download_meshc.dig("with", "path") == "release-assets/"
+    errors << "verify-release-assets job must download the target-specific meshc artifact into release-assets/"
+  end
+
+  download_meshpkg = verify_find_step.call("Download meshpkg artifact")
+  unless download_meshpkg.is_a?(Hash) && download_meshpkg["uses"] == "actions/download-artifact@v4" && download_meshpkg.dig("with", "name") == "meshpkg-${{ matrix.target }}" && download_meshpkg.dig("with", "path") == "release-assets/"
+    errors << "verify-release-assets job must download the target-specific meshpkg artifact into release-assets/"
+  end
+
+  checksum_unix = verify_find_step.call("Generate SHA256SUMS (Unix)")
+  if checksum_unix.is_a?(Hash)
+    unless checksum_unix["if"].to_s.include?("runner.os != 'Windows'")
+      errors << "verify-release-assets Unix checksum step must stay non-Windows only"
+    end
+    unless checksum_unix["run"].to_s.include?("sha256sum meshc-v*-${{ matrix.target }}.${{ matrix.archive_ext }} meshpkg-v*-${{ matrix.target }}.${{ matrix.archive_ext }} > SHA256SUMS")
+      errors << "verify-release-assets Unix checksum step must generate SHA256SUMS from the staged archives"
+    end
+  else
+    errors << "verify-release-assets job must generate SHA256SUMS on Unix runners"
+  end
+
+  checksum_windows = verify_find_step.call("Generate SHA256SUMS (Windows)")
+  if checksum_windows.is_a?(Hash)
+    unless checksum_windows["if"].to_s.include?("runner.os == 'Windows'")
+      errors << "verify-release-assets Windows checksum step must stay Windows only"
+    end
+    run_text = checksum_windows["run"].to_s
+    unless run_text.include?("Get-FileHash") && run_text.include?("SHA256SUMS") && run_text.include?("missing release archive")
+      errors << "verify-release-assets Windows checksum step must hash the staged archives and fail clearly on missing files"
+    end
+  else
+    errors << "verify-release-assets job must generate SHA256SUMS on Windows runners"
+  end
+
+  verify_unix = verify_find_step.call("Verify staged installer assets (Unix)")
+  if verify_unix.is_a?(Hash)
+    unless verify_unix["if"].to_s.include?("runner.os != 'Windows'")
+      errors << "verify-release-assets Unix verifier step must stay non-Windows only"
+    end
+    unless verify_unix["run"].to_s.strip == "bash scripts/verify-m034-s03.sh"
+      errors << "verify-release-assets Unix verifier step must shell out to bash scripts/verify-m034-s03.sh"
+    end
+    unless verify_unix.dig("env", "M034_S03_PREBUILT_RELEASE_DIR") == "${{ github.workspace }}/release-assets"
+      errors << "verify-release-assets Unix verifier step must point M034_S03_PREBUILT_RELEASE_DIR at the staged release-assets directory"
+    end
+  else
+    errors << "verify-release-assets job must run the Unix staged installer verifier"
+  end
+
+  verify_windows = verify_find_step.call("Verify staged installer assets (Windows)")
+  if verify_windows.is_a?(Hash)
+    unless verify_windows["if"].to_s.include?("runner.os == 'Windows'")
+      errors << "verify-release-assets Windows verifier step must stay Windows only"
+    end
+    unless verify_windows["run"].to_s.strip == "pwsh -NoProfile -File scripts/verify-m034-s03.ps1"
+      errors << "verify-release-assets Windows verifier step must shell out to pwsh -NoProfile -File scripts/verify-m034-s03.ps1"
+    end
+    unless verify_windows.dig("env", "M034_S03_PREBUILT_RELEASE_DIR") == "${{ github.workspace }}\\release-assets"
+      errors << "verify-release-assets Windows verifier step must point M034_S03_PREBUILT_RELEASE_DIR at the staged release-assets directory"
+    end
+  else
+    errors << "verify-release-assets job must run the Windows staged installer verifier"
+  end
+
+  diagnostics = verify_find_step.call("Upload release smoke diagnostics")
+  if diagnostics.is_a?(Hash)
+    unless diagnostics["uses"] == "actions/upload-artifact@v4"
+      errors << "verify-release-assets diagnostics upload must use actions/upload-artifact@v4"
+    end
+    unless diagnostics["if"].to_s.include?("failure()")
+      errors << "verify-release-assets diagnostics upload must run only on failure"
+    end
+    unless diagnostics.dig("with", "name") == "release-smoke-${{ matrix.target }}-diagnostics"
+      errors << "verify-release-assets diagnostics artifact name drifted"
+    end
+    unless diagnostics.dig("with", "path") == ".tmp/m034-s03/**"
+      errors << "verify-release-assets diagnostics upload must keep .tmp/m034-s03/**"
+    end
+  else
+    errors << "verify-release-assets job must upload staged smoke diagnostics on failure"
+  end
+else
+  errors << "release workflow must define the verify-release-assets job"
+end
+
 release = jobs.is_a?(Hash) ? jobs["release"] : nil
 if release.is_a?(Hash)
   errors << "release job name must stay 'Create Release'" unless release["name"] == "Create Release"
@@ -512,9 +705,9 @@ if release.is_a?(Hash)
   errors << "release job must stay on ubuntu-latest" unless release["runs-on"] == "ubuntu-latest"
 
   release_needs = release["needs"]
-  expected_release_needs = %w[authoritative-live-proof build build-meshpkg]
+  expected_release_needs = %w[authoritative-live-proof build build-meshpkg verify-release-assets]
   unless release_needs.is_a?(Array) && release_needs.sort == expected_release_needs.sort
-    errors << "release job must depend on build, build-meshpkg, and authoritative-live-proof"
+    errors << "release job must depend on build, build-meshpkg, authoritative-live-proof, and verify-release-assets"
   end
 
   release_permissions = release["permissions"]
@@ -564,6 +757,24 @@ end
 
 if raw.scan("./.github/workflows/authoritative-live-proof.yml").length != 1
   errors << "release workflow must reference the reusable workflow exactly once"
+end
+
+if raw.scan("bash scripts/verify-m034-s03.sh").length != 1
+  errors << "release workflow must invoke bash scripts/verify-m034-s03.sh exactly once"
+end
+
+if raw.scan("pwsh -NoProfile -File scripts/verify-m034-s03.ps1").length != 1
+  errors << "release workflow must invoke pwsh -NoProfile -File scripts/verify-m034-s03.ps1 exactly once"
+end
+
+["meshc --version", "meshpkg --version", "meshc build"].each do |forbidden|
+  if raw.include?(forbidden)
+    errors << "release workflow must not inline installer smoke assertions (found #{forbidden.inspect})"
+  end
+end
+
+if raw.include?('echo "version=dev" >> "$GITHUB_OUTPUT"')
+  errors << "release workflow must derive staged asset versions from repo Cargo versions instead of hardcoding dev"
 end
 
 if errors.empty?

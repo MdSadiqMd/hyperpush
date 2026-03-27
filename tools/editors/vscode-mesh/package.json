@@ -12,11 +12,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mesh-lang/mesh.git"
+    "url": "https://github.com/snowdamiz/mesh-lang.git"
   },
   "homepage": "https://meshlang.dev",
   "bugs": {
-    "url": "https://github.com/mesh-lang/mesh/issues"
+    "url": "https://github.com/snowdamiz/mesh-lang/issues"
   },
   "keywords": [
     "mesh",
@@ -78,8 +78,9 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --no-dependencies",
-    "install-local": "vsce package --no-dependencies && code --install-extension mesh-lang-0.3.0.vsix"
+    "test:vsix-path": "node --test ./scripts/vsix-path.test.mjs",
+    "package": "node ./scripts/vsix-path.mjs package",
+    "install-local": "node ./scripts/vsix-path.mjs install-local"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

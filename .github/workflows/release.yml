@@ -184,10 +184,21 @@ jobs:
         id: version
         shell: bash
         run: |
+          meshc_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' compiler/meshc/Cargo.toml | head -n1)"
+          meshpkg_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' compiler/meshpkg/Cargo.toml | head -n1)"
+          if [[ -z "$meshc_version" || "$meshc_version" != "$meshpkg_version" ]]; then
+            echo "meshc and meshpkg versions must stay aligned" >&2
+            exit 1
+          fi
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "$tag_version" != "$meshc_version" ]]; then
+              echo "tag version $tag_version does not match Cargo version $meshc_version" >&2
+              exit 1
+            fi
+            echo "version=$tag_version" >> "$GITHUB_OUTPUT"
           else
-            echo "version=dev" >> "$GITHUB_OUTPUT"
+            echo "version=$meshc_version" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Strip binary (Unix)
@@ -225,12 +236,19 @@ jobs:
         include:
           - target: x86_64-apple-darwin
             os: macos-15-intel
+            archive_ext: tar.gz
           - target: aarch64-apple-darwin
             os: macos-14
+            archive_ext: tar.gz
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-24.04
+            archive_ext: tar.gz
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
+            archive_ext: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive_ext: zip
 
     steps:
       - name: Checkout
@@ -250,28 +268,49 @@ jobs:
         id: version
         shell: bash
         run: |
+          meshc_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' compiler/meshc/Cargo.toml | head -n1)"
+          meshpkg_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' compiler/meshpkg/Cargo.toml | head -n1)"
+          if [[ -z "$meshc_version" || "$meshc_version" != "$meshpkg_version" ]]; then
+            echo "meshc and meshpkg versions must stay aligned" >&2
+            exit 1
+          fi
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "$tag_version" != "$meshc_version" ]]; then
+              echo "tag version $tag_version does not match Cargo version $meshc_version" >&2
+              exit 1
+            fi
+            echo "version=$tag_version" >> "$GITHUB_OUTPUT"
           else
-            echo "version=dev" >> "$GITHUB_OUTPUT"
+            echo "version=$meshc_version" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build meshpkg
         run: cargo build --release -p meshpkg --target ${{ matrix.target }}
 
       - name: Strip binary
+        if: runner.os != 'Windows'
         run: strip target/${{ matrix.target }}/release/meshpkg
 
       - name: Package (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
         run: |
           tar czf "meshpkg-v${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz" \
             -C "target/${{ matrix.target }}/release" meshpkg
+
+      - name: Package (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "target/${{ matrix.target }}/release/meshpkg.exe" `
+            -DestinationPath "meshpkg-v${{ steps.version.outputs.version }}-${{ matrix.target }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: meshpkg-${{ matrix.target }}
-          path: meshpkg-v${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz
+          path: meshpkg-v${{ steps.version.outputs.version }}-${{ matrix.target }}.${{ matrix.archive_ext }}
 
   # ── Authoritative live proof ───────────────────────────────────────
 
@@ -283,11 +322,98 @@ jobs:
       MESH_PUBLISH_OWNER: ${{ secrets.MESH_PUBLISH_OWNER }}
       MESH_PUBLISH_TOKEN: ${{ secrets.MESH_PUBLISH_TOKEN }}
 
+  # ── Release asset smoke ────────────────────────────────────────────
+
+  verify-release-assets:
+    name: Verify release assets (${{ matrix.target }})
+    needs: [build, build-meshpkg]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+            archive_ext: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-14
+            archive_ext: tar.gz
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+            archive_ext: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            archive_ext: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive_ext: zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download meshc artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: meshc-${{ matrix.target }}
+          path: release-assets/
+
+      - name: Download meshpkg artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: meshpkg-${{ matrix.target }}
+          path: release-assets/
+
+      - name: Generate SHA256SUMS (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd release-assets/
+          sha256sum meshc-v*-${{ matrix.target }}.${{ matrix.archive_ext }} meshpkg-v*-${{ matrix.target }}.${{ matrix.archive_ext }} > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Generate SHA256SUMS (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $files = @(
+            Get-ChildItem -Path release-assets -Filter "meshc-v*-${{ matrix.target }}.${{ matrix.archive_ext }}" | Select-Object -First 1,
+            Get-ChildItem -Path release-assets -Filter "meshpkg-v*-${{ matrix.target }}.${{ matrix.archive_ext }}" | Select-Object -First 1
+          )
+          if ($files.Count -ne 2 -or ($files | Where-Object { $null -eq $_ }).Count -gt 0) {
+            throw "missing release archive for ${{ matrix.target }}"
+          }
+          $lines = foreach ($file in $files) {
+            "$((Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($file.Name)"
+          }
+          Set-Content -Path release-assets/SHA256SUMS -Value $lines
+          Get-Content release-assets/SHA256SUMS
+
+      - name: Verify staged installer assets (Unix)
+        if: runner.os != 'Windows'
+        env:
+          M034_S03_PREBUILT_RELEASE_DIR: ${{ github.workspace }}/release-assets
+        run: bash scripts/verify-m034-s03.sh
+
+      - name: Verify staged installer assets (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          M034_S03_PREBUILT_RELEASE_DIR: ${{ github.workspace }}\release-assets
+        run: pwsh -NoProfile -File scripts/verify-m034-s03.ps1
+
+      - name: Upload release smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-smoke-${{ matrix.target }}-diagnostics
+          path: .tmp/m034-s03/**
+          if-no-files-found: warn
+
   # ── Release ─────────────────────────────────────────────────────────
 
   release:
     name: Create Release
-    needs: [build, build-meshpkg, authoritative-live-proof]
+    needs: [build, build-meshpkg, authoritative-live-proof, verify-release-assets]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
