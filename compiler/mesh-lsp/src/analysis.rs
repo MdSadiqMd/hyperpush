@@ -977,7 +977,8 @@ mod tests {
     }
 
     fn entry_module<'a>(graph: &'a ModuleGraph) -> &'a mesh_common::module_graph::ModuleInfo {
-        graph.modules
+        graph
+            .modules
             .iter()
             .find(|module| module.is_entry)
             .expect("project graph should contain an entry module")
@@ -1152,7 +1153,15 @@ mod tests {
         assert_eq!(entry_relative_path, PathBuf::from("lib/start.mpl"));
         assert_eq!(entry.path, PathBuf::from("lib/start.mpl"));
         assert_eq!(entry.name, "Lib.Start");
-        assert_eq!(project.graph.modules.iter().filter(|module| module.is_entry).count(), 1);
+        assert_eq!(
+            project
+                .graph
+                .modules
+                .iter()
+                .filter(|module| module.is_entry)
+                .count(),
+            1
+        );
 
         let result = analyze_document(&file_uri(&open_path), &source, &[]);
         let messages = diagnostic_messages(&result);
@@ -1197,9 +1206,20 @@ mod tests {
 
         assert_eq!(entry.path, PathBuf::from("lib/start.mpl"));
         assert_eq!(entry.name, "Lib.Start");
-        assert_eq!(project.graph.modules.iter().filter(|module| module.is_entry).count(), 1);
+        assert_eq!(
+            project
+                .graph
+                .modules
+                .iter()
+                .filter(|module| module.is_entry)
+                .count(),
+            1
+        );
         assert_eq!(root_main.name, "Main");
-        assert!(!root_main.is_entry, "root main.mpl should not stay executable");
+        assert!(
+            !root_main.is_entry,
+            "root main.mpl should not stay executable"
+        );
 
         let result = analyze_document(&file_uri(&open_path), &source, &[]);
         let messages = diagnostic_messages(&result);

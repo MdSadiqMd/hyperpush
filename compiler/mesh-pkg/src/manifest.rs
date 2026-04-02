@@ -418,9 +418,9 @@ pub fn rewrite_manifest_entrypoint_source(
     let manifest_table = manifest_value
         .as_table_mut()
         .ok_or_else(|| "Manifest root must be a TOML table".to_string())?;
-    let package_value = manifest_table
-        .get_mut("package")
-        .ok_or_else(|| "Manifest must contain a [package] table to rewrite entrypoint".to_string())?;
+    let package_value = manifest_table.get_mut("package").ok_or_else(|| {
+        "Manifest must contain a [package] table to rewrite entrypoint".to_string()
+    })?;
     let package_table = package_value
         .as_table_mut()
         .ok_or_else(|| "Manifest [package] section must be a TOML table".to_string())?;

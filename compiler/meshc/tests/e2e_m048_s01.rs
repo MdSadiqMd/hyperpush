@@ -43,11 +43,15 @@ fn artifact_dir(test_name: &str) -> PathBuf {
 
 fn write_file(path: &Path, contents: &str) -> Result<(), String> {
     let Some(parent) = path.parent() else {
-        return Err(format!("File '{}' is missing a parent directory", path.display()));
+        return Err(format!(
+            "File '{}' is missing a parent directory",
+            path.display()
+        ));
     };
     fs::create_dir_all(parent)
         .map_err(|error| format!("Failed to create '{}': {error}", parent.display()))?;
-    fs::write(path, contents).map_err(|error| format!("Failed to write '{}': {error}", path.display()))
+    fs::write(path, contents)
+        .map_err(|error| format!("Failed to write '{}': {error}", path.display()))
 }
 
 fn validate_relative_fixture_path(path: &str) -> Result<(), String> {
@@ -85,7 +89,8 @@ fn ensure_clean_dir(path: &Path) -> Result<(), String> {
         fs::remove_dir_all(path)
             .map_err(|error| format!("Failed to clear '{}': {error}", path.display()))?;
     }
-    fs::create_dir_all(path).map_err(|error| format!("Failed to create '{}': {error}", path.display()))
+    fs::create_dir_all(path)
+        .map_err(|error| format!("Failed to create '{}': {error}", path.display()))
 }
 
 fn write_fixture_project(
@@ -93,7 +98,8 @@ fn write_fixture_project(
     spec: &FixtureSpec<'_>,
     artifacts: &Path,
 ) -> Result<FixtureProject, String> {
-    let tempdir = tempfile::tempdir().map_err(|error| format!("Failed to create temp dir: {error}"))?;
+    let tempdir =
+        tempfile::tempdir().map_err(|error| format!("Failed to create temp dir: {error}"))?;
     let project_dir = tempdir.path().join(name);
     fs::create_dir_all(&project_dir)
         .map_err(|error| format!("Failed to create '{}': {error}", project_dir.display()))?;
@@ -134,9 +140,7 @@ fn write_fixture_project(
 }
 
 fn package_manifest(name: &str, entrypoint: &str) -> String {
-    format!(
-        "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nentrypoint = \"{entrypoint}\"\n"
-    )
+    format!("[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nentrypoint = \"{entrypoint}\"\n")
 }
 
 fn meshc_command() -> Command {
@@ -271,7 +275,10 @@ fn run_command_and_archive(
                     error.message, error.status_code, stdout, stderr
                 ),
             );
-            panic!("{description} timed out; artifacts: {}", artifacts.display());
+            panic!(
+                "{description} timed out; artifacts: {}",
+                artifacts.display()
+            );
         }
     }
 }
@@ -408,12 +415,10 @@ fn override_precedence_fixture(artifacts: &Path) -> FixtureProject {
         test_file: None,
     };
 
-    write_fixture_project("override-precedence-project", &spec, artifacts).unwrap_or_else(
-        |error| {
-            route_free::write_artifact(&artifacts.join("setup.error.txt"), &error);
-            panic!("override precedence fixture should materialize: {error}");
-        },
-    )
+    write_fixture_project("override-precedence-project", &spec, artifacts).unwrap_or_else(|error| {
+        route_free::write_artifact(&artifacts.join("setup.error.txt"), &error);
+        panic!("override precedence fixture should materialize: {error}");
+    })
 }
 
 fn override_only_build_fixture(artifacts: &Path) -> FixtureProject {
@@ -434,12 +439,10 @@ fn override_only_build_fixture(artifacts: &Path) -> FixtureProject {
         test_file: None,
     };
 
-    write_fixture_project("override-only-build-project", &spec, artifacts).unwrap_or_else(
-        |error| {
-            route_free::write_artifact(&artifacts.join("setup.error.txt"), &error);
-            panic!("override-only build fixture should materialize: {error}");
-        },
-    )
+    write_fixture_project("override-only-build-project", &spec, artifacts).unwrap_or_else(|error| {
+        route_free::write_artifact(&artifacts.join("setup.error.txt"), &error);
+        panic!("override-only build fixture should materialize: {error}");
+    })
 }
 
 fn override_test_fixture(artifacts: &Path) -> FixtureProject {

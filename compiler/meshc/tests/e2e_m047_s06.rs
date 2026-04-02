@@ -198,7 +198,11 @@ fn m047_s06_docs_layer_s04_s05_s06_and_s07_truthfully() {
         );
         assert_contains(path_label, source, "bash scripts/verify-m047-s05.sh");
         assert_contains(path_label, source, "bash scripts/verify-m047-s06.sh");
-        assert_contains(path_label, source, "cargo test -p meshc --test e2e_m047_s07 -- --nocapture");
+        assert_contains(
+            path_label,
+            source,
+            "cargo test -p meshc --test e2e_m047_s07 -- --nocapture",
+        );
     }
 }
 

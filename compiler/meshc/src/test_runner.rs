@@ -1207,7 +1207,12 @@ fn copy_project_sources_to_tmp(
     tmp_dir: &Path,
     excluded_entry_relative_path: &Path,
 ) -> Result<(), String> {
-    copy_sources_recursive(project_dir, project_dir, tmp_dir, excluded_entry_relative_path)
+    copy_sources_recursive(
+        project_dir,
+        project_dir,
+        tmp_dir,
+        excluded_entry_relative_path,
+    )
 }
 
 fn copy_sources_recursive(
@@ -1216,8 +1221,8 @@ fn copy_sources_recursive(
     tmp_dir: &Path,
     excluded_entry_relative_path: &Path,
 ) -> Result<(), String> {
-    let entries = std::fs::read_dir(dir)
-        .map_err(|e| format!("Failed to read '{}': {}", dir.display(), e))?;
+    let entries =
+        std::fs::read_dir(dir).map_err(|e| format!("Failed to read '{}': {}", dir.display(), e))?;
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read '{}': {}", dir.display(), e))?;
         let path = entry.path();
@@ -1358,7 +1363,10 @@ mod tests {
 
         let err = resolve_project_dir(Some(&orphan)).unwrap_err();
 
-        assert!(err.contains("Could not resolve a Mesh project root"), "{err}");
+        assert!(
+            err.contains("Could not resolve a Mesh project root"),
+            "{err}"
+        );
         assert!(err.contains(&orphan.display().to_string()), "{err}");
     }
 
@@ -1394,7 +1402,8 @@ mod tests {
     }
 
     #[test]
-    fn prepare_temp_test_project_rewrites_entrypoint_to_synthetic_main_and_preserves_dependencies() {
+    fn prepare_temp_test_project_rewrites_entrypoint_to_synthetic_main_and_preserves_dependencies()
+    {
         let temp = tempfile::tempdir().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let project_dir = temp.path().join("override-project");
@@ -1413,8 +1422,12 @@ mod tests {
         );
 
         let test_project = resolve_test_project(Some(&project_dir)).unwrap();
-        prepare_temp_test_project(&test_project, tmp.path(), "fn main() do\n  println(\"tests\")\nend\n")
-            .unwrap();
+        prepare_temp_test_project(
+            &test_project,
+            tmp.path(),
+            "fn main() do\n  println(\"tests\")\nend\n",
+        )
+        .unwrap();
 
         let manifest = Manifest::from_file(&tmp.path().join("mesh.toml")).unwrap();
         let entrypoint = resolve_entrypoint(tmp.path(), Some(&manifest)).unwrap();

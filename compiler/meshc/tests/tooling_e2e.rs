@@ -337,10 +337,7 @@ fn test_test_specific_file_target_succeeds_for_override_entry_without_root_main(
 fn test_test_specific_file_target_fails_closed_when_no_project_root_exists() {
     let dir = tempfile::tempdir().unwrap();
     let orphan = dir.path().join("orphan.test.mpl");
-    write_file(
-        &orphan,
-        "test(\"orphan\") do\n  assert(true)\nend\n",
-    );
+    write_file(&orphan, "test(\"orphan\") do\n  assert(true)\nend\n");
 
     let output = Command::new(meshc_bin())
         .args(["test", orphan.to_str().unwrap()])

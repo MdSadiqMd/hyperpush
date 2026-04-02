@@ -2,6 +2,7 @@ pub mod lockfile;
 pub mod manifest;
 pub mod resolver;
 pub mod scaffold;
+pub mod toolchain_update;
 
 // Re-export key types for convenience.
 pub use lockfile::{LockedPackage, Lockfile};
@@ -16,3 +17,6 @@ pub use manifest::{
 };
 pub use resolver::resolve_dependencies;
 pub use scaffold::{scaffold_clustered_project, scaffold_project, scaffold_todo_api_project};
+pub use toolchain_update::{
+    run_toolchain_update, ToolchainUpdateError, ToolchainUpdateMode, ToolchainUpdateOutcome,
+};

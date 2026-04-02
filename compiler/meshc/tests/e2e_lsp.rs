@@ -58,7 +58,8 @@ fn write_file(path: &Path, contents: &str) -> Result<(), String> {
     };
     fs::create_dir_all(parent)
         .map_err(|error| format!("Failed to create '{}': {error}", parent.display()))?;
-    fs::write(path, contents).map_err(|error| format!("Failed to write '{}': {error}", path.display()))
+    fs::write(path, contents)
+        .map_err(|error| format!("Failed to write '{}': {error}", path.display()))
 }
 
 fn validate_relative_fixture_path(path: &str) -> Result<(), String> {
@@ -86,9 +87,7 @@ fn validate_relative_fixture_path(path: &str) -> Result<(), String> {
 }
 
 fn package_manifest(name: &str, entrypoint: &str) -> String {
-    format!(
-        "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nentrypoint = \"{entrypoint}\"\n"
-    )
+    format!("[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nentrypoint = \"{entrypoint}\"\n")
 }
 
 fn source_position(source: &str, needle: &str, occurrence: usize) -> (u64, u64) {
@@ -145,7 +144,8 @@ fn write_override_project_fixture(
     validate_relative_fixture_path(spec.nested_support_path)?;
 
     let artifacts = artifact_dir(test_name);
-    let tempdir = tempfile::tempdir().map_err(|error| format!("Failed to create temp dir: {error}"))?;
+    let tempdir =
+        tempfile::tempdir().map_err(|error| format!("Failed to create temp dir: {error}"))?;
     let project_dir = tempdir.path().join(spec.name);
     fs::create_dir_all(&project_dir)
         .map_err(|error| format!("Failed to create '{}': {error}", project_dir.display()))?;
@@ -178,10 +178,18 @@ fn write_override_project_fixture(
 
     route_free::archive_directory_tree(&project_dir, &artifacts.join("project"));
 
-    let project_dir = fs::canonicalize(&project_dir)
-        .map_err(|error| format!("Failed to canonicalize '{}': {error}", project_dir.display()))?;
-    let entry_path = fs::canonicalize(&expected_entry)
-        .map_err(|error| format!("Failed to canonicalize '{}': {error}", expected_entry.display()))?;
+    let project_dir = fs::canonicalize(&project_dir).map_err(|error| {
+        format!(
+            "Failed to canonicalize '{}': {error}",
+            project_dir.display()
+        )
+    })?;
+    let entry_path = fs::canonicalize(&expected_entry).map_err(|error| {
+        format!(
+            "Failed to canonicalize '{}': {error}",
+            expected_entry.display()
+        )
+    })?;
     let nested_support_path = fs::canonicalize(&expected_nested_support).map_err(|error| {
         format!(
             "Failed to canonicalize '{}': {error}",
@@ -190,8 +198,12 @@ fn write_override_project_fixture(
     })?;
     let entry_source = fs::read_to_string(&entry_path)
         .map_err(|error| format!("Failed to read '{}': {error}", entry_path.display()))?;
-    let nested_support_source = fs::read_to_string(&nested_support_path)
-        .map_err(|error| format!("Failed to read '{}': {error}", nested_support_path.display()))?;
+    let nested_support_source = fs::read_to_string(&nested_support_path).map_err(|error| {
+        format!(
+            "Failed to read '{}': {error}",
+            nested_support_path.display()
+        )
+    })?;
 
     route_free::write_artifact(
         &artifacts.join("fixture-paths.txt"),
@@ -619,7 +631,10 @@ impl Drop for LspSession {
 
 fn require_single_location<'a>(response: &'a Value, context: &str) -> &'a Value {
     let Some(result) = response.get("result") else {
-        panic!("{context} missing result payload: {}", pretty_json(response));
+        panic!(
+            "{context} missing result payload: {}",
+            pretty_json(response)
+        );
     };
 
     match result {
@@ -630,8 +645,14 @@ fn require_single_location<'a>(response: &'a Value, context: &str) -> &'a Value 
             locations.len(),
             pretty_json(response)
         ),
-        Value::Null => panic!("{context} returned null instead of a definition location: {}", pretty_json(response)),
-        _ => panic!("{context} returned malformed location payload: {}", pretty_json(response)),
+        Value::Null => panic!(
+            "{context} returned null instead of a definition location: {}",
+            pretty_json(response)
+        ),
+        _ => panic!(
+            "{context} returned malformed location payload: {}",
+            pretty_json(response)
+        ),
     }
 }
 
@@ -1032,8 +1053,10 @@ fn lsp_json_rpc_override_entry_flow() {
             }
         }),
     );
-    let support_diagnostics = session
-        .wait_for_diagnostics(&fixture.nested_support_uri, "override-entry didOpen nested support");
+    let support_diagnostics = session.wait_for_diagnostics(
+        &fixture.nested_support_uri,
+        "override-entry didOpen nested support",
+    );
     assert!(
         support_diagnostics.is_empty(),
         "override-entry nested support file should open cleanly through live JSON-RPC, got diagnostics: {:?}\nartifacts: {}",
