@@ -1,0 +1,443 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+ARTIFACT_ROOT=".tmp/m047-s04"
+ARTIFACT_DIR="$ARTIFACT_ROOT/verify"
+PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
+STATUS_PATH="$ARTIFACT_DIR/status.txt"
+CURRENT_PHASE_PATH="$ARTIFACT_DIR/current-phase.txt"
+LATEST_PROOF_BUNDLE_PATH="$ARTIFACT_DIR/latest-proof-bundle.txt"
+RETAINED_ARTIFACTS_DIR="$ARTIFACT_DIR/retained-m047-s04-artifacts"
+
+rm -rf "$ARTIFACT_DIR"
+mkdir -p "$ARTIFACT_DIR"
+exec > >(tee "$ARTIFACT_DIR/full-contract.log") 2>&1
+
+: >"$PHASE_REPORT_PATH"
+printf 'running\n' >"$STATUS_PATH"
+printf 'init\n' >"$CURRENT_PHASE_PATH"
+
+on_exit() {
+  local exit_code=$?
+  if [[ $exit_code -eq 0 ]]; then
+    printf 'ok\n' >"$STATUS_PATH"
+    printf 'complete\n' >"$CURRENT_PHASE_PATH"
+  elif [[ ! -f "$STATUS_PATH" || "$(<"$STATUS_PATH")" != "failed" ]]; then
+    printf 'failed\n' >"$STATUS_PATH"
+  fi
+}
+trap on_exit EXIT
+
+record_phase() {
+  printf '%s\t%s\n' "$1" "$2" >>"$PHASE_REPORT_PATH"
+}
+
+print_log_excerpt() {
+  local log_path="$1"
+  python3 - "$log_path" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+if not path.exists():
+    print(f"missing log: {path}")
+    raise SystemExit(0)
+lines = path.read_text(errors="replace").splitlines()
+for line in lines[:220]:
+    print(line)
+if len(lines) > 220:
+    print(f"... truncated after 220 lines (total {len(lines)})")
+PY
+}
+
+fail_phase() {
+  local phase="$1"
+  local reason="$2"
+  local log_path="${3:-}"
+  local artifact_hint="${4:-}"
+  printf 'failed\n' >"$STATUS_PATH"
+  printf '%s\n' "$phase" >"$CURRENT_PHASE_PATH"
+  echo "verification drift: ${reason}" >&2
+  if [[ -n "$artifact_hint" ]]; then
+    echo "artifact hint: ${artifact_hint}" >&2
+  fi
+  if [[ -n "$log_path" ]]; then
+    echo "failing log: ${log_path}" >&2
+    echo "--- ${log_path} ---" >&2
+    print_log_excerpt "$log_path" >&2
+  fi
+  exit 1
+}
+
+assert_file_contains_regex() {
+  local phase="$1"
+  local path="$2"
+  local regex="$3"
+  local description="$4"
+  local log_path="${5:-}"
+  if ! python3 - "$path" "$regex" "$description" >"$ARTIFACT_DIR/${phase}.content-check.log" 2>&1 <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+regex = sys.argv[2]
+description = sys.argv[3]
+text = path.read_text(errors="replace")
+if not re.search(regex, text, re.MULTILINE):
+    raise SystemExit(f"{description}: missing regex {regex!r} in {path}")
+print(f"{description}: matched {regex!r}")
+PY
+  then
+    fail_phase "$phase" "$description" "$ARTIFACT_DIR/${phase}.content-check.log" "${log_path:-$path}"
+  fi
+}
+
+assert_file_lacks_regex() {
+  local phase="$1"
+  local path="$2"
+  local regex="$3"
+  local description="$4"
+  if ! python3 - "$path" "$regex" "$description" >"$ARTIFACT_DIR/${phase}.content-check.log" 2>&1 <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+regex = sys.argv[2]
+description = sys.argv[3]
+text = path.read_text(errors="replace")
+match = re.search(regex, text, re.MULTILINE)
+if match:
+    raise SystemExit(
+        f"{description}: matched forbidden regex {regex!r} in {path} at {match.start()}..{match.end()}"
+    )
+print(f"{description}: no match for {regex!r}")
+PY
+  then
+    fail_phase "$phase" "$description" "$ARTIFACT_DIR/${phase}.content-check.log" "$path"
+  fi
+}
+
+run_command() {
+  local timeout_secs="$1"
+  local log_path="$2"
+  shift 2
+  local -a cmd=("$@")
+  {
+    printf '$'
+    printf ' %q' "${cmd[@]}"
+    printf '\n'
+    "${cmd[@]}"
+  } >"$log_path" 2>&1 &
+  local cmd_pid=$!
+  local deadline=$((SECONDS + timeout_secs))
+  while kill -0 "$cmd_pid" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      echo "command timed out after ${timeout_secs}s" >>"$log_path"
+      kill -TERM "$cmd_pid" 2>/dev/null || true
+      sleep 1
+      kill -KILL "$cmd_pid" 2>/dev/null || true
+      wait "$cmd_pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+  done
+  wait "$cmd_pid"
+}
+
+assert_test_filter_ran() {
+  local phase="$1"
+  local log_path="$2"
+  local label="$3"
+  if ! python3 - "$log_path" "$label" >"$ARTIFACT_DIR/${label}.test-count.log" 2>&1 <<'PY'
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(errors="replace")
+label = sys.argv[2]
+counts = [int(value) for value in re.findall(r"running (\d+) test", text)]
+if not counts:
+    raise SystemExit(f"{label}: missing 'running N test' line")
+if max(counts) <= 0:
+    raise SystemExit(f"{label}: test filter ran 0 tests")
+print(f"{label}: running-counts={counts}")
+PY
+  then
+    fail_phase "$phase" "named test filter ran 0 tests or produced malformed output" "$ARTIFACT_DIR/${label}.test-count.log"
+  fi
+}
+
+run_expect_success() {
+  local phase="$1"
+  local label="$2"
+  local require_tests="$3"
+  local timeout_secs="$4"
+  shift 4
+  local -a cmd=("$@")
+  local log_path="$ARTIFACT_DIR/${label}.log"
+  record_phase "$phase" started
+  printf '%s\n' "$phase" >"$CURRENT_PHASE_PATH"
+  echo "==> ${cmd[*]}"
+  if ! run_command "$timeout_secs" "$log_path" "${cmd[@]}"; then
+    record_phase "$phase" failed
+    fail_phase "$phase" "expected success within ${timeout_secs}s" "$log_path"
+  fi
+  if [[ "$require_tests" == "yes" ]]; then
+    assert_test_filter_ran "$phase" "$log_path" "$label"
+  fi
+  record_phase "$phase" passed
+}
+
+capture_snapshot() {
+  local source_root="$1"
+  local snapshot_path="$2"
+  python3 - "$source_root" "$snapshot_path" <<'PY'
+from pathlib import Path
+import sys
+
+source_root = Path(sys.argv[1])
+snapshot_path = Path(sys.argv[2])
+names = []
+if source_root.exists():
+    names = sorted(
+        path.name
+        for path in source_root.iterdir()
+        if path.is_dir() and path.name != 'verify'
+    )
+snapshot_path.write_text(''.join(f"{name}\n" for name in names))
+PY
+}
+
+copy_new_artifacts_or_fail() {
+  local phase="$1"
+  local before_snapshot="$2"
+  local source_root="$3"
+  local dest_root="$4"
+  local manifest_path="$5"
+
+  if ! python3 - "$before_snapshot" "$source_root" "$dest_root" >"$manifest_path" 2>"$ARTIFACT_DIR/${phase}.artifact-check.log" <<'PY'
+from pathlib import Path
+import shutil
+import sys
+
+before_snapshot = Path(sys.argv[1])
+source_root = Path(sys.argv[2])
+dest_root = Path(sys.argv[3])
+
+before = {
+    line.strip()
+    for line in before_snapshot.read_text(errors='replace').splitlines()
+    if line.strip()
+}
+after_paths = {
+    path.name: path
+    for path in source_root.iterdir()
+    if path.is_dir() and path.name != 'verify'
+}
+new_names = sorted(name for name in after_paths if name not in before)
+if not new_names:
+    raise SystemExit('expected fresh .tmp/m047-s04 artifact directories from the M047 cutover e2e replay')
+
+if dest_root.exists():
+    shutil.rmtree(dest_root)
+dest_root.mkdir(parents=True, exist_ok=True)
+manifest_lines = []
+for name in new_names:
+    src = after_paths[name]
+    if not any(src.iterdir()):
+        raise SystemExit(f'{src}: expected non-empty artifact directory')
+    dst = dest_root / name
+    shutil.copytree(src, dst)
+    manifest_lines.append(f'{name}\t{src}')
+    for child in sorted(src.rglob('*')):
+        if child.is_file():
+            manifest_lines.append(f'  - {child}')
+
+print('\n'.join(manifest_lines))
+PY
+  then
+    fail_phase "$phase" "missing or malformed copied evidence" "$ARTIFACT_DIR/${phase}.artifact-check.log" "$dest_root"
+  fi
+}
+
+assert_retained_bundle_shape() {
+  local phase="$1"
+  local bundle_root="$2"
+  local manifest_path="$3"
+  local pointer_path="$4"
+  local log_path="$ARTIFACT_DIR/${phase}.bundle-check.log"
+  if ! python3 - "$bundle_root" "$manifest_path" "$pointer_path" >"$log_path" 2>&1 <<'PY'
+from pathlib import Path
+import json
+import sys
+
+bundle_root = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+pointer_path = Path(sys.argv[3])
+expected_pointer = str(bundle_root)
+actual_pointer = pointer_path.read_text(errors='replace').strip()
+if actual_pointer != expected_pointer:
+    raise SystemExit(
+        f'latest-proof-bundle pointer drifted: expected {expected_pointer!r}, got {actual_pointer!r}'
+    )
+manifest_lines = [line for line in manifest_path.read_text(errors='replace').splitlines() if line.strip()]
+if not manifest_lines:
+    raise SystemExit(f'{manifest_path}: expected non-empty copied-artifact manifest')
+
+children = sorted(path for path in bundle_root.iterdir() if path.is_dir())
+if len(children) < 3:
+    raise SystemExit(f'{bundle_root}: expected at least three retained contract snapshots')
+
+required_prefixes = [
+    'cutover-verifier-contract-',
+    'cutover-docs-contract-',
+    'cutover-runbook-contract-',
+]
+for prefix in required_prefixes:
+    matches = [path for path in children if path.name.startswith(prefix)]
+    if len(matches) != 1:
+        raise SystemExit(f'{bundle_root}: expected exactly one retained bundle for {prefix}, found {[path.name for path in matches]}')
+
+verifier_dir = next(path for path in children if path.name.startswith('cutover-verifier-contract-'))
+if not (verifier_dir / 'scenario-meta.json').is_file():
+    raise SystemExit(f'{verifier_dir}: missing scenario-meta.json')
+scenario = json.loads((verifier_dir / 'scenario-meta.json').read_text())
+if scenario.get('authoritative_verifier') != 'scripts/verify-m047-s04.sh':
+    raise SystemExit(f'{verifier_dir}/scenario-meta.json: authoritative verifier drifted: {scenario!r}')
+for rel in [
+    'contract/verify-m047-s04.sh',
+    'contract/verify-m045-s04.sh',
+    'contract/verify-m045-s05.sh',
+    'contract/verify-m046-s04.sh',
+    'contract/verify-m046-s05.sh',
+    'contract/verify-m046-s06.sh',
+    'contract/README.md',
+    'contract/distributed-proof.index.md',
+]:
+    if not (verifier_dir / rel).exists():
+        raise SystemExit(f'{verifier_dir}: missing retained contract file {rel}')
+
+print('retained-bundle-shape: ok')
+PY
+  then
+    fail_phase "$phase" "missing retained proof artifacts or malformed bundle pointer" "$log_path" "$bundle_root"
+  fi
+}
+
+record_phase contract-guards started
+printf 'contract-guards\n' >"$CURRENT_PHASE_PATH"
+assert_file_contains_regex \
+  contract-readme \
+  README.md \
+  'scripts/verify-m047-s04.sh' \
+  'README lost the authoritative M047 cutover rail reference'
+assert_file_contains_regex \
+  contract-proof \
+  website/docs/docs/distributed-proof/index.md \
+  'scripts/verify-m047-s04.sh' \
+  'distributed-proof docs lost the authoritative M047 cutover rail reference'
+assert_file_contains_regex \
+  contract-tooling \
+  website/docs/docs/tooling/index.md \
+  'scripts/verify-m047-s04.sh' \
+  'tooling docs lost the authoritative M047 cutover rail reference'
+assert_file_contains_regex \
+  contract-clustered-example \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'scripts/verify-m047-s04.sh' \
+  'clustered example docs lost the authoritative M047 cutover rail reference'
+assert_file_contains_regex \
+  contract-distributed \
+  website/docs/docs/distributed/index.md \
+  'scripts/verify-m047-s04.sh' \
+  'distributed guide lost the authoritative M047 cutover rail reference'
+assert_file_contains_regex \
+  contract-tiny-cluster \
+  tiny-cluster/README.md \
+  'scripts/verify-m047-s04.sh' \
+  'tiny-cluster README lost the authoritative M047 cutover rail reference'
+assert_file_contains_regex \
+  contract-cluster-proof \
+  cluster-proof/README.md \
+  'scripts/verify-m047-s04.sh' \
+  'cluster-proof README lost the authoritative M047 cutover rail reference'
+assert_file_lacks_regex \
+  contract-readme-old-authority \
+  README.md \
+  '`bash scripts/verify-m046-s06.sh` — the authoritative assembled closeout rail' \
+  'README still teaches the M046 rail as authoritative'
+assert_file_lacks_regex \
+  contract-proof-old-authority \
+  website/docs/docs/distributed-proof/index.md \
+  '`bash scripts/verify-m046-s06.sh` — the authoritative assembled closeout rail' \
+  'distributed-proof docs still teach the M046 rail as authoritative'
+record_phase contract-guards passed
+
+run_expect_success m047-s04-parser 00-m047-s04-parser yes 2400 \
+  cargo test -p mesh-parser m047_s04 -- --nocapture
+run_expect_success m047-s04-pkg 01-m047-s04-pkg yes 2400 \
+  cargo test -p mesh-pkg m047_s04 -- --nocapture
+run_expect_success m047-s04-compiler 02-m047-s04-compiler yes 3600 \
+  cargo test -p meshc --test e2e_m047_s01 -- --nocapture
+run_expect_success m047-s04-scaffold-unit 03-m047-s04-scaffold-unit yes 1800 \
+  cargo test -p mesh-pkg scaffold_clustered_project_writes_public_cluster_contract -- --nocapture
+run_expect_success m047-s04-scaffold-smoke 04-m047-s04-scaffold-smoke yes 2400 \
+  cargo test -p meshc --test tooling_e2e test_init_clustered_creates_project -- --nocapture
+run_expect_success m047-s04-tiny-cluster-tests 05-m047-s04-tiny-cluster-tests no 1800 \
+  cargo run -q -p meshc -- test tiny-cluster/tests
+run_expect_success m047-s04-tiny-cluster-build 06-m047-s04-tiny-cluster-build no 1800 \
+  cargo run -q -p meshc -- build tiny-cluster
+run_expect_success m047-s04-cluster-proof-tests 07-m047-s04-cluster-proof-tests no 1800 \
+  cargo run -q -p meshc -- test cluster-proof/tests
+run_expect_success m047-s04-cluster-proof-build 08-m047-s04-cluster-proof-build no 1800 \
+  cargo run -q -p meshc -- build cluster-proof
+run_expect_success m047-s04-docs-build 09-m047-s04-docs-build no 2400 \
+  npm --prefix website run build
+
+BEFORE_SNAPSHOT="$ARTIFACT_DIR/10-m047-s04.before.txt"
+capture_snapshot .tmp/m047-s04 "$BEFORE_SNAPSHOT"
+run_expect_success m047-s04-e2e 10-m047-s04-e2e yes 2400 \
+  cargo test -p meshc --test e2e_m047_s04 -- --nocapture
+record_phase m047-s04-artifacts started
+copy_new_artifacts_or_fail \
+  m047-s04-artifacts \
+  "$BEFORE_SNAPSHOT" \
+  .tmp/m047-s04 \
+  "$RETAINED_ARTIFACTS_DIR" \
+  "$ARTIFACT_DIR/10-m047-s04-artifacts.txt"
+printf '%s\n' "$RETAINED_ARTIFACTS_DIR" >"$LATEST_PROOF_BUNDLE_PATH"
+record_phase m047-s04-artifacts passed
+record_phase m047-s04-bundle-shape started
+assert_retained_bundle_shape \
+  m047-s04-bundle-shape \
+  "$RETAINED_ARTIFACTS_DIR" \
+  "$ARTIFACT_DIR/10-m047-s04-artifacts.txt" \
+  "$LATEST_PROOF_BUNDLE_PATH"
+record_phase m047-s04-bundle-shape passed
+
+for expected_phase in \
+  contract-guards \
+  m047-s04-parser \
+  m047-s04-pkg \
+  m047-s04-compiler \
+  m047-s04-scaffold-unit \
+  m047-s04-scaffold-smoke \
+  m047-s04-tiny-cluster-tests \
+  m047-s04-tiny-cluster-build \
+  m047-s04-cluster-proof-tests \
+  m047-s04-cluster-proof-build \
+  m047-s04-docs-build \
+  m047-s04-e2e \
+  m047-s04-artifacts \
+  m047-s04-bundle-shape; do
+  if ! rg -q "^${expected_phase}\\tpassed$" "$PHASE_REPORT_PATH"; then
+    fail_phase verifier-status "missing ${expected_phase} pass marker" "$ARTIFACT_DIR/full-contract.log" "$PHASE_REPORT_PATH"
+  fi
+done
+
+echo "verify-m047-s04: ok"

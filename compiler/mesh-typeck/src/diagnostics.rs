@@ -99,6 +99,7 @@ fn error_code(err: &TypeError) -> &'static str {
         | TypeError::UnknownField { .. }
         | TypeError::NoSuchField { .. } => "E0009",
         TypeError::NoSuchMethod { .. } => "E0030",
+        TypeError::ManualContinuityPromotionDisabled { .. } => "E0046",
         TypeError::UnknownVariant { .. } => "E0010",
         TypeError::OrPatternBindingMismatch { .. } => "E0011",
         TypeError::NonExhaustiveMatch { .. } => "E0012",
@@ -126,6 +127,11 @@ fn error_code(err: &TypeError) -> &'static str {
         TypeError::ImportModuleNotFound { .. } => "E0031",
         TypeError::ImportNameNotFound { .. } => "E0034",
         TypeError::PrivateItem { .. } => "E0035",
+        TypeError::HttpClusteredInvalidArguments { .. } => "E0047",
+        TypeError::HttpClusteredPrivateHandler { .. } => "E0048",
+        TypeError::HttpClusteredOutsideRouteHandlerPosition { .. } => "E0049",
+        TypeError::HttpClusteredConflictingReplicationCount { .. } => "E0050",
+        TypeError::HttpClusteredImportedOriginMissing { .. } => "E0051",
         TypeError::TryIncompatibleReturn { .. } => "E0036",
         TypeError::TryOnNonResultOption { .. } => "E0037",
         TypeError::NonSerializableField { .. } => "E0038",
@@ -492,6 +498,11 @@ pub fn render_json_diagnostic(
                 | TypeError::ImportModuleNotFound { span, .. }
                 | TypeError::ImportNameNotFound { span, .. }
                 | TypeError::PrivateItem { span, .. }
+                | TypeError::HttpClusteredInvalidArguments { span, .. }
+                | TypeError::HttpClusteredPrivateHandler { span, .. }
+                | TypeError::HttpClusteredOutsideRouteHandlerPosition { span }
+                | TypeError::HttpClusteredConflictingReplicationCount { span, .. }
+                | TypeError::HttpClusteredImportedOriginMissing { span, .. }
                 | TypeError::TryIncompatibleReturn { span, .. }
                 | TypeError::TryOnNonResultOption { span, .. }
                 | TypeError::UnresolvedAssocType { span, .. }
@@ -922,6 +933,25 @@ pub fn render_diagnostic(
                     "type `{}` has no trait impl providing `{}`",
                     ty, method_name
                 ))
+                .finish()
+        }
+
+        TypeError::ManualContinuityPromotionDisabled { span } => {
+            let msg = "`Continuity.promote()` is disabled";
+            let range = clamp(text_range_to_range(*span));
+
+            Report::build(ReportKind::Error, (fname.clone(), range.clone()))
+                .with_code(code)
+                .with_message(msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), range))
+                        .with_message("manual authority changes are no longer part of the Mesh surface")
+                        .with_color(Color::Red),
+                )
+                .with_help(
+                    "failover is automatic-only now; use `Continuity.authority_status()` to inspect authority state",
+                )
                 .finish()
         }
 
@@ -1525,6 +1555,123 @@ pub fn render_diagnostic(
                     "add `pub` to `{}` in module `{}` to make it accessible",
                     name, module_name
                 ))
+                .finish()
+        }
+
+        TypeError::HttpClusteredInvalidArguments { reason, span } => {
+            let msg = "invalid HTTP.clustered(...) usage";
+            let range = clamp(text_range_to_range(*span));
+
+            Report::build(ReportKind::Error, (fname.clone(), range.clone()))
+                .with_code(code)
+                .with_message(msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), range))
+                        .with_message(reason.clone())
+                        .with_color(Color::Red),
+                )
+                .with_help(
+                    "use `HTTP.clustered(handler)` or `HTTP.clustered(<int>, handler)` with a public top-level route handler reference",
+                )
+                .finish()
+        }
+
+        TypeError::HttpClusteredPrivateHandler { handler_name, span } => {
+            let msg = "clustered route handler must be public";
+            let range = clamp(text_range_to_range(*span));
+
+            Report::build(ReportKind::Error, (fname.clone(), range.clone()))
+                .with_code(code)
+                .with_message(msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), range))
+                        .with_message(format!(
+                            "`{}` is private and cannot cross the clustered route boundary",
+                            handler_name
+                        ))
+                        .with_color(Color::Red),
+                )
+                .with_help(format!(
+                    "add `pub` to `{}` or remove `HTTP.clustered(...)`",
+                    handler_name
+                ))
+                .finish()
+        }
+
+        TypeError::HttpClusteredOutsideRouteHandlerPosition { span } => {
+            let msg = "HTTP.clustered(...) is only valid in route handler position";
+            let range = clamp(text_range_to_range(*span));
+
+            Report::build(ReportKind::Error, (fname.clone(), range.clone()))
+                .with_code(code)
+                .with_message(msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), range))
+                        .with_message(
+                            "use this wrapper directly as the handler argument to `HTTP.route(...)` or `HTTP.on_*(...)`",
+                        )
+                        .with_color(Color::Red),
+                )
+                .finish()
+        }
+
+        TypeError::HttpClusteredConflictingReplicationCount {
+            runtime_name,
+            first_count,
+            current_count,
+            first_span,
+            span,
+        } => {
+            let msg = "conflicting clustered route replication counts";
+            let first_range = clamp(text_range_to_range(*first_span));
+            let current_range = clamp(text_range_to_range(*span));
+
+            Report::build(ReportKind::Error, (fname.clone(), current_range.clone()))
+                .with_code(code)
+                .with_message(msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), first_range))
+                        .with_message(format!(
+                            "`{}` was first declared here with replication count {}",
+                            runtime_name, first_count
+                        ))
+                        .with_color(Color::Blue),
+                )
+                .with_label(
+                    Label::new((fname.clone(), current_range))
+                        .with_message(format!(
+                            "conflicting replication count {} for `{}`",
+                            current_count, runtime_name
+                        ))
+                        .with_color(Color::Red),
+                )
+                .with_help("keep one replication count per clustered route handler runtime name")
+                .finish()
+        }
+
+        TypeError::HttpClusteredImportedOriginMissing { handler_name, span } => {
+            let msg = "imported clustered route handler is missing origin metadata";
+            let range = clamp(text_range_to_range(*span));
+
+            Report::build(ReportKind::Error, (fname.clone(), range.clone()))
+                .with_code(code)
+                .with_message(msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), range))
+                        .with_message(format!(
+                            "cannot determine the defining module for imported handler `{}`",
+                            handler_name
+                        ))
+                        .with_color(Color::Red),
+                )
+                .with_note(
+                    "imported bare handlers must preserve their defining module so clustered route lowering can keep the real runtime name",
+                )
                 .finish()
         }
 

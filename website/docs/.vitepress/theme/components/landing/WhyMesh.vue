@@ -10,20 +10,26 @@ const comparisons = [
   {
     icon: Droplets,
     label: 'vs Elixir',
+    tagline: 'Static types, native speed',
     description:
       'Mesh shares Elixir\'s actor model and let-it-crash philosophy, but adds static types with full inference. No runtime type errors, no dialyzer setup, and it compiles to native binaries instead of running on the BEAM.',
+    pros: ['Type inference', 'Native binaries', 'Familiar model'],
   },
   {
     icon: Cog,
     label: 'vs Rust',
+    tagline: 'Simpler concurrency',
     description:
       'Mesh provides Rust-level native performance without borrow checking complexity. Mesh uses per-actor garbage collection instead of ownership, making concurrent code dramatically simpler to write.',
+    pros: ['No borrow checker', 'Per-actor GC', 'Actor supervision'],
   },
   {
     icon: Gauge,
     label: 'vs Go',
+    tagline: 'More expressive',
     description:
       'Like Go, Mesh compiles to fast native binaries with lightweight concurrency. But Mesh adds pattern matching, algebraic types, type inference, and supervision trees — making it more expressive and fault-tolerant.',
+    pros: ['Pattern matching', 'Sum types', 'Supervision trees'],
   },
 ]
 
@@ -35,7 +41,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="border-t border-border py-20 md:py-28">
+  <section class="relative border-t border-border py-20 md:py-28">
     <div class="mx-auto max-w-5xl px-4">
       <!-- Section header -->
       <div class="text-center">
@@ -53,18 +59,32 @@ onMounted(() => {
           v-for="(comparison, index) in comparisons"
           :key="comparison.label"
           :ref="(el) => { if (el) cards[index] = el as HTMLElement }"
-          class="reveal rounded-xl border border-foreground/10 bg-card p-8 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/30 hover:shadow-lg"
+          class="reveal group rounded-xl border border-border bg-card p-7 transition-all duration-300 hover:-translate-y-1 hover:border-foreground/20 hover:shadow-xl"
           :class="`reveal-delay-${index + 1}`"
         >
-          <div class="mb-4 flex size-11 items-center justify-center rounded-xl bg-muted text-foreground">
-            <component :is="comparison.icon" class="size-5" />
+          <div class="mb-5 flex size-11 items-center justify-center rounded-xl bg-foreground/[0.06] dark:bg-foreground/[0.08] text-foreground transition-colors group-hover:bg-foreground/[0.1]">
+            <component :is="comparison.icon" class="size-5" :stroke-width="1.75" />
           </div>
-          <div class="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-bold text-foreground">
+
+          <div class="inline-flex items-center rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-bold">
             {{ comparison.label }}
           </div>
-          <p class="mt-4 text-base leading-relaxed text-muted-foreground">
+          <p class="mt-1.5 text-xs font-medium text-muted-foreground">{{ comparison.tagline }}</p>
+
+          <p class="mt-4 text-sm leading-relaxed text-muted-foreground">
             {{ comparison.description }}
           </p>
+
+          <!-- Advantage tags -->
+          <div class="mt-5 flex flex-wrap gap-1.5">
+            <span
+              v-for="pro in comparison.pros"
+              :key="pro"
+              class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+            >
+              {{ pro }}
+            </span>
+          </div>
         </div>
       </div>
     </div>

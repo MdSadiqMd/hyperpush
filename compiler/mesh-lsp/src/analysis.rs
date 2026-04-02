@@ -13,6 +13,10 @@ use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range, Url}
 
 use mesh_common::module_graph::{self, ModuleGraph, ModuleId};
 use mesh_parser::ast::item::{Item, SourceFile};
+use mesh_pkg::manifest::{
+    build_clustered_export_surface, collect_source_cluster_declarations,
+    validate_cluster_declarations_with_source, ClusteredDeclarationError, Manifest,
+};
 use mesh_typeck::error::{ConstraintOrigin, TypeError};
 use mesh_typeck::ty::Ty;
 use mesh_typeck::{ImportContext, ModuleExports, TypeckResult};
@@ -190,11 +194,17 @@ fn type_error_span(error: &TypeError) -> Option<TextRange> {
         TypeError::UnsupportedDerive { .. } => None,
         TypeError::MissingDerivePrerequisite { .. } => None,
         TypeError::NoSuchMethod { span, .. } => Some(*span),
+        TypeError::ManualContinuityPromotionDisabled { span } => Some(*span),
         TypeError::BreakOutsideLoop { span, .. } => Some(*span),
         TypeError::ContinueOutsideLoop { span, .. } => Some(*span),
         TypeError::ImportModuleNotFound { span, .. } => Some(*span),
         TypeError::ImportNameNotFound { span, .. } => Some(*span),
         TypeError::PrivateItem { span, .. } => Some(*span),
+        TypeError::HttpClusteredInvalidArguments { span, .. } => Some(*span),
+        TypeError::HttpClusteredPrivateHandler { span, .. } => Some(*span),
+        TypeError::HttpClusteredOutsideRouteHandlerPosition { span } => Some(*span),
+        TypeError::HttpClusteredConflictingReplicationCount { span, .. } => Some(*span),
+        TypeError::HttpClusteredImportedOriginMissing { span, .. } => Some(*span),
         TypeError::TryIncompatibleReturn { span, .. } => Some(*span),
         TypeError::TryOnNonResultOption { span, .. } => Some(*span),
         TypeError::NonSerializableField { .. } => None,
@@ -306,6 +316,13 @@ fn analyze_project_document(
         .find(|module| module.path == relative_path)
         .map(|module| module.id)?;
 
+    let manifest_path = project_root.join("mesh.toml");
+    let manifest = if manifest_path.exists() {
+        Some(Manifest::from_file(&manifest_path).map_err(|error| vec![project_diagnostic(error)]))
+    } else {
+        None
+    };
+
     let module_count = project.graph.module_count();
     let mut all_exports = vec![None; module_count];
     let mut all_typeck = (0..module_count).map(|_| None).collect::<Vec<_>>();
@@ -322,17 +339,140 @@ fn analyze_project_document(
         all_typeck[idx] = Some(typeck);
     }
 
+    let source_cluster_declarations =
+        collect_source_cluster_declarations(&project.graph, &project.module_parses);
+    let has_project_errors = project
+        .module_parses
+        .iter()
+        .any(|parse| !parse.errors().is_empty())
+        || all_typeck
+            .iter()
+            .filter_map(|typeck| typeck.as_ref())
+            .any(|typeck| !typeck.errors.is_empty());
+
     let current_idx = current_id.0 as usize;
     let current_source = project.module_sources.get(current_idx)?.clone();
     let current_typeck = all_typeck.into_iter().nth(current_idx).flatten()?;
     let current_parse = mesh_parser::parse(&current_source);
-    let diagnostics =
+    let mut diagnostics =
         diagnostics_from_parse_and_typeck(&current_source, &current_parse, &current_typeck);
+
+    if !has_project_errors {
+        if let Some(cluster_diagnostics) = cluster_diagnostics(
+            manifest,
+            &source_cluster_declarations,
+            &project.graph,
+            &project.module_parses,
+            &all_exports,
+            &relative_path,
+            &current_source,
+        ) {
+            diagnostics.extend(cluster_diagnostics);
+        }
+    } else if let Some(Err(manifest_errors)) = manifest {
+        diagnostics.extend(manifest_errors);
+    }
 
     Some(AnalysisResult {
         diagnostics,
         parse: current_parse,
         typeck: current_typeck,
+    })
+}
+
+fn project_diagnostic(message: impl Into<String>) -> Diagnostic {
+    Diagnostic {
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
+        severity: Some(DiagnosticSeverity::ERROR),
+        source: Some("mesh".to_string()),
+        message: message.into(),
+        ..Default::default()
+    }
+}
+
+fn cluster_diagnostics(
+    manifest: Option<Result<Manifest, Vec<Diagnostic>>>,
+    source_cluster_declarations: &[mesh_pkg::manifest::SourceClusteredDeclaration],
+    graph: &ModuleGraph,
+    parses: &[mesh_parser::Parse],
+    all_exports: &[Option<mesh_typeck::ExportedSymbols>],
+    current_relative_path: &Path,
+    current_source: &str,
+) -> Option<Vec<Diagnostic>> {
+    let manifest = match manifest {
+        None => None,
+        Some(Err(errors)) => return Some(errors),
+        Some(Ok(manifest)) => Some(manifest),
+    };
+
+    if manifest
+        .as_ref()
+        .and_then(|manifest| manifest.cluster.as_ref())
+        .is_none()
+        && source_cluster_declarations.is_empty()
+    {
+        return None;
+    }
+
+    let surface = build_clustered_export_surface(graph, parses, all_exports);
+    match validate_cluster_declarations_with_source(
+        manifest
+            .as_ref()
+            .and_then(|manifest| manifest.cluster.as_ref()),
+        source_cluster_declarations,
+        &surface,
+    ) {
+        Ok(_) => None,
+        Err(issues) => Some(
+            issues
+                .into_iter()
+                .filter_map(|issue| {
+                    clustered_declaration_diagnostic(issue, current_relative_path, current_source)
+                })
+                .collect(),
+        ),
+    }
+}
+
+fn clustered_issue_range(source: &str, span: mesh_common::span::Span) -> std::ops::Range<usize> {
+    if source.is_empty() {
+        return 0..0;
+    }
+
+    let mut start = (span.start as usize).min(source.len() - 1);
+    let mut end = (span.end as usize).min(source.len());
+    if end <= start {
+        end = (start + 1).min(source.len());
+    }
+    start = start.min(end.saturating_sub(1));
+    start..end
+}
+
+fn clustered_declaration_diagnostic(
+    issue: ClusteredDeclarationError,
+    current_relative_path: &Path,
+    current_source: &str,
+) -> Option<Diagnostic> {
+    let range = match issue.origin.provenance() {
+        Some(provenance) => {
+            if provenance.file != current_relative_path {
+                return None;
+            }
+            let span = clustered_issue_range(current_source, provenance.span);
+            Range::new(
+                offset_to_position(current_source, span.start),
+                offset_to_position(current_source, span.end),
+            )
+        }
+        None => Range::new(Position::new(0, 0), Position::new(0, 0)),
+    };
+
+    Some(Diagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::ERROR),
+        source: Some("mesh".to_string()),
+        message: issue.to_string(),
+        ..Default::default()
     })
 }
 
@@ -686,6 +826,289 @@ mod tests {
             .to_string()
     }
 
+    fn clustered_project_main_source() -> &'static str {
+        "from Services import Jobs\nfrom Work import handle_submit\n\nfn main() do\n  let pid = Jobs.start(0)\n  let _ = Jobs.submit(pid, \"demo\")\n  let _ = handle_submit(\"demo\")\nend\n"
+    }
+
+    fn clustered_project_services_source() -> &'static str {
+        "service Jobs do\n  fn init(start :: Int) -> Int do\n    start\n  end\n\n  call Submit(payload :: String) :: String do |state|\n    (state, payload)\n  end\n\n  cast Reset() do |_state|\n    0\n  end\nend\n"
+    }
+
+    fn clustered_project_work_source() -> &'static str {
+        "pub fn handle_submit(payload :: String) -> String do\n  payload\nend\n\nfn hidden_submit(payload :: String) -> String do\n  payload\nend\n"
+    }
+
+    fn source_declared_work_project_main_source() -> &'static str {
+        "fn main() do\n  nil\nend\n"
+    }
+
+    fn source_declared_public_work_source() -> &'static str {
+        "@cluster pub fn handle_submit(payload :: String) -> String do\n  payload\nend\n\n@cluster(3) pub fn handle_retry(payload :: String) -> String do\n  payload\nend\n"
+    }
+
+    fn source_declared_private_work_source() -> &'static str {
+        "@cluster fn hidden_submit(payload :: String) -> String do\n  payload\nend\n"
+    }
+
+    fn legacy_clustered_work_source() -> &'static str {
+        "clustered(work) pub fn handle_submit(payload :: String) -> String do\n  payload\nend\n"
+    }
+
+    fn legacy_manifest(name: &str) -> String {
+        format!(
+            "{}\n[cluster]\nenabled = true\ndeclarations = [\n  {{ kind = \"work\", target = \"Work.handle_submit\" }},\n]\n",
+            package_manifest(name)
+        )
+    }
+
+    fn write_clustered_project(manifest: &str) -> (tempfile::TempDir, PathBuf, String) {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("project");
+        let main_path = project_dir.join("main.mpl");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        std::fs::write(project_dir.join("mesh.toml"), manifest).unwrap();
+        std::fs::write(&main_path, clustered_project_main_source()).unwrap();
+        std::fs::write(
+            project_dir.join("services.mpl"),
+            clustered_project_services_source(),
+        )
+        .unwrap();
+        std::fs::write(
+            project_dir.join("work.mpl"),
+            clustered_project_work_source(),
+        )
+        .unwrap();
+        (tmp, main_path, clustered_project_main_source().to_string())
+    }
+
+    fn write_source_declared_work_project(
+        manifest: &str,
+        work_source: &str,
+    ) -> (tempfile::TempDir, PathBuf, String) {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("project");
+        let work_path = project_dir.join("work.mpl");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        std::fs::write(project_dir.join("mesh.toml"), manifest).unwrap();
+        std::fs::write(
+            &project_dir.join("main.mpl"),
+            source_declared_work_project_main_source(),
+        )
+        .unwrap();
+        std::fs::write(&work_path, work_source).unwrap();
+        (tmp, work_path, work_source.to_string())
+    }
+
+    fn clustered_route_wrapper_main_source() -> &'static str {
+        "from Api.Todos import handle_list_todos\n\npub fn handle_local(req :: Request) -> Response do\n  HTTP.response(200, \"ok\")\nend\n\nfn build() do\n  let router = HTTP.router()\n  let router = HTTP.on_get(router, \"/local\", HTTP.clustered(handle_local))\n  router |> HTTP.on_get(\"/todos\", HTTP.clustered(handle_list_todos))\nend\n\nfn main() do\n  let _ = build()\n  nil\nend\n"
+    }
+
+    fn clustered_route_wrapper_todos_source() -> &'static str {
+        "pub fn handle_list_todos(req :: Request) -> Response do\n  HTTP.response(200, \"todos\")\nend\n\nfn hidden_todos(req :: Request) -> Response do\n  HTTP.response(200, \"hidden\")\nend\n"
+    }
+
+    fn write_clustered_route_wrapper_project() -> (tempfile::TempDir, PathBuf, String) {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("project");
+        let main_path = project_dir.join("main.mpl");
+        std::fs::create_dir_all(project_dir.join("api")).unwrap();
+        std::fs::write(
+            project_dir.join("mesh.toml"),
+            package_manifest("clustered-routes"),
+        )
+        .unwrap();
+        std::fs::write(&main_path, clustered_route_wrapper_main_source()).unwrap();
+        std::fs::write(
+            project_dir.join("api/todos.mpl"),
+            clustered_route_wrapper_todos_source(),
+        )
+        .unwrap();
+        (
+            tmp,
+            main_path,
+            clustered_route_wrapper_main_source().to_string(),
+        )
+    }
+
+    fn assert_decorator_anchored_range(diag: &Diagnostic) {
+        assert_eq!(diag.range.start, Position::new(0, 0));
+        assert!(
+            diag.range.end.line > diag.range.start.line
+                || diag.range.end.character > diag.range.start.character,
+            "expected clustered diagnostic to cover a non-empty decorator span, got {:?}",
+            diag.range
+        );
+    }
+
+    // ── Clustered cutover contract ────────────────────────────────────
+
+    #[test]
+    fn m047_s04_source_decorated_work_still_analyzes_without_diagnostics() {
+        let (_tmp, work_path, source) = write_source_declared_work_project(
+            &package_manifest("clustered-source-proof"),
+            source_declared_public_work_source(),
+        );
+
+        let result = analyze_document(&file_uri(&work_path), &source, &[]);
+        let messages = result
+            .diagnostics
+            .iter()
+            .map(|diag| diag.message.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(
+            messages.is_empty(),
+            "expected clean diagnostics for valid source-decorated work, got: {:?}",
+            messages
+        );
+    }
+
+    #[test]
+    fn m047_s04_legacy_manifest_cluster_section_reports_project_diagnostic() {
+        let (_tmp, work_path, source) = write_source_declared_work_project(
+            &legacy_manifest("clustered-source-proof"),
+            source_declared_public_work_source(),
+        );
+
+        let result = analyze_document(&file_uri(&work_path), &source, &[]);
+        let diag = result
+            .diagnostics
+            .iter()
+            .find(|diag| {
+                diag.message
+                    .contains("`[cluster]` manifest sections are no longer supported")
+                    && diag.message.contains("mesh.toml")
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected legacy manifest diagnostic, got: {:?}",
+                    result
+                        .diagnostics
+                        .iter()
+                        .map(|diag| (&diag.message, diag.range))
+                        .collect::<Vec<_>>()
+                )
+            });
+
+        assert_eq!(diag.range.start, Position::new(0, 0));
+    }
+
+    #[test]
+    fn m047_s04_legacy_clustered_work_reports_parse_diagnostic_at_source_range() {
+        let (_tmp, work_path, source) = write_source_declared_work_project(
+            &package_manifest("clustered-source-proof"),
+            legacy_clustered_work_source(),
+        );
+
+        let result = analyze_document(&file_uri(&work_path), &source, &[]);
+        let diag = result
+            .diagnostics
+            .iter()
+            .find(|diag| {
+                diag.message
+                    .contains("legacy `clustered(work)` declarations are no longer supported")
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected legacy clustered(work) diagnostic, got: {:?}",
+                    result
+                        .diagnostics
+                        .iter()
+                        .map(|diag| (&diag.message, diag.range))
+                        .collect::<Vec<_>>()
+                )
+            });
+
+        assert_eq!(diag.range.start.line, 0);
+        assert!(
+            diag.range.end.line > diag.range.start.line
+                || diag.range.end.character > diag.range.start.character,
+            "expected non-empty legacy source range, got {:?}",
+            diag.range
+        );
+    }
+
+    #[test]
+    fn m047_s01_source_decorated_work_analyzes_without_diagnostics() {
+        let (_tmp, work_path, source) = write_source_declared_work_project(
+            &package_manifest("clustered-source-proof"),
+            source_declared_public_work_source(),
+        );
+
+        let result = analyze_document(&file_uri(&work_path), &source, &[]);
+        let messages = result
+            .diagnostics
+            .iter()
+            .map(|diag| diag.message.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(
+            messages.is_empty(),
+            "expected clean diagnostics for valid source-decorated work, got: {:?}",
+            messages
+        );
+    }
+
+    #[test]
+    fn m047_s01_private_source_decorator_reports_declaration_range() {
+        let (_tmp, work_path, source) = write_source_declared_work_project(
+            &package_manifest("clustered-source-proof"),
+            source_declared_private_work_source(),
+        );
+
+        let result = analyze_document(&file_uri(&work_path), &source, &[]);
+        let diag = result
+            .diagnostics
+            .iter()
+            .find(|diag| {
+                diag.message.contains("private function")
+                    && diag.message.contains("Work.hidden_submit")
+                    && diag.message.contains("source `@cluster` decorator")
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected private decorated work diagnostic, got: {:?}",
+                    result
+                        .diagnostics
+                        .iter()
+                        .map(|diag| (&diag.message, diag.range))
+                        .collect::<Vec<_>>()
+                )
+            });
+
+        assert_decorator_anchored_range(diag);
+    }
+
+    #[test]
+    fn m047_s01_manifest_source_duplicate_reports_declaration_range() {
+        let (_tmp, work_path, source) = write_source_declared_work_project(
+            &legacy_manifest("clustered-source-proof"),
+            source_declared_public_work_source(),
+        );
+
+        let result = analyze_document(&file_uri(&work_path), &source, &[]);
+        let diag = result
+            .diagnostics
+            .iter()
+            .find(|diag| {
+                diag.message
+                    .contains("`[cluster]` manifest sections are no longer supported")
+                    && diag.message.contains("mesh.toml")
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected legacy manifest diagnostic, got: {:?}",
+                    result
+                        .diagnostics
+                        .iter()
+                        .map(|diag| (&diag.message, diag.range))
+                        .collect::<Vec<_>>()
+                )
+            });
+
+        assert_eq!(diag.range.start, Position::new(0, 0));
+    }
+
     // ── Scoped installed package regressions ────────────────────────────
 
     #[test]
@@ -803,6 +1226,81 @@ mod tests {
             messages.is_empty(),
             "flat installed packages should analyze without diagnostics, got: {:?}",
             messages
+        );
+    }
+
+    #[test]
+    fn m047_s07_clustered_route_wrapper_project_keeps_imported_origin_metadata() {
+        let (_tmp, main_path, source) = write_clustered_route_wrapper_project();
+
+        let result = analyze_document(&file_uri(&main_path), &source, &[]);
+        let messages = result
+            .diagnostics
+            .iter()
+            .map(|diag| diag.message.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(
+            messages.is_empty(),
+            "expected clean diagnostics for valid clustered route wrappers, got: {:?}",
+            messages
+        );
+
+        let metadata = result
+            .typeck
+            .clustered_route_wrappers
+            .values()
+            .find(|metadata| metadata.runtime_name == "Api.Todos.handle_list_todos")
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected imported clustered route metadata, got: {:?}",
+                    result
+                        .typeck
+                        .clustered_route_wrappers
+                        .values()
+                        .map(|metadata| {
+                            (
+                                metadata.runtime_name.as_str(),
+                                metadata.defining_module.as_deref(),
+                                metadata.replication_count.value,
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                )
+            });
+
+        assert_eq!(metadata.defining_module.as_deref(), Some("Api.Todos"));
+        assert_eq!(metadata.replication_count.value, 2);
+    }
+
+    #[test]
+    fn m047_s07_clustered_route_wrapper_reports_wrapper_range_in_lsp() {
+        let source = "pub fn handle(req :: Request) -> Response do\n  HTTP.response(200, \"ok\")\nend\n\nfn build() do\n  let wrapped = HTTP.clustered(handle)\n  wrapped\nend\n";
+        let result = analyze_document("file:///test.mpl", source, &[]);
+        let diag = result
+            .diagnostics
+            .iter()
+            .find(|diag| diag.message.contains("HTTP.clustered"))
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected clustered-route diagnostic, got: {:?}",
+                    result
+                        .diagnostics
+                        .iter()
+                        .map(|diag| (&diag.message, diag.range))
+                        .collect::<Vec<_>>()
+                )
+            });
+
+        let wrapper_start = source
+            .find("HTTP.clustered")
+            .expect("wrapper text should exist");
+        assert_eq!(diag.range.start, offset_to_position(source, wrapper_start));
+        assert!(
+            diag.range.end.line > diag.range.start.line
+                || diag.range.end.character > diag.range.start.character,
+            "expected wrapper diagnostic to cover a non-empty range, got {:?}",
+            diag.range
         );
     }
 

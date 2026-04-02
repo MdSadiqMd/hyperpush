@@ -3,8 +3,9 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Menu, X, ChevronRight, Search } from "lucide-react"
+import { ChevronRight, Search, Menu, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { Header } from "@/components/landing/header"
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar navigation data                                           */
@@ -237,7 +238,7 @@ const tocItems = [
 function TableOfContents() {
   return (
     <div className="hidden xl:block w-56 shrink-0">
-      <div className="sticky top-28">
+      <div className="sticky top-16">
         <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-3">On this page</p>
         <ul className="space-y-1.5">
           {tocItems.map((item) => (
@@ -266,39 +267,29 @@ export default function DocsPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* ---- Top header ---- */}
-      <header className="fixed top-0 left-0 right-0 z-50">
-        <nav className="mx-auto max-w-[1440px] px-6 py-4">
-          <div className="flex items-center justify-between rounded-full border border-border bg-background/80 backdrop-blur-md px-6 py-3">
-            <Link href="/" className="flex items-center gap-3">
-              <img src="/logo-light.svg" alt="hyperpush" className="h-7" />
-              <span className="text-sm text-muted-foreground font-mono">/docs</span>
-            </Link>
+      <Header
+        section="/docs"
+        maxWidth="max-w-[1440px]"
+        extraActions={
+          <Button size="sm" variant="outline" className="gap-2 h-8 text-xs font-mono">
+            <Search className="w-3.5 h-3.5" />
+            Search
+            <kbd className="ml-1 text-[10px] bg-muted px-1 py-0.5 rounded border border-border">⌘K</kbd>
+          </Button>
+        }
+      />
 
-            <div className="hidden md:flex items-center gap-8">
-              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-              <Link href="/docs" className="text-sm text-foreground font-medium">Docs</Link>
-              <Link href="/#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
-            </div>
-
-            <div className="hidden md:flex items-center gap-4">
-              <Button size="sm" variant="outline" className="gap-2 h-8 text-xs font-mono">
-                <Search className="w-3.5 h-3.5" />
-                Search
-                <kbd className="ml-1 text-[10px] bg-muted px-1 py-0.5 rounded border border-border">⌘K</kbd>
-              </Button>
-              <Button size="sm">Join Waitlist</Button>
-            </div>
-
-            <button
-              type="button"
-              className="md:hidden p-2 text-muted-foreground hover:text-foreground"
-              onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            >
-              {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-        </nav>
-      </header>
+      {/* ---- Mobile docs sidebar toggle ---- */}
+      <div className="md:hidden px-6 pt-4">
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          onClick={() => setMobileNavOpen(!mobileNavOpen)}
+        >
+          <Menu className="w-4 h-4" />
+          Docs navigation
+        </button>
+      </div>
 
       {/* ---- Mobile sidebar overlay ---- */}
       <AnimatePresence>
@@ -332,10 +323,10 @@ export default function DocsPage() {
       </AnimatePresence>
 
       {/* ---- Main layout ---- */}
-      <div className="max-w-[1440px] mx-auto px-6 pt-28 flex gap-0">
+      <div className="max-w-[1440px] mx-auto px-6 pt-8 flex gap-0">
         {/* Desktop sidebar */}
         <div className="hidden md:block w-64 shrink-0">
-          <div className="sticky top-28 max-h-[calc(100vh-8rem)] overflow-y-auto pr-4 pb-12">
+          <div className="sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto pr-4 pb-12">
             <Sidebar />
           </div>
         </div>

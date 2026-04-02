@@ -2,6 +2,7 @@
 import HeroSection from './HeroSection.vue'
 import CapabilitiesBar from './CapabilitiesBar.vue'
 import FeatureShowcase from './FeatureShowcase.vue'
+import BenchmarkSection from './BenchmarkSection.vue'
 import WhyMesh from './WhyMesh.vue'
 import GetStartedCTA from './GetStartedCTA.vue'
 import LandingFooter from './LandingFooter.vue'
@@ -12,6 +13,7 @@ import LandingFooter from './LandingFooter.vue'
     <HeroSection />
     <CapabilitiesBar />
     <FeatureShowcase />
+    <BenchmarkSection />
     <WhyMesh />
     <GetStartedCTA />
     <LandingFooter />

@@ -130,9 +130,31 @@ pub use db::repo::{
     mesh_repo_update_where, mesh_repo_update_where_expr,
 };
 pub use db::sqlite::{mesh_sqlite_close, mesh_sqlite_execute, mesh_sqlite_open, mesh_sqlite_query};
+pub use dist::bootstrap::{BootstrapMode, BootstrapStatus};
+pub use dist::continuity::{
+    attempt_id_from_token, continuity_registry, mesh_continuity_acknowledge_replica,
+    mesh_continuity_authority_status, mesh_continuity_mark_completed, mesh_continuity_status,
+    mesh_continuity_submit, mesh_continuity_submit_declared_work,
+    mesh_continuity_submit_with_durability, ContinuityAuthorityStatus, ContinuityPhase,
+    ContinuityRecord, ContinuityRegistry, ContinuityResult, ContinuitySnapshot,
+    MeshContinuityAuthorityStatus, MeshContinuityRecord, MeshContinuitySubmitDecision,
+    ReplicaStatus, SubmitDecision, SubmitOutcome, SubmitRequest,
+};
 pub use dist::node::{
     mesh_node_connect, mesh_node_list, mesh_node_self, mesh_node_spawn, mesh_node_start,
-    mesh_register_function,
+    mesh_node_start_from_env, mesh_register_declared_handler, mesh_register_function,
+    mesh_register_startup_work, mesh_trigger_startup_work, start_from_env as node_start_from_env,
+    MeshBootstrapStatus,
+};
+pub use dist::operator::{
+    operator_continuity_list, operator_continuity_status, operator_recent_diagnostics,
+    operator_status, query_operator_continuity_list, query_operator_continuity_list_remote,
+    query_operator_continuity_status, query_operator_continuity_status_remote,
+    query_operator_diagnostics, query_operator_diagnostics_remote, query_operator_status,
+    query_operator_status_remote, OperatorAuthoritySnapshot, OperatorContinuityList,
+    OperatorDiagnosticEntry, OperatorDiagnosticRecord, OperatorDiagnosticsBuffer,
+    OperatorDiagnosticsSnapshot, OperatorMembershipSnapshot, OperatorQueryError, OperatorQueryKind,
+    OperatorStatusSnapshot, DEFAULT_OPERATOR_QUERY_TIMEOUT,
 };
 pub use env::{mesh_env_args, mesh_env_get, mesh_env_get_int, mesh_env_get_with_default};
 pub use file::{

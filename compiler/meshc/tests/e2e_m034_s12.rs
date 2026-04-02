@@ -31,8 +31,14 @@ fn copy_smoke_fixture(dest: &Path) {
 fn read_trace(path: &Path) -> Value {
     let raw = std::fs::read_to_string(path)
         .unwrap_or_else(|error| panic!("failed to read trace {}: {}", path.display(), error));
-    serde_json::from_str(&raw)
-        .unwrap_or_else(|error| panic!("failed to parse trace {}: {}\n{}", path.display(), error, raw))
+    serde_json::from_str(&raw).unwrap_or_else(|error| {
+        panic!(
+            "failed to parse trace {}: {}\n{}",
+            path.display(),
+            error,
+            raw
+        )
+    })
 }
 
 #[test]
@@ -74,13 +80,20 @@ fn m034_s12_native_build_trace_records_object_and_link_context() {
     assert_eq!(trace["linkStarted"], true);
     assert_eq!(trace["linkCompleted"], true);
     assert_eq!(trace["buildOutputPath"], output_path.display().to_string());
-    assert_eq!(trace["objectPath"], output_path.with_extension("o").display().to_string());
+    assert_eq!(
+        trace["objectPath"],
+        output_path.with_extension("o").display().to_string()
+    );
     assert!(
-        trace["runtimeLibraryPath"].as_str().is_some_and(|value| !value.is_empty()),
+        trace["runtimeLibraryPath"]
+            .as_str()
+            .is_some_and(|value| !value.is_empty()),
         "trace should record the resolved runtime path: {trace:#}"
     );
     assert!(
-        trace["linkerProgram"].as_str().is_some_and(|value| !value.is_empty()),
+        trace["linkerProgram"]
+            .as_str()
+            .is_some_and(|value| !value.is_empty()),
         "trace should record the linker program: {trace:#}"
     );
 }
@@ -125,7 +138,10 @@ fn m034_s12_missing_runtime_lookup_is_reported_before_object_emission() {
     assert_eq!(trace["linkStarted"], Value::Null);
     assert_eq!(trace["linkCompleted"], Value::Null);
     assert_eq!(trace["runtimeLibraryExists"], false);
-    assert_eq!(trace["cargoTargetDir"], empty_target_dir.display().to_string());
+    assert_eq!(
+        trace["cargoTargetDir"],
+        empty_target_dir.display().to_string()
+    );
     assert!(
         trace["error"]
             .as_str()
@@ -177,7 +193,10 @@ fn m034_s12_bad_windows_llvm_prefix_is_reported_before_object_emission() {
 
     assert_eq!(trace["lastStage"], "resolve-runtime-library");
     assert_eq!(trace["meshRtLibPath"], runtime_path.display().to_string());
-    assert_eq!(trace["runtimeLibraryPath"], runtime_path.display().to_string());
+    assert_eq!(
+        trace["runtimeLibraryPath"],
+        runtime_path.display().to_string()
+    );
     assert_eq!(trace["runtimeLibraryExists"], true);
     assert_eq!(trace["objectEmissionStarted"], Value::Null);
     assert_eq!(trace["objectEmissionCompleted"], Value::Null);
@@ -185,12 +204,14 @@ fn m034_s12_bad_windows_llvm_prefix_is_reported_before_object_emission() {
     assert_eq!(trace["linkCompleted"], Value::Null);
     assert!(
         trace["error"].as_str().is_some_and(|value| {
-            value.contains("LLVM_SYS_211_PREFIX") && value.contains(&expected_clang.display().to_string())
+            value.contains("LLVM_SYS_211_PREFIX")
+                && value.contains(&expected_clang.display().to_string())
         }),
         "trace should preserve the bad LLVM prefix failure: {trace:#}"
     );
     assert!(
-        stderr.contains("LLVM_SYS_211_PREFIX") && stderr.contains(&expected_clang.display().to_string()),
+        stderr.contains("LLVM_SYS_211_PREFIX")
+            && stderr.contains(&expected_clang.display().to_string()),
         "stderr should preserve the bad LLVM prefix failure:\n{stderr}"
     );
 }

@@ -6,6 +6,8 @@
 
 tools/editors/vscode-mesh/node_modules/
 tools/editors/vscode-mesh/*.vsix
+tools/editors/vscode-mesh/.vscode-test/
+tools/editors/vscode-mesh/out/
 
 # Root
 /node_modules/
@@ -13,6 +15,7 @@ tools/editors/vscode-mesh/*.vsix
 # Frontend
 frontend/node_modules/
 frontend/dist/
+packages-website/.svelte-kit/
 
 # Website
 website/node_modules/
@@ -23,6 +26,9 @@ website/docs/.vitepress/cache/
 reference-backend/reference-backend
 mesher/mesher
 benchmarks/*/benchmark
+cluster-proof/cluster-proof
+tiny-cluster/tiny-cluster
+tiny-cluster-prefered/tiny-cluster
 
 # Temp probe/scratch directories (created during debugging)
 /.tmp/
@@ -45,6 +51,7 @@ benchmarks/*/benchmark
 /.gsd/state-manifest.json
 /.gsd/metrics.json
 /.gsd/completed-units.json
+/.gsd/reports/
 
 # ── GSD baseline (auto-generated) ──
 .DS_Store

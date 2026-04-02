@@ -145,7 +145,7 @@ pub enum TokenKind {
     /// `}`
     RBrace,
 
-    // ── Punctuation (5) ────────────────────────────────────────────────
+    // ── Punctuation (6) ────────────────────────────────────────────────
     /// `,`
     Comma,
     /// `.`
@@ -154,6 +154,8 @@ pub enum TokenKind {
     Colon,
     /// `;`
     Semicolon,
+    /// `@`
+    At,
     /// Significant newline (statement terminator).
     Newline,
 
@@ -344,19 +346,18 @@ mod tests {
 
     #[test]
     fn token_kind_variant_count() {
-        // Count variants by checking that all categories are covered.
-        // Keywords: 49 (added JsonKw), Operators: 25 (added SlotPipe(u32)), Delimiters: 6, Punctuation: 5,
-        // Literals: 9 (added RegexLiteral(String, String)), Identifiers/comments: 4, Special: 2 = 100 total
+        // Keywords: 49 (added JsonKw), Operators: 25 (added SlotPipe(u32)), Delimiters: 6, Punctuation: 6,
+        // Literals: 9 (added RegexLiteral(String, String)), Identifiers/comments: 4, Special: 2 = 101 total
         // This test documents the expected count.
         let keywords = 49u32; // Added JsonKw
         let operators = 25; // Added SlotPipe(u32)
         let delimiters = 6;
-        let punctuation = 5;
+        let punctuation = 6;
         let literals = 9; // Added RegexLiteral(String, String)
         let ident_comments = 4;
         let special = 2;
         let total =
             keywords + operators + delimiters + punctuation + literals + ident_comments + special;
-        assert_eq!(total, 100, "TokenKind should have 100 variants");
+        assert_eq!(total, 101, "TokenKind should have 101 variants");
     }
 }

@@ -123,7 +123,7 @@ end
 
 ### Format on Save
 
-Most editors can be configured to run the formatter automatically when you save a file. In VS Code with the Mesh extension, the language server handles formatting. For other editors, configure your format-on-save command to run `meshc fmt <file>`.
+Mesh only publishes repo-owned format-on-save guidance for the first-class editors in the [support tiers](#support-tiers) below. In VS Code, the Mesh extension routes document formatting through `meshc lsp`. In Neovim, the repo-owned pack attaches the native `meshc lsp` client, so save-time formatting should use your normal Neovim LSP formatting hook. Best-effort editors should invoke `meshc fmt <file>` directly and treat that integration as user-maintained.
 
 ## REPL
 
@@ -205,6 +205,40 @@ fn main() do
   IO.puts("Hello from Mesh!")
 end
 ```
+
+Use `meshc init --clustered` when you want the public clustered-app scaffold instead of the hello-world starter:
+
+```bash
+meshc init --clustered my_clustered_app
+```
+
+That scaffold adds:
+
+- a package-only `mesh.toml`
+- an `@cluster pub fn add()` boundary in `work.mpl`
+- the generic `MESH_CLUSTER_COOKIE`, `MESH_NODE_NAME`, `MESH_DISCOVERY_SEED`, `MESH_CLUSTER_PORT`, `MESH_CONTINUITY_ROLE`, and `MESH_CONTINUITY_PROMOTION_EPOCH` contract in the generated README
+- built-in operator guidance that points at the runtime-owned CLI instead of app-authored control-plane surfaces
+
+If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
+
+If you want a larger starter without changing that clustered contract, generate the Todo template instead:
+
+```bash
+meshc init --template todo-api my_todo_app
+```
+
+The Todo template keeps `work.mpl` on `@cluster pub fn sync_todos()`, adds a SQLite-backed Todo API with several `HTTP.on_get`, `HTTP.on_post`, `HTTP.on_put`, and `HTTP.on_delete` routes, dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, keeps `GET /health` plus mutating routes local, wires in actor-backed rate limiting, and ships a Dockerfile that packages the binary produced by `meshc build .` instead of assuming access to the Mesh repo. Treat it as the fuller starter layered above the same route-free clustered contract, not as a replacement for the canonical route-free public surfaces. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
+
+Inspect a running clustered app with the same operator order used by the scaffold, `tiny-cluster/`, and `cluster-proof/`:
+
+```bash
+meshc cluster status <node-name@host:port> --json
+meshc cluster continuity <node-name@host:port> --json
+meshc cluster continuity <node-name@host:port> <request_key> --json
+meshc cluster diagnostics <node-name@host:port> --json
+```
+
+Use the list form first to discover startup or request keys, then inspect a single continuity record. Start with [Clustered Example](/docs/getting-started/clustered-example/) when you want the scaffold-first app story. For the named clustered-app/operator proof rails behind this scaffold, start with [Distributed Proof](/docs/distributed-proof/). `bash scripts/verify-m047-s04.sh` remains the authoritative cutover rail for the source-first route-free clustered contract, `bash scripts/verify-m047-s05.sh` is the lower-level Todo/runtime subrail that proves the fuller starter natively and inside Docker, `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` remains the repo S07 rail for default-count and two-node wrapper behavior, and `bash scripts/verify-m047-s06.sh` is the final closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle. `bash scripts/verify-m046-s06.sh`, `bash scripts/verify-m046-s05.sh`, `bash scripts/verify-m046-s04.sh`, `bash scripts/verify-m045-s05.sh`, and `bash scripts/verify-m045-s04.sh` remain historical compatibility aliases into the M047 cutover rail, while `bash scripts/verify-m045-s03.sh` remains the historical failover-specific subrail. Use [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) for the smallest repo-owned package surface and [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md) for the deeper packaged failover runbook.
 
 ### Project Manifest
 
@@ -355,7 +389,7 @@ The language server runs the full Mesh compiler pipeline (lexer, parser, type ch
 
 ### Configuration
 
-The LSP server is configured through your editor's settings. In VS Code, the Mesh extension handles starting the server automatically. For other editors that support LSP (Neovim, Emacs, Helix, Zed), configure the language server command as:
+The JSON-RPC transport is shared across editors, but Mesh only publishes repo-owned editor-host guidance for VS Code and Neovim. VS Code starts `meshc lsp` through the Mesh extension. Neovim uses the repo-owned pack in `tools/editors/neovim-mesh/`. Best-effort editors that support LSP can point their client at:
 
 ```json
 {
@@ -366,13 +400,20 @@ The LSP server is configured through your editor's settings. In VS Code, the Mes
 
 ## Editor Support
 
+### Support tiers
+
+| Tier | Editors | Mesh-owned contract |
+|------|---------|---------------------|
+| First-class | VS Code and Neovim | Public docs, editor-specific READMEs, and repo-owned proof cover the published install/run path. |
+| Best-effort | Emacs, Helix, Zed, Sublime Text, TextMate reuse, and similar setups | Reuse the shared `meshc lsp` transport or VS Code TextMate grammar, but Mesh does not publish repo-owned editor-host smoke for these integrations. |
+
 ### VS Code
 
-The official Mesh extension for VS Code provides syntax highlighting plus the `meshc lsp` features that now have transport-level proof on `reference-backend/`: diagnostics, hover, go-to-definition, document formatting, and signature help. The extension is located in the `tools/editors/vscode-mesh/` directory of the Mesh repository.
+VS Code is a first-class editor host in the public Mesh tooling contract. The official Mesh extension provides syntax highlighting plus the `meshc lsp` features that now have transport-level proof on `reference-backend/`: diagnostics, hover, go-to-definition, document formatting, and signature help. The extension is located in the `tools/editors/vscode-mesh/` directory of the Mesh repository.
 
 #### Features
 
-- **Syntax highlighting** via a TextMate grammar that covers Mesh keywords, operators, string interpolation, and comments
+- **Syntax highlighting** via the shared TextMate grammar used by VS Code and the docs, with verified coverage for Mesh keywords, operators, comments, and both `#{...}` plus `${...}` interpolation in double- and triple-quoted strings
 - **Language configuration** for bracket matching, auto-closing pairs, and automatic indentation of `do`/`end` blocks
 - **Verified LSP integration** that starts `meshc lsp` automatically and exposes diagnostics, hover, go-to-definition, document formatting, and signature help
 
@@ -395,17 +436,58 @@ npm run install-local
 
 Or open the `tools/editors/vscode-mesh/` folder in VS Code and press F5 to launch an Extension Development Host with the extension loaded.
 
+When you need the full repo-root public proof chain instead of only the VS Code packaging/install loop, run:
+
+```bash
+bash scripts/verify-m036-s03.sh
+```
+
+That verifier keeps the public tooling contract honest by replaying the docs contract, VitePress build, existing VSIX/public README proof, real VS Code editor-host smoke, and the Neovim replay from one named-phase command.
+
 #### Configuration
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `mesh.lsp.path` | `"meshc"` | Path to the `meshc` binary (must be in PATH, or provide an absolute path) |
 
-### Other Editors
+### Neovim
 
-For editors that support TextMate grammars (Sublime Text, Atom, etc.), the grammar file at `tools/editors/vscode-mesh/syntaxes/mesh.tmLanguage.json` can be used directly for syntax highlighting.
+Neovim is a first-class editor host in the public Mesh tooling contract for the audited classic syntax plus native `meshc lsp` path already proven in `scripts/verify-m036-s02.sh`. The repo-owned support pack lives in `tools/editors/neovim-mesh/` and requires **Neovim 0.11+**.
 
-For editors that support LSP (Neovim, Emacs, Helix, Zed), configure `meshc lsp` as the language server command. The server communicates via stdin/stdout using standard JSON-RPC.
+#### Installation
+
+Install Mesh first so `meshc` is available, then place `tools/editors/neovim-mesh/` on an active `packpath` as `pack/*/start/mesh-nvim`. A direct repo-local install looks like this:
+
+```bash
+mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/pack/mesh/start"
+ln -s \
+  "/absolute/path/to/mesh-lang/tools/editors/neovim-mesh" \
+  "${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/pack/mesh/start/mesh-nvim"
+```
+
+After installation, opening any `*.mpl` file should load the classic syntax runtime files and auto-enable the native `meshc lsp` config when the binary is available.
+
+#### Verification
+
+For the full repo-root public tooling/editor proof chain, run:
+
+```bash
+bash scripts/verify-m036-s03.sh
+```
+
+Use the Neovim-specific verifier below when you only need to replay this pack's bounded proof surface:
+
+```bash
+NEOVIM_BIN="${NEOVIM_BIN:-nvim}" bash scripts/verify-m036-s02.sh
+```
+
+That proof is intentionally bounded to the shared syntax corpus plus the native `meshc lsp` path. It does not imply Tree-sitter support or support for third-party Neovim plugin-manager packaging.
+
+### Best-effort editors
+
+Editors outside the first-class tier can still reuse the shared Mesh surfaces, but those integrations are best-effort. For syntax highlighting, reuse `tools/editors/vscode-mesh/syntaxes/mesh.tmLanguage.json` anywhere that can ingest a TextMate grammar. For LSP, point your editor at `meshc lsp` over stdin/stdout JSON-RPC.
+
+Best-effort examples include Emacs, Helix, Zed, Sublime Text, and TextMate-style consumers of the shared grammar. Mesh does not publish repo-owned editor-host smoke, packaging, or troubleshooting guides for those setups.
 
 ## Tool Summary
 
@@ -417,7 +499,8 @@ For editors that support LSP (Neovim, Emacs, Helix, Zed), configure `meshc lsp` 
 | Test Runner | `meshc test [path]` | Run `*.test.mpl` files from a project root, tests directory, or specific test file |
 | Package CLI | `meshpkg <command>` | Publish, install, and search registry packages |
 | Language Server | `meshc lsp` | JSON-RPC LSP server for diagnostics, hover, formatting, navigation, and signature help |
-| VS Code Extension | -- | Syntax highlighting plus verified Mesh LSP editor integration |
+| VS Code Extension | -- | First-class VS Code editor host with verified Mesh LSP integration |
+| Neovim Pack | -- | First-class Neovim editor host for the classic syntax plus native `meshc lsp` path |
 
 ## Next Steps
 

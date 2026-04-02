@@ -17,9 +17,16 @@
 //! ```
 
 pub mod codegen;
+pub mod declared;
 pub mod link;
 pub mod mir;
 pub mod pattern;
+
+pub use declared::{
+    declared_route_wrapper_name, prepare_clustered_route_handler_plan,
+    prepare_declared_runtime_handlers, prepare_startup_work_registrations, DeclaredHandlerKind,
+    DeclaredHandlerPlanEntry, DeclaredRuntimeRegistration, StartupWorkRegistration,
+};
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -33,7 +40,7 @@ use mir::mono::monomorphize;
 pub(crate) mod build_trace {
     use std::path::{Path, PathBuf};
 
-    use serde_json::{Map, Value, json};
+    use serde_json::{json, Map, Value};
 
     const TRACE_ENV: &str = "MESH_BUILD_TRACE_PATH";
 
@@ -79,10 +86,15 @@ pub(crate) mod build_trace {
                 "buildOutputPath".to_string(),
                 json!(output.display().to_string()),
             );
-            doc.insert("objectPath".to_string(), json!(object.display().to_string()));
+            doc.insert(
+                "objectPath".to_string(),
+                json!(object.display().to_string()),
+            );
             doc.insert(
                 "requestedTargetTriple".to_string(),
-                target_triple.map(|value| json!(value)).unwrap_or(Value::Null),
+                target_triple
+                    .map(|value| json!(value))
+                    .unwrap_or(Value::Null),
             );
             doc.insert(
                 "llvmSys211Prefix".to_string(),
@@ -125,10 +137,7 @@ pub(crate) mod build_trace {
         update(|doc| {
             doc.insert("lastStage".to_string(), json!("object-emitted"));
             doc.insert("objectEmissionCompleted".to_string(), json!(true));
-            doc.insert(
-                "objectExistsAfterEmit".to_string(),
-                json!(object.exists()),
-            );
+            doc.insert("objectExistsAfterEmit".to_string(), json!(object.exists()));
         });
     }
 
@@ -401,6 +410,8 @@ pub fn compile(
 /// from multiple source modules) and produces a native executable.
 pub fn compile_mir_to_binary(
     mir: &mir::MirModule,
+    declared_handlers: &[DeclaredRuntimeRegistration],
+    startup_work_registrations: &[StartupWorkRegistration],
     output: &Path,
     opt_level: u8,
     target_triple: Option<&str>,
@@ -414,6 +425,8 @@ pub fn compile_mir_to_binary(
         build_trace::set_stage("pre-llvm-init");
         let context = Context::create();
         let mut codegen = CodeGen::new(&context, "mesh_module", opt_level, target_triple)?;
+        codegen.set_declared_handlers(declared_handlers);
+        codegen.set_startup_work_registrations(startup_work_registrations);
 
         build_trace::set_stage("compile-llvm-module");
         codegen.compile(mir)?;
@@ -446,11 +459,15 @@ pub fn compile_mir_to_binary(
 /// Compile a pre-built MIR module to LLVM IR text.
 pub fn compile_mir_to_llvm_ir(
     mir: &mir::MirModule,
+    declared_handlers: &[DeclaredRuntimeRegistration],
+    startup_work_registrations: &[StartupWorkRegistration],
     output: &Path,
     target_triple: Option<&str>,
 ) -> Result<(), String> {
     let context = Context::create();
     let mut codegen = CodeGen::new(&context, "mesh_module", 0, target_triple)?;
+    codegen.set_declared_handlers(declared_handlers);
+    codegen.set_startup_work_registrations(startup_work_registrations);
     codegen.compile(mir)?;
 
     codegen.emit_llvm_ir(output)?;
@@ -466,7 +483,11 @@ pub fn compile_mir_to_llvm_ir(
 ///
 /// After merging, runs the monomorphization pass to eliminate unreachable
 /// functions (which requires the entry point from the merged module).
-pub fn merge_mir_modules(modules: Vec<mir::MirModule>, entry_module_idx: usize) -> mir::MirModule {
+pub fn merge_mir_modules(
+    modules: Vec<mir::MirModule>,
+    entry_module_idx: usize,
+    extra_reachable_fns: &[String],
+) -> mir::MirModule {
     use std::collections::HashSet;
 
     let mut merged = mir::MirModule {
@@ -513,7 +534,75 @@ pub fn merge_mir_modules(modules: Vec<mir::MirModule>, entry_module_idx: usize) 
     // Run monomorphization on the merged module to eliminate unreachable
     // functions (builtins like Ord__compare__String that are generated in
     // every module but only used if referenced from main).
-    monomorphize(&mut merged);
+    // Keep manifest-declared executable symbols alive even if the local Mesh
+    // entrypoint never references them directly; declared-handler preparation
+    // runs after merge and still needs those lowered functions available.
+    crate::mir::mono::monomorphize_with_roots(&mut merged, extra_reachable_fns);
 
     merged
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn llvm_codegen_prefers_local_string_binding_over_same_named_function() {
+        let source = r#"
+fn node_name() -> String do
+  "fn"
+end
+
+fn request_registry_name_for_node(node_name :: String) -> String do
+  if String.length(node_name) > 0 do
+    "cluster_proof_work_requests@#{node_name}"
+  else
+    "cluster_proof_work_requests"
+  end
+end
+
+fn main() do
+  request_registry_name_for_node("peer")
+end
+"#;
+        let parse = mesh_parser::parse(source);
+        let typeck = mesh_typeck::check(&parse);
+        assert!(
+            typeck.errors.is_empty(),
+            "expected test source to type-check cleanly, got {:?}",
+            typeck.errors
+        );
+
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let ll_path = std::env::temp_dir().join(format!("mesh-codegen-shadowing-{stamp}.ll"));
+
+        compile_to_llvm_ir(&parse, &typeck, &ll_path, None)
+            .expect("failed to emit llvm for shadowing regression");
+        let llvm = fs::read_to_string(&ll_path).expect("failed to read emitted llvm");
+        let _ = fs::remove_file(&ll_path);
+
+        let request_fn = llvm
+            .split("define ptr @request_registry_name_for_node")
+            .nth(1)
+            .and_then(|rest| rest.split("define ").next())
+            .expect("request_registry_name_for_node body missing from llvm");
+
+        assert!(
+            request_fn.contains("mesh_string_length(ptr %"),
+            "expected request_registry_name_for_node to pass a local pointer into mesh_string_length, got:\n{request_fn}"
+        );
+        assert!(
+            !request_fn.contains("mesh_string_length(ptr @node_name)"),
+            "request_registry_name_for_node must not pass the same-named function symbol to mesh_string_length:\n{request_fn}"
+        );
+        assert!(
+            !request_fn.contains("mesh_string_concat(ptr %str, ptr @node_name)"),
+            "request_registry_name_for_node must interpolate the local binding, not the function symbol:\n{request_fn}"
+        );
+    }
 }

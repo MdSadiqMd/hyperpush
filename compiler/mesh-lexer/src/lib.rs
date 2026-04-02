@@ -106,6 +106,7 @@ impl<'src> Lexer<'src> {
             '}' => self.single_char_token(TokenKind::RBrace, start),
             ',' => self.single_char_token(TokenKind::Comma, start),
             ';' => self.single_char_token(TokenKind::Semicolon, start),
+            '@' => self.single_char_token(TokenKind::At, start),
 
             // ── Multi-character operators ────────────────────────────────
             '=' => self.lex_eq(start),
@@ -785,6 +786,7 @@ impl<'src> Lexer<'src> {
             ')' => self.single_char_token(TokenKind::RParen, start),
             '[' => self.single_char_token(TokenKind::LBracket, start),
             ']' => self.single_char_token(TokenKind::RBracket, start),
+            '@' => self.single_char_token(TokenKind::At, start),
             ',' => self.single_char_token(TokenKind::Comma, start),
             ';' => self.single_char_token(TokenKind::Semicolon, start),
             '=' => self.lex_eq(start),

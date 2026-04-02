@@ -44,24 +44,8 @@
           "begin": "\"\"\"",
           "end": "\"\"\"",
           "patterns": [
-            {
-              "name": "constant.character.escape.mesh",
-              "match": "\\\\."
-            },
-            {
-              "name": "meta.interpolation.mesh",
-              "begin": "\\$\\{",
-              "end": "\\}",
-              "beginCaptures": {
-                "0": { "name": "punctuation.section.interpolation.begin.mesh" }
-              },
-              "endCaptures": {
-                "0": { "name": "punctuation.section.interpolation.end.mesh" }
-              },
-              "patterns": [
-                { "include": "source.mesh" }
-              ]
-            }
+            { "include": "#string-escapes" },
+            { "include": "#string-interpolation" }
           ]
         },
         {
@@ -69,24 +53,47 @@
           "begin": "\"",
           "end": "\"",
           "patterns": [
-            {
-              "name": "constant.character.escape.mesh",
-              "match": "\\\\."
-            },
-            {
-              "name": "meta.interpolation.mesh",
-              "begin": "\\$\\{",
-              "end": "\\}",
-              "beginCaptures": {
-                "0": { "name": "punctuation.section.interpolation.begin.mesh" }
-              },
-              "endCaptures": {
-                "0": { "name": "punctuation.section.interpolation.end.mesh" }
-              },
-              "patterns": [
-                { "include": "source.mesh" }
-              ]
-            }
+            { "include": "#string-escapes" },
+            { "include": "#string-interpolation" }
+          ]
+        }
+      ]
+    },
+    "string-escapes": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.mesh",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "string-interpolation": {
+      "patterns": [
+        {
+          "name": "meta.interpolation.mesh",
+          "begin": "#\\{|\\$\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.interpolation.begin.mesh" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.interpolation.end.mesh" }
+          },
+          "patterns": [
+            { "include": "#interpolation-braces" },
+            { "include": "source.mesh" }
+          ]
+        }
+      ]
+    },
+    "interpolation-braces": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [
+            { "include": "#interpolation-braces" },
+            { "include": "source.mesh" }
           ]
         }
       ]

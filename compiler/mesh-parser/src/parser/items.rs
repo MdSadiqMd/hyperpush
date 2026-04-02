@@ -22,22 +22,192 @@ fn parse_optional_visibility(p: &mut Parser) {
 
 // ── Function Definition ──────────────────────────────────────────────────
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ClusteredDeclPrefixState {
+    Absent,
+    SourceDecoratorValid,
+    SourceDecoratorInvalid,
+    LegacyCompatValid,
+    LegacyCompatInvalid,
+}
+
+impl ClusteredDeclPrefixState {
+    fn missing_fn_message(self) -> Option<&'static str> {
+        match self {
+            Self::SourceDecoratorValid | Self::SourceDecoratorInvalid => {
+                Some("expected `fn` or `def` after `@cluster`")
+            }
+            Self::LegacyCompatValid | Self::LegacyCompatInvalid | Self::Absent => None,
+        }
+    }
+
+    fn is_legacy(self) -> bool {
+        matches!(self, Self::LegacyCompatValid | Self::LegacyCompatInvalid)
+    }
+}
+
+pub(crate) fn starts_clustered_fn_def(p: &Parser) -> bool {
+    p.at(SyntaxKind::AT)
+        || (p.at(SyntaxKind::IDENT)
+            && p.current_text() == "clustered"
+            && matches!(
+                p.nth(1),
+                SyntaxKind::L_PAREN
+                    | SyntaxKind::PUB_KW
+                    | SyntaxKind::FN_KW
+                    | SyntaxKind::DEF_KW
+                    | SyntaxKind::IDENT
+            ))
+}
+
+fn recover_cluster_decorator_args(p: &mut Parser) {
+    while !matches!(
+        p.current(),
+        SyntaxKind::R_PAREN
+            | SyntaxKind::EOF
+            | SyntaxKind::NEWLINE
+            | SyntaxKind::PUB_KW
+            | SyntaxKind::FN_KW
+            | SyntaxKind::DEF_KW
+    ) {
+        p.advance();
+    }
+}
+
+fn parse_cluster_decorator_decl(p: &mut Parser) -> ClusteredDeclPrefixState {
+    if !p.at(SyntaxKind::AT) {
+        return ClusteredDeclPrefixState::Absent;
+    }
+
+    let m = p.open();
+    let start_span = p.current_span();
+    let mut valid = true;
+
+    p.advance(); // @
+
+    if p.at(SyntaxKind::IDENT) && p.current_text() == "cluster" {
+        p.advance();
+    } else {
+        p.error("expected `cluster` after `@`");
+        if p.at(SyntaxKind::IDENT) {
+            p.advance();
+        }
+        p.close(m, SyntaxKind::ERROR_NODE);
+        return ClusteredDeclPrefixState::SourceDecoratorInvalid;
+    }
+
+    if p.eat(SyntaxKind::L_PAREN) {
+        if p.at(SyntaxKind::INT_LITERAL) {
+            p.advance();
+            if !p.at(SyntaxKind::R_PAREN) {
+                p.error("expected exactly one replication count in `@cluster(N)`");
+                recover_cluster_decorator_args(p);
+                valid = false;
+            }
+        } else {
+            p.error("expected integer replication count inside `@cluster(...)`");
+            recover_cluster_decorator_args(p);
+            valid = false;
+        }
+
+        if !p.eat(SyntaxKind::R_PAREN) {
+            p.error_with_related(
+                "expected `)` to close `@cluster(...)`",
+                start_span,
+                "`@cluster(` started here",
+            );
+            valid = false;
+        }
+    }
+
+    p.close(
+        m,
+        if valid {
+            SyntaxKind::CLUSTER_DECORATOR_DECL
+        } else {
+            SyntaxKind::ERROR_NODE
+        },
+    );
+
+    if valid {
+        ClusteredDeclPrefixState::SourceDecoratorValid
+    } else {
+        ClusteredDeclPrefixState::SourceDecoratorInvalid
+    }
+}
+
+fn parse_legacy_clustered_work_decl(p: &mut Parser) -> ClusteredDeclPrefixState {
+    if !(p.at(SyntaxKind::IDENT) && p.current_text() == "clustered") {
+        return ClusteredDeclPrefixState::Absent;
+    }
+
+    let m = p.open();
+    let start_span = p.current_span();
+    p.advance(); // clustered
+
+    let has_parens = p.eat(SyntaxKind::L_PAREN);
+    while !matches!(
+        p.current(),
+        SyntaxKind::EOF
+            | SyntaxKind::NEWLINE
+            | SyntaxKind::PUB_KW
+            | SyntaxKind::FN_KW
+            | SyntaxKind::DEF_KW
+    ) {
+        if has_parens && p.at(SyntaxKind::R_PAREN) {
+            break;
+        }
+        p.advance();
+    }
+    if has_parens {
+        p.eat(SyntaxKind::R_PAREN);
+    }
+
+    p.error_with_related(
+        "legacy `clustered(work)` declarations are no longer supported; migrate to `@cluster` or `@cluster(N)` before `fn`/`def`",
+        start_span,
+        "legacy clustered declaration started here",
+    );
+    p.close(m, SyntaxKind::ERROR_NODE);
+    ClusteredDeclPrefixState::LegacyCompatInvalid
+}
+
+fn parse_optional_clustered_decl(p: &mut Parser) -> ClusteredDeclPrefixState {
+    if p.at(SyntaxKind::AT) {
+        parse_cluster_decorator_decl(p)
+    } else {
+        parse_legacy_clustered_work_decl(p)
+    }
+}
+
 /// Parse a function definition.
 ///
 /// Supports two body forms:
-/// - Block body: `[pub] fn|def name(params) [-> ReturnType] [where ...] do body end`
-/// - Expression body: `[pub] fn|def name(pattern_params) [when guard] = expr`
+/// - Block body: `[@cluster] [@cluster(N)] [clustered(work)] [pub] fn|def name(params) [-> ReturnType] [where ...] do body end`
+/// - Expression body: `[@cluster] [@cluster(N)] [clustered(work)] [pub] fn|def name(pattern_params) [when guard] = expr`
 ///
 /// Pattern parameters (literals, wildcards, constructors, tuples) are supported
 /// alongside regular named parameters in both forms.
 pub(crate) fn parse_fn_def(p: &mut Parser) {
     let m = p.open();
 
+    let clustered_prefix = parse_optional_clustered_decl(p);
+
     // Optional visibility.
     parse_optional_visibility(p);
 
     // Consume fn or def keyword.
-    p.advance(); // FN_KW or DEF_KW
+    if p.at(SyntaxKind::FN_KW) || p.at(SyntaxKind::DEF_KW) {
+        p.advance();
+    } else {
+        if let Some(message) = clustered_prefix.missing_fn_message() {
+            p.error(message);
+        } else if !clustered_prefix.is_legacy() {
+            p.error("expected `fn` or `def`");
+        }
+        p.close(m, SyntaxKind::FN_DEF);
+        return;
+    }
 
     // Function name.
     if p.at(SyntaxKind::IDENT) {

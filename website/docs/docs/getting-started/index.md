@@ -7,6 +7,8 @@ title: Getting Started
 This guide will take you from zero to running your first Mesh program. By the end, you will have Mesh installed, understand the basic project structure, and have compiled and run a working program.
 
 > **Production backend proof:** This guide stays focused on first steps. If you are evaluating Mesh as a real backend runtime, start with [Production Backend Proof](/docs/production-backend-proof/) and the repo runbook at `reference-backend/README.md`.
+>
+> **Starting a clustered app?** Go straight to [Clustered Example](/docs/getting-started/clustered-example/). It uses the real `meshc init --clustered` scaffold, the public `MESH_*` runtime contract, and the runtime-owned `meshc cluster status|continuity|diagnostics` inspection commands.
 
 ## What is Mesh?
 
@@ -184,6 +186,7 @@ This prints `11`. The expression `5 |> double |> add_one` is equivalent to `add_
 
 Now that you have Mesh installed and running, explore the language in depth:
 
+- [Clustered Example](/docs/getting-started/clustered-example/) -- the scaffold-first clustered tutorial using `meshc init --clustered`
 - [Production Backend Proof](/docs/production-backend-proof/) -- the canonical public proof surface for the real `reference-backend/` package
 - [Language Basics](/docs/language-basics/) -- variables, types, functions, pattern matching, control flow, and more
 - [Type System](/docs/type-system/) -- structs, sum types, generics, and type inference

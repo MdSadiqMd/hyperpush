@@ -10,6 +10,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::error::{ConstraintOrigin, TypeError};
 use crate::ty::{Scheme, Ty, TyCon, TyVar};
+use crate::{ClusteredRouteReplicationCount, ClusteredRouteWrapperMetadata};
 
 /// The inference context -- owns the unification table, level state, and errors.
 ///
@@ -38,6 +39,23 @@ pub struct InferCtx {
     /// Function names imported via `from Module import name1, name2`.
     /// Tracked so the MIR lowerer can skip trait dispatch for these.
     pub imported_functions: Vec<String>,
+    /// Defining module for imported bare function references.
+    /// Keyed by the imported in-scope name (e.g. `handle_submit` -> `Work`).
+    pub imported_function_origins: FxHashMap<String, String>,
+    /// Full module name for qualified module namespaces (e.g. `Todos` -> `Api.Todos`).
+    pub qualified_module_origins: FxHashMap<String, String>,
+    /// Private names exported by a qualified module namespace.
+    /// Used to turn `HTTP.clustered(Module.hidden)` into a focused privacy diagnostic.
+    pub qualified_module_private_names: FxHashMap<String, FxHashSet<String>>,
+    /// Top-level function visibility in the current module.
+    /// Keyed by the unqualified function name; value is true when the fn is public.
+    pub top_level_function_visibility: FxHashMap<String, bool>,
+    /// Metadata for each `HTTP.clustered(...)` wrapper call.
+    pub clustered_route_wrappers: FxHashMap<TextRange, ClusteredRouteWrapperMetadata>,
+    /// Wrapper call ranges that were consumed in the route-handler slot.
+    pub consumed_clustered_route_wrappers: FxHashSet<TextRange>,
+    /// Replication counts already declared for a clustered route runtime name.
+    pub clustered_route_replication_counts: FxHashMap<String, ClusteredRouteReplicationCount>,
     /// Service method mappings imported from other modules.
     /// Maps service_name -> Vec<(method_name, generated_fn_name)>.
     /// Populated during import resolution, propagated to TypeckResult for MIR lowering.
@@ -73,6 +91,13 @@ impl InferCtx {
             loop_depth: 0,
             qualified_modules: FxHashMap::default(),
             imported_functions: Vec::new(),
+            imported_function_origins: FxHashMap::default(),
+            qualified_module_origins: FxHashMap::default(),
+            qualified_module_private_names: FxHashMap::default(),
+            top_level_function_visibility: FxHashMap::default(),
+            clustered_route_wrappers: FxHashMap::default(),
+            consumed_clustered_route_wrappers: FxHashSet::default(),
+            clustered_route_replication_counts: FxHashMap::default(),
             imported_service_methods: FxHashMap::default(),
             local_service_exports: FxHashMap::default(),
             current_module: None,

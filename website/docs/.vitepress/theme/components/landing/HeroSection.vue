@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useData } from 'vitepress'
 import { Button } from '@/components/ui/button'
 import { getHighlighter, highlightCode } from '@/composables/useShiki'
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, Github } from 'lucide-vue-next'
 
 const { theme } = useData()
 
@@ -41,25 +41,32 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="relative overflow-hidden">
-    <!-- Subtle radial vignette background -->
+  <section class="relative overflow-x-clip grain">
+    <!-- Layered background: radial vignette + subtle grid -->
     <div class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,var(--border),transparent_70%)] opacity-60" />
+    <div class="absolute inset-0 opacity-[0.02] dark:opacity-[0.04]" style="background-image: linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px); background-size: 48px 48px;" />
 
-    <div class="relative mx-auto max-w-6xl px-4 pt-12 pb-16 md:pt-16 lg:pt-24 md:pb-24">
+    <div class="relative mx-auto max-w-6xl px-6 pt-16 pb-20 md:pt-20 lg:pt-28 md:pb-28">
       <div class="grid items-center gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
         <!-- Left column: text -->
         <div class="text-center lg:text-left animate-fade-in-up">
           <!-- Version badge -->
-          <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-medium text-muted-foreground">
+          <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-card/80 backdrop-blur-sm px-3.5 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
             <span class="relative inline-flex size-2">
-              <span class="absolute inline-flex size-full animate-ping rounded-full bg-foreground/40" />
-              <span class="relative inline-block size-2 rounded-full bg-foreground" />
+              <span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500/50" />
+              <span class="relative inline-block size-2 rounded-full bg-emerald-500" />
             </span>
             Now in development &mdash; v{{ theme.meshVersion }}
           </div>
 
-          <h1 class="text-5xl font-extrabold tracking-tighter text-foreground sm:text-6xl lg:text-7xl" style="line-height: 1.05;">
-            Build concurrent systems with confidence.
+          <h1 class="text-[1.75rem] font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-[4.25rem]" style="line-height: 1.1;">
+            Build concurrent systems with
+            <span class="relative inline-block">
+              confidence.
+              <svg class="absolute -bottom-1 left-0 w-full h-3 text-foreground/15" viewBox="0 0 200 12" preserveAspectRatio="none">
+                <path d="M0 9 Q50 0 100 7 Q150 14 200 5" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
+              </svg>
+            </span>
           </h1>
 
           <p class="mx-auto mt-6 max-w-lg text-lg text-muted-foreground sm:text-xl lg:mx-0" style="line-height: 1.7;">
@@ -68,35 +75,56 @@ onMounted(async () => {
           </p>
 
           <div class="mt-10 flex items-center justify-center gap-3 lg:justify-start">
-            <Button as="a" href="/docs/getting-started/" size="lg" class="h-12 px-8 rounded-lg text-base font-semibold">
+            <Button as="a" href="/docs/getting-started/" size="lg" class="h-12 px-8 rounded-lg text-base font-semibold shadow-md hover:shadow-lg transition-shadow">
               Get Started
               <ArrowRight class="ml-1.5 size-4" />
             </Button>
             <Button as="a" href="https://github.com/snowdamiz/mesh-lang" variant="outline" size="lg" class="h-12 px-8 rounded-lg text-base font-semibold">
-              View on GitHub
+              <Github class="mr-1.5 size-4" />
+              GitHub
             </Button>
+          </div>
+
+          <!-- Social proof line -->
+          <div class="mt-8 flex items-center justify-center gap-6 lg:justify-start text-sm text-muted-foreground">
+            <span class="flex items-center gap-1.5">
+              <span class="font-mono font-bold text-foreground tabular-nums">29K+</span> req/s
+            </span>
+            <span class="h-3 w-px bg-border" />
+            <span class="flex items-center gap-1.5">
+              <span class="font-mono font-bold text-foreground tabular-nums">~5 MB</span> RSS
+            </span>
+            <span class="h-3 w-px bg-border" />
+            <span class="flex items-center gap-1.5">
+              <span class="font-mono font-bold text-foreground">LLVM</span> native
+            </span>
           </div>
         </div>
 
         <!-- Right column: code block -->
         <div class="relative animate-fade-in-up" style="animation-delay: 200ms;">
           <!-- Glow orb -->
-          <div class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-72 rounded-full bg-foreground/5 blur-3xl animate-glow-pulse" />
+          <div class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-80 rounded-full bg-foreground/[0.04] blur-3xl animate-glow-pulse" />
 
           <!-- Terminal -->
-          <div class="relative overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+          <div class="relative overflow-hidden rounded-xl border border-border bg-card shadow-2xl ring-1 ring-foreground/[0.05]">
             <!-- Terminal header -->
-            <div class="flex items-center gap-2 border-b border-border px-4 py-3">
+            <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-muted/30">
               <div class="flex gap-1.5">
-                <div class="size-3 rounded-full" style="background: #ff5f57;" />
-                <div class="size-3 rounded-full" style="background: #febc2e;" />
-                <div class="size-3 rounded-full" style="background: #28c840;" />
+                <div class="size-3 rounded-full bg-[#ff5f57] shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]" />
+                <div class="size-3 rounded-full bg-[#febc2e] shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]" />
+                <div class="size-3 rounded-full bg-[#28c840] shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]" />
               </div>
               <span class="ml-2 text-xs text-muted-foreground font-medium">main.mpl</span>
             </div>
             <!-- Code content -->
             <div v-if="highlightedHtml" v-html="highlightedHtml" class="vp-code [&_pre]:px-5 [&_pre]:py-4 [&_pre]:!bg-transparent" />
             <pre v-else class="overflow-x-auto px-5 py-4 text-sm leading-relaxed text-foreground font-mono"><code>{{ heroCode }}</code></pre>
+          </div>
+
+          <!-- Floating language tag -->
+          <div class="absolute -bottom-3 -right-3 md:-bottom-4 md:-right-4 rounded-lg border border-border bg-card px-3 py-1.5 shadow-lg text-xs font-mono text-muted-foreground animate-float" style="animation-delay: 1s;">
+            .mpl
           </div>
         </div>
       </div>

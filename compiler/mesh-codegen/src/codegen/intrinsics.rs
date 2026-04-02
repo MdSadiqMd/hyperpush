@@ -2319,11 +2319,15 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
         Some(inkwell::module::Linkage::External),
     );
 
-    // mesh_node_spawn(node_ptr: ptr, node_len: i64, fn_name_ptr: ptr, fn_name_len: i64, args_ptr: ptr, args_size: i64, link_flag: i8) -> i64
+    // mesh_node_spawn(node_ptr: ptr, node_len: i64, fn_name_ptr: ptr, fn_name_len: i64,
+    //                 args_ptr: ptr, args_size: i64, arg_tags_ptr: ptr, arg_count: i64,
+    //                 link_flag: i8) -> i64
     module.add_function(
         "mesh_node_spawn",
         i64_type.fn_type(
             &[
+                ptr_type.into(),
+                i64_type.into(),
                 ptr_type.into(),
                 i64_type.into(),
                 ptr_type.into(),
@@ -2341,6 +2345,39 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     module.add_function(
         "mesh_register_function",
         void_type.fn_type(&[ptr_type.into(), i64_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_register_declared_handler(runtime_name_ptr: ptr, runtime_name_len: i64,
+    //     executable_name_ptr: ptr, executable_name_len: i64, replication_count: i64,
+    //     fn_ptr: ptr) -> void
+    module.add_function(
+        "mesh_register_declared_handler",
+        void_type.fn_type(
+            &[
+                ptr_type.into(),
+                i64_type.into(),
+                ptr_type.into(),
+                i64_type.into(),
+                i64_type.into(),
+                ptr_type.into(),
+            ],
+            false,
+        ),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_register_startup_work(runtime_name_ptr: ptr, runtime_name_len: i64) -> void
+    module.add_function(
+        "mesh_register_startup_work",
+        void_type.fn_type(&[ptr_type.into(), i64_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_trigger_startup_work() -> void
+    module.add_function(
+        "mesh_trigger_startup_work",
+        void_type.fn_type(&[], false),
         Some(inkwell::module::Linkage::External),
     );
 
@@ -3454,6 +3491,102 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
         i64_type.fn_type(&[ptr_type.into(), i64_type.into()], false),
         Some(inkwell::module::Linkage::External),
     );
+
+    // mesh_node_start_from_env() -> ptr (MeshResult<BootstrapStatus, String>)
+    module.add_function(
+        "mesh_node_start_from_env",
+        ptr_type.fn_type(&[], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // ── M042/M044: Continuity runtime functions ───────────────────────────
+    // mesh_continuity_submit_with_durability(...) -> ptr (MeshResult<ContinuitySubmitDecision, String>)
+    module.add_function(
+        "mesh_continuity_submit_with_durability",
+        ptr_type.fn_type(
+            &[
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                i64_type.into(),
+                i8_type.into(),
+                i8_type.into(),
+            ],
+            false,
+        ),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_continuity_submit_declared_work(runtime_name, request_key, payload_hash, required_replica_count)
+    //   -> ptr (MeshResult<ContinuitySubmitDecision, String>)
+    module.add_function(
+        "mesh_continuity_submit_declared_work",
+        ptr_type.fn_type(
+            &[
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                i64_type.into(),
+            ],
+            false,
+        ),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // Compatibility wrapper: mesh_continuity_submit(...) -> ptr (MeshResult<ContinuitySubmitDecision, String>)
+    module.add_function(
+        "mesh_continuity_submit",
+        ptr_type.fn_type(
+            &[
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                i8_type.into(),
+                i8_type.into(),
+            ],
+            false,
+        ),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_continuity_status(request_key) -> ptr (MeshResult<ContinuityRecord, String>)
+    module.add_function(
+        "mesh_continuity_status",
+        ptr_type.fn_type(&[ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_continuity_authority_status() -> ptr (MeshResult<ContinuityAuthorityStatus, String>)
+    module.add_function(
+        "mesh_continuity_authority_status",
+        ptr_type.fn_type(&[], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_continuity_mark_completed(...) -> ptr (MeshResult<ContinuityRecord, String>)
+    module.add_function(
+        "mesh_continuity_mark_completed",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_continuity_complete_declared_work(...) -> ptr (MeshResult<ContinuityRecord, String>)
+    module.add_function(
+        "mesh_continuity_complete_declared_work",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_continuity_acknowledge_replica(...) -> ptr (MeshResult<ContinuityRecord, String>)
+    module.add_function(
+        "mesh_continuity_acknowledge_replica",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
 }
 
 /// Get a runtime function by name from the module.
@@ -3780,15 +3913,40 @@ mod tests {
 
         // Phase 67: Node distribution & remote spawn
         assert!(module.get_function("mesh_node_start").is_some());
+        assert!(module.get_function("mesh_node_start_from_env").is_some());
         assert!(module.get_function("mesh_node_connect").is_some());
         assert!(module.get_function("mesh_node_self").is_some());
         assert!(module.get_function("mesh_node_list").is_some());
         assert!(module.get_function("mesh_node_monitor").is_some());
         assert!(module.get_function("mesh_node_spawn").is_some());
         assert!(module.get_function("mesh_register_function").is_some());
+        assert!(module
+            .get_function("mesh_register_declared_handler")
+            .is_some());
         assert!(module.get_function("mesh_process_monitor").is_some());
         assert!(module.get_function("mesh_process_demonitor").is_some());
         assert!(module.get_function("mesh_actor_send_named").is_some());
+
+        // M042/M045: continuity runtime functions
+        assert!(module
+            .get_function("mesh_continuity_submit_with_durability")
+            .is_some());
+        assert!(module
+            .get_function("mesh_continuity_submit_declared_work")
+            .is_some());
+        assert!(module.get_function("mesh_continuity_status").is_some());
+        assert!(module
+            .get_function("mesh_continuity_authority_status")
+            .is_some());
+        assert!(module
+            .get_function("mesh_continuity_mark_completed")
+            .is_some());
+        assert!(module
+            .get_function("mesh_continuity_complete_declared_work")
+            .is_some());
+        assert!(module
+            .get_function("mesh_continuity_acknowledge_replica")
+            .is_some());
 
         // Phase 68: Global Registry
         assert!(module.get_function("mesh_global_register").is_some());

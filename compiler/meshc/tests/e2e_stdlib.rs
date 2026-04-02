@@ -1986,13 +1986,40 @@ fn e2e_struct_in_result_roundtrip() {
 
 // ── M032/S01: retained-limit runtime proofs ────────────────────────────
 
+fn m032_route_bare_server_source() -> &'static str {
+    r#"
+fn handler(_request) do
+  HTTP.response(200, "bare_ok")
+end
+
+fn main() do
+  let r = HTTP.router()
+  let r = HTTP.route(r, "/", handler)
+  HTTP.serve(r, 18124)
+end
+"#
+}
+
+fn m032_route_closure_server_source() -> &'static str {
+    r#"
+fn main() do
+  let suffix = "ok"
+  let handler = fn(_request) do
+    HTTP.response(200, "closure_" <> suffix)
+  end
+
+  let r = HTTP.router()
+  let r = HTTP.route(r, "/", handler)
+  HTTP.serve(r, 18123)
+end
+"#
+}
+
 /// Confirms the bare-function control path used by `mesher/ingestion/routes.mpl`
 /// still serves live HTTP requests correctly.
 #[test]
 fn e2e_m032_route_bare_handler_control() {
-    let mut guard = compile_and_start_server(include_str!(
-        "../../../.tmp/m032-s01/route_bare_server/main.mpl"
-    ));
+    let mut guard = compile_and_start_server(m032_route_bare_server_source());
     wait_for_server_ready(&mut guard);
 
     let response = send_request(
@@ -2016,9 +2043,7 @@ fn e2e_m032_route_bare_handler_control() {
 /// Confirms closure-based HTTP routes still fail only at live request time.
 #[test]
 fn e2e_m032_route_closure_runtime_failure() {
-    let mut guard = compile_and_start_server(include_str!(
-        "../../../.tmp/m032-s01/route_closure_server/main.mpl"
-    ));
+    let mut guard = compile_and_start_server(m032_route_closure_server_source());
     wait_for_server_ready(&mut guard);
 
     let response = send_request(

@@ -2,9 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mesh Packages</title>
+
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- SEO defaults -->
+    <meta name="theme-color" content="#0f0f0f" />
+    <meta property="og:site_name" content="Mesh Packages" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@meshlang" />
+
+
+    <!-- Prevent dark-mode FOUC -->
     <script>
       (function() {
         var stored = localStorage.getItem('theme');

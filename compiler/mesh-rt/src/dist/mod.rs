@@ -4,6 +4,10 @@
 //! serializer/deserializer, and the node identity/connection layer for
 //! inter-node message transport.
 
+pub mod bootstrap;
+pub mod continuity;
+pub mod discovery;
 pub mod global;
 pub mod node;
+pub mod operator;
 pub mod wire;

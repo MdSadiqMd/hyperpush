@@ -1,8 +1,10 @@
-**/target/
-.git/
-.planning/
-tests/
-mesher/mesher
-node_modules/
+**
+!Cargo.toml
+!Cargo.lock
+!compiler/**
+!cluster-proof/**
+
+cluster-proof/cluster-proof
+compiler/**/target/
 *.log
 .DS_Store

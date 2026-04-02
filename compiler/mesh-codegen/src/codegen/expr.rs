@@ -324,18 +324,10 @@ impl<'ctx> CodeGen<'ctx> {
                 .into());
         }
 
-        // Check if it's a known function reference (for passing as fn ptr)
-        if let Some(fn_val) = self.functions.get(name) {
-            return Ok(fn_val.as_global_value().as_pointer_value().into());
-        }
-
-        // Check if it's a runtime intrinsic function (e.g., mesh_int_to_string
-        // used as a callback function pointer for collection Display).
-        if let Some(fn_val) = self.module.get_function(name) {
-            return Ok(fn_val.as_global_value().as_pointer_value().into());
-        }
-
-        // Load from local variable alloca
+        // Load from local variable alloca before looking for function pointers.
+        // Local bindings must shadow top-level/runtime functions; otherwise a
+        // local like `node_name` can be lowered as the function `@node_name`
+        // and then passed into string intrinsics as if it were a MeshString.
         if let Some(alloca) = self.locals.get(name) {
             let alloca = *alloca;
             let llvm_ty = self.llvm_type(ty);
@@ -344,6 +336,13 @@ impl<'ctx> CodeGen<'ctx> {
                 .build_load(llvm_ty, alloca, name)
                 .map_err(|e| e.to_string())?;
             Ok(val)
+        } else if let Some(fn_val) = self.functions.get(name) {
+            // Known function reference (for passing as fn ptr)
+            Ok(fn_val.as_global_value().as_pointer_value().into())
+        } else if let Some(fn_val) = self.module.get_function(name) {
+            // Runtime intrinsic function (e.g., mesh_int_to_string used as a
+            // callback function pointer for collection Display).
+            Ok(fn_val.as_global_value().as_pointer_value().into())
         } else {
             Err(format!("Undefined variable '{}'", name))
         }
@@ -2256,41 +2255,16 @@ impl<'ctx> CodeGen<'ctx> {
             );
 
             // Store each field via the variant overlay.
-            // For generic sum types like Result/Option where the layout is {i8, ptr},
-            // a struct payload (e.g., Ok(MyStruct{x,y})) may be larger than the 8-byte
-            // ptr slot. In that case, heap-allocate the struct and store the pointer
-            // so the store fits within the {i8, ptr} layout without overflow.
+            // Generic builtin Result/Option constructors often use the canonical
+            // {i8, ptr} layout even when the source-level payload is scalar
+            // (e.g. Ok(1) for Result<Int, String>). In those cases we must box
+            // the payload before storing it so callers can safely treat the slot
+            // as a pointer during pattern matching / try-lowering.
             for (i, field_expr) in fields.iter().enumerate() {
                 let val = self.codegen_expr(field_expr)?;
-
-                // Struct values in variant fields must always be heap-allocated (pointer-boxed).
-                // The variant layout {i8 tag, ptr data} stores an opaque pointer in the data
-                // slot. Pattern matching reads the slot as a pointer and dereferences it, so
-                // storing a struct directly (even an 8-byte one) causes a dereference of a
-                // raw integer value (segfault). Always box: heap-allocate and store the ptr.
-                let val = if val.is_struct_value() {
-                    let sv = val.into_struct_value();
-                    let sv_ty = sv.get_type();
-                    let i64_ty = self.context.i64_type();
-                    let target_data = self.target_machine.get_target_data();
-                    let struct_size = target_data.get_store_size(&sv_ty);
-                    let size = sv_ty
-                        .size_of()
-                        .unwrap_or(i64_ty.const_int(struct_size, false));
-                    let align = i64_ty.const_int(8, false);
-                    let gc_alloc = get_intrinsic(&self.module, "mesh_gc_alloc_actor");
-                    let heap_ptr = self
-                        .builder
-                        .build_call(gc_alloc, &[size.into(), align.into()], "variant_box")
-                        .map_err(|e| e.to_string())?
-                        .try_as_basic_value()
-                        .basic()
-                        .ok_or("mesh_gc_alloc_actor returned void")?
-                        .into_pointer_value();
-                    self.builder
-                        .build_store(heap_ptr, sv)
-                        .map_err(|e| e.to_string())?;
-                    heap_ptr.into()
+                let expected_field_ty = field_types.get(i).unwrap_or(field_expr.ty());
+                let val = if matches!(expected_field_ty, MirType::Ptr) && !val.is_pointer_value() {
+                    self.box_variant_payload(val, "variant_box")?
                 } else {
                     val
                 };
@@ -2313,6 +2287,35 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(|e| e.to_string())?;
 
         Ok(result)
+    }
+
+    /// Box a non-pointer sum payload on the GC heap so generic {i8, ptr}
+    /// sum layouts (like builtin Result/Option) can safely carry scalar
+    /// values such as Int, Bool, and Float.
+    fn box_variant_payload(
+        &mut self,
+        val: BasicValueEnum<'ctx>,
+        name: &str,
+    ) -> Result<BasicValueEnum<'ctx>, String> {
+        let i64_ty = self.context.i64_type();
+        let size = val
+            .get_type()
+            .size_of()
+            .unwrap_or(i64_ty.const_int(8, false));
+        let align = i64_ty.const_int(8, false);
+        let gc_alloc = get_intrinsic(&self.module, "mesh_gc_alloc_actor");
+        let heap_ptr = self
+            .builder
+            .build_call(gc_alloc, &[size.into(), align.into()], name)
+            .map_err(|e| e.to_string())?
+            .try_as_basic_value()
+            .basic()
+            .ok_or("mesh_gc_alloc_actor returned void")?
+            .into_pointer_value();
+        self.builder
+            .build_store(heap_ptr, val)
+            .map_err(|e| e.to_string())?;
+        Ok(heap_ptr.into())
     }
 
     // ── Closure creation ─────────────────────────────────────────────
@@ -2843,6 +2846,21 @@ impl<'ctx> CodeGen<'ctx> {
             .ok_or_else(|| "mesh_global_register returned void".to_string())
     }
 
+    fn remote_spawn_arg_tag(&self, ty: &MirType) -> Result<u8, String> {
+        match ty {
+            MirType::Int => Ok(1),
+            MirType::Float => Ok(2),
+            MirType::Bool => Ok(3),
+            MirType::String => Ok(4),
+            MirType::Pid(_) => Ok(5),
+            MirType::Unit => Ok(6),
+            other => Err(format!(
+                "Node.spawn does not yet support remote argument type {}",
+                other
+            )),
+        }
+    }
+
     /// Codegen for Node.spawn / Node.spawn_link.
     ///
     /// Node.spawn(node_name, func_ref, args...) compiles to:
@@ -2884,13 +2902,29 @@ impl<'ctx> CodeGen<'ctx> {
 
         // args[1] = function reference -- extract the name as a string constant.
         // The MIR has this as MirExpr::Var("function_name", FnPtr(...)).
-        let fn_name = match &args[1] {
-            MirExpr::Var(name, _) => name.clone(),
+        let (fn_name, expected_arg_types) = match &args[1] {
+            MirExpr::Var(name, MirType::FnPtr(params, _))
+            | MirExpr::Var(name, MirType::Closure(params, _)) => (name.clone(), params.clone()),
+            MirExpr::Var(name, _) => {
+                let params = self
+                    .mir_functions
+                    .iter()
+                    .find(|function| function.name == *name)
+                    .map(|function| {
+                        function
+                            .params
+                            .iter()
+                            .map(|(_, ty)| ty.clone())
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                (name.clone(), params)
+            }
             _ => {
                 // Fallback: try to evaluate and use a placeholder.
                 // This should not happen in practice -- Node.spawn's second arg
                 // should always be a named function reference.
-                "unknown".to_string()
+                ("unknown".to_string(), Vec::new())
             }
         };
 
@@ -2901,14 +2935,47 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(|e| e.to_string())?;
         let fn_name_len = i64_ty.const_int(fn_name.len() as u64, false);
 
-        // args[2..] = actor arguments. Pack into i64 array on GC heap (same as local spawn).
+        // args[2..] = actor arguments. Pack raw values into a u64 array (same as
+        // local spawn) and pass a parallel type-tag array so the runtime can deep-copy
+        // remote-safe values like Strings instead of treating them as local pointers.
         let spawn_args = &args[2..];
-        let (args_ptr, args_size) = if spawn_args.is_empty() {
-            (ptr_ty.const_null(), i64_ty.const_int(0, false))
+        let (args_ptr, args_size, arg_tags_ptr, arg_count) = if spawn_args.is_empty() {
+            (
+                ptr_ty.const_null(),
+                i64_ty.const_int(0, false),
+                ptr_ty.const_null(),
+                i64_ty.const_int(0, false),
+            )
         } else {
             let arg_vals: Vec<BasicValueEnum<'ctx>> = spawn_args
                 .iter()
-                .map(|a| self.codegen_expr(a))
+                .enumerate()
+                .map(|(i, arg)| {
+                    let expected_ty = expected_arg_types.get(i).unwrap_or(arg.ty());
+                    match arg {
+                        MirExpr::Var(name, mir_ty) if matches!(mir_ty, MirType::Unit) => {
+                            if let Some(alloca) = self.locals.get(name).copied() {
+                                self.builder
+                                    .build_load(
+                                        self.llvm_type(expected_ty),
+                                        alloca,
+                                        &format!("{}_as_remote_arg", name),
+                                    )
+                                    .map_err(|e| e.to_string())
+                            } else {
+                                self.codegen_expr(arg)
+                            }
+                        }
+                        _ => self.codegen_expr(arg),
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let arg_tags: Vec<u8> = spawn_args
+                .iter()
+                .enumerate()
+                .map(|(i, arg)| {
+                    self.remote_spawn_arg_tag(expected_arg_types.get(i).unwrap_or(arg.ty()))
+                })
                 .collect::<Result<Vec<_>, _>>()?;
 
             let total_size = (arg_vals.len() * 8) as u64;
@@ -2956,12 +3023,36 @@ impl<'ctx> CodeGen<'ctx> {
                     .map_err(|e| e.to_string())?;
             }
 
-            (buf_ptr, i64_ty.const_int(total_size, false))
+            let tag_arr_ty = i8_ty.array_type(arg_tags.len() as u32);
+            let tag_buf_ptr = self
+                .builder
+                .build_alloca(tag_arr_ty, "spawn_arg_tags")
+                .map_err(|e| e.to_string())?;
+            for (i, tag) in arg_tags.iter().enumerate() {
+                let idx = self.context.i32_type().const_int(i as u64, false);
+                let zero = self.context.i32_type().const_int(0, false);
+                let tag_ptr = unsafe {
+                    self.builder
+                        .build_gep(tag_arr_ty, tag_buf_ptr, &[zero, idx], "arg_tag_ptr")
+                        .map_err(|e| e.to_string())?
+                };
+                self.builder
+                    .build_store(tag_ptr, i8_ty.const_int(*tag as u64, false))
+                    .map_err(|e| e.to_string())?;
+            }
+
+            (
+                buf_ptr,
+                i64_ty.const_int(total_size, false),
+                tag_buf_ptr,
+                i64_ty.const_int(arg_tags.len() as u64, false),
+            )
         };
 
         let link_val = i8_ty.const_int(link_flag as u64, false);
 
-        // Call mesh_node_spawn(node_ptr, node_len, fn_name_ptr, fn_name_len, args_ptr, args_size, link_flag)
+        // Call mesh_node_spawn(node_ptr, node_len, fn_name_ptr, fn_name_len,
+        //                      args_ptr, args_size, arg_tags_ptr, arg_count, link_flag)
         let spawn_fn = get_intrinsic(&self.module, "mesh_node_spawn");
         let result = self
             .builder
@@ -2974,6 +3065,8 @@ impl<'ctx> CodeGen<'ctx> {
                     fn_name_len.into(),
                     args_ptr.into(),
                     args_size.into(),
+                    arg_tags_ptr.into(),
+                    arg_count.into(),
                     link_val.into(),
                 ],
                 "remote_pid",
@@ -4306,7 +4399,7 @@ impl<'ctx> CodeGen<'ctx> {
     /// typed body function.
     pub(crate) fn codegen_actor_wrapper(
         &mut self,
-        _wrapper_name: &str,
+        wrapper_name: &str,
         body_fn_name: &str,
     ) -> Result<(), String> {
         let i64_ty = self.context.i64_type();
@@ -4393,6 +4486,25 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder
             .build_call(body_fn, &call_args, "body_call")
             .map_err(|e| e.to_string())?;
+
+        if wrapper_name.starts_with("__declared_work_") {
+            if call_args.len() < 2 {
+                return Err(format!(
+                    "declared work wrapper '{}' expected request_key and attempt_id arguments",
+                    wrapper_name
+                ));
+            }
+
+            let complete_declared_work =
+                get_intrinsic(&self.module, "mesh_continuity_complete_declared_work");
+            self.builder
+                .build_call(
+                    complete_declared_work,
+                    &[call_args[0], call_args[1]],
+                    "declared_work_complete",
+                )
+                .map_err(|e| e.to_string())?;
+        }
 
         // Return Unit (empty struct).
         let unit_val = self.context.struct_type(&[], false).const_zero();

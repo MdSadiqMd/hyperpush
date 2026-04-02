@@ -242,6 +242,13 @@ fn start_single_child_remote(
     let node_bytes = target_node.as_bytes();
     let fn_bytes = fn_name.as_bytes();
 
+    let arg_count = child.spec.start_args_size / 8;
+    let arg_tags = if arg_count == 0 {
+        Vec::new()
+    } else {
+        vec![1u8; arg_count as usize]
+    };
+
     // mesh_node_spawn is an extern "C" function expecting raw pointers.
     // It must be called from within an actor coroutine context (reads
     // stack::get_current_pid()). The supervisor IS an actor, so this works.
@@ -252,6 +259,12 @@ fn start_single_child_remote(
         fn_bytes.len() as u64,
         child.spec.start_args_ptr,
         child.spec.start_args_size,
+        if arg_tags.is_empty() {
+            std::ptr::null()
+        } else {
+            arg_tags.as_ptr()
+        },
+        arg_count,
         1, // link_flag=1: spawn with bidirectional link
     );
 

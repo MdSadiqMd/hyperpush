@@ -109,11 +109,12 @@ pub enum SyntaxKind {
     L_BRACE,
     R_BRACE,
 
-    // ── Punctuation (5) ────────────────────────────────────────────────
+    // ── Punctuation (6) ────────────────────────────────────────────────
     COMMA,
     DOT,
     COLON,
     SEMICOLON,
+    AT,
     NEWLINE,
 
     // ── Literals (9) ───────────────────────────────────────────────────
@@ -285,6 +286,10 @@ pub enum SyntaxKind {
     CONS_PAT,
     /// Guard clause: `when r > 0.0`
     GUARD_CLAUSE,
+    /// Narrow source decorator declaration: `@cluster` or `@cluster(N)` before `fn|def`.
+    CLUSTER_DECORATOR_DECL,
+    /// Narrow source declaration marker: `clustered(work)` before `fn|def`.
+    CLUSTERED_WORK_DECL,
     /// Deriving clause: `deriving(Eq, Display, ...)`
     DERIVING_CLAUSE,
     /// Expression body for `fn name(pattern) = expr` form.
@@ -469,6 +474,7 @@ impl From<TokenKind> for SyntaxKind {
             TokenKind::Dot => SyntaxKind::DOT,
             TokenKind::Colon => SyntaxKind::COLON,
             TokenKind::Semicolon => SyntaxKind::SEMICOLON,
+            TokenKind::At => SyntaxKind::AT,
             TokenKind::Newline => SyntaxKind::NEWLINE,
             // Literals
             TokenKind::IntLiteral => SyntaxKind::INT_LITERAL,
@@ -583,11 +589,12 @@ mod tests {
             TokenKind::RBracket,
             TokenKind::LBrace,
             TokenKind::RBrace,
-            // Punctuation (5)
+            // Punctuation (6)
             TokenKind::Comma,
             TokenKind::Dot,
             TokenKind::Colon,
             TokenKind::Semicolon,
+            TokenKind::At,
             TokenKind::Newline,
             // Literals (9)
             TokenKind::IntLiteral,
@@ -609,7 +616,7 @@ mod tests {
             TokenKind::Error,
         ];
 
-        assert_eq!(all_kinds.len(), 100, "must test all 100 TokenKind variants");
+        assert_eq!(all_kinds.len(), 101, "must test all 101 TokenKind variants");
 
         for kind in all_kinds {
             let _syntax_kind: SyntaxKind = kind.into();
@@ -638,8 +645,8 @@ mod tests {
 
     #[test]
     fn syntax_kind_has_enough_variants() {
-        // 2 sentinels + 91 token kinds + 1 WHITESPACE + 58 node kinds
-        // Verify we have at least the expected count of composite node kinds.
+        // 2 sentinels + token kinds + 1 WHITESPACE + composite node kinds.
+        // Verify we keep broad coverage of parser-produced node variants.
         let node_kinds = [
             SyntaxKind::SOURCE_FILE,
             SyntaxKind::FN_DEF,
@@ -710,6 +717,8 @@ mod tests {
             SyntaxKind::AS_PAT,
             SyntaxKind::CONS_PAT,
             SyntaxKind::GUARD_CLAUSE,
+            SyntaxKind::CLUSTER_DECORATOR_DECL,
+            SyntaxKind::CLUSTERED_WORK_DECL,
             SyntaxKind::DERIVING_CLAUSE,
             SyntaxKind::FN_EXPR_BODY,
             SyntaxKind::CLOSURE_CLAUSE,

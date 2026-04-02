@@ -8,6 +8,7 @@ interface Feature {
   title: string
   description: string
   filename: string
+  badge: string
   code: string
 }
 
@@ -16,8 +17,9 @@ const features: Feature[] = [
     number: '01',
     title: 'Lightweight Actors',
     description:
-      'Spawn millions of lightweight actors with crash isolation and supervision trees. Each actor has its own heap and message queue.',
+      'Spawn millions of lightweight actors with crash isolation and supervision trees. Each actor has its own heap and message queue — no shared-state headaches.',
     filename: 'actors.mpl',
+    badge: 'Concurrency',
     code: `service Counter do
   fn init(n :: Int) -> Int do n end
 
@@ -42,8 +44,9 @@ let count = Counter.get_count(pid)`,
     number: '02',
     title: 'Pattern Matching',
     description:
-      'First-class pattern matching with exhaustiveness checking. Destructure any value — structs, tuples, sum types, lists.',
+      'First-class pattern matching with exhaustiveness checking. Destructure any value — structs, tuples, sum types, lists — and the compiler ensures you handle every case.',
     filename: 'patterns.mpl',
+    badge: 'Safety',
     code: `fn describe(value) do
   case value do
     0 -> "zero"
@@ -63,8 +66,9 @@ end`,
     number: '03',
     title: 'Type Inference',
     description:
-      'Hindley-Milner type inference means you rarely write type annotations. The compiler catches errors at compile time.',
+      'Hindley-Milner type inference means you rarely write type annotations. The compiler catches errors at compile time — no runtime type surprises.',
     filename: 'types.mpl',
+    badge: 'Types',
     code: `# Types are inferred -- no annotations needed
 let name = "Mesh"
 let numbers = [1, 2, 3, 4, 5]
@@ -86,6 +90,7 @@ let user = User { name: "Alice", age: 30 }`,
     description:
       'Chain transformations naturally with the pipe operator. Use |N> to route values to any argument position — both read left to right.',
     filename: 'pipes.mpl',
+    badge: 'Ergonomics',
     code: `let result = "hello world"
   |> String.split(" ")
   |> List.map(fn(word) do
@@ -126,7 +131,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="border-t border-border py-20 md:py-28">
+  <section class="relative border-t border-border py-20 md:py-28">
     <div class="mx-auto max-w-6xl px-4">
       <!-- Section header -->
       <div class="text-center">
@@ -149,8 +154,13 @@ onMounted(async () => {
         >
           <!-- Text -->
           <div :class="{ 'lg:order-last': index % 2 === 1 }">
-            <div class="font-mono text-sm font-semibold text-muted-foreground">{{ feature.number }}</div>
-            <h3 class="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <div class="flex items-center gap-3">
+              <div class="font-mono text-sm font-bold text-muted-foreground/50">{{ feature.number }}</div>
+              <div class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {{ feature.badge }}
+              </div>
+            </div>
+            <h3 class="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               {{ feature.title }}
             </h3>
             <p class="mt-3 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
@@ -159,13 +169,13 @@ onMounted(async () => {
           </div>
 
           <!-- Code block -->
-          <div class="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+          <div class="group overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-shadow duration-300 hover:shadow-xl ring-1 ring-foreground/[0.03]">
             <!-- Terminal chrome -->
-            <div class="flex items-center gap-2 border-b border-border px-4 py-3">
+            <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-muted/30">
               <div class="flex gap-1.5">
-                <div class="size-3 rounded-full" style="background: #ff5f57;" />
-                <div class="size-3 rounded-full" style="background: #febc2e;" />
-                <div class="size-3 rounded-full" style="background: #28c840;" />
+                <div class="size-3 rounded-full bg-[#ff5f57] shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]" />
+                <div class="size-3 rounded-full bg-[#febc2e] shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]" />
+                <div class="size-3 rounded-full bg-[#28c840] shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]" />
               </div>
               <span class="ml-2 text-xs text-muted-foreground font-medium">{{ feature.filename }}</span>
             </div>

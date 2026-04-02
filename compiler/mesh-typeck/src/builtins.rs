@@ -578,6 +578,81 @@ pub fn register_builtins(
         Scheme::mono(Ty::fun(vec![http_client_handle_t], Ty::Tuple(vec![]))),
     );
 
+    // ── Continuity public API (M044) ──────────────────────────────────────
+
+    let continuity_authority_status_t = Ty::Con(TyCon::new("ContinuityAuthorityStatus"));
+    let continuity_record_t = Ty::Con(TyCon::new("ContinuityRecord"));
+    let continuity_submit_decision_t = Ty::Con(TyCon::new("ContinuitySubmitDecision"));
+    let bootstrap_status_t = Ty::Con(TyCon::new("BootstrapStatus"));
+
+    // Builtin continuity/bootstrap payload structs are available as type annotations.
+    env.insert("BootstrapStatus".into(), Scheme::mono(bootstrap_status_t));
+    env.insert(
+        "ContinuityAuthorityStatus".into(),
+        Scheme::mono(continuity_authority_status_t.clone()),
+    );
+    env.insert(
+        "ContinuityRecord".into(),
+        Scheme::mono(continuity_record_t.clone()),
+    );
+    env.insert(
+        "ContinuitySubmitDecision".into(),
+        Scheme::mono(continuity_submit_decision_t.clone()),
+    );
+
+    // Module-qualified: Continuity.submit -> prefixed "continuity_submit".
+    env.insert(
+        "continuity_submit".into(),
+        Scheme::mono(Ty::fun(
+            vec![
+                Ty::string(),
+                Ty::string(),
+                Ty::string(),
+                Ty::string(),
+                Ty::string(),
+                Ty::int(),
+                Ty::bool(),
+                Ty::bool(),
+            ],
+            Ty::result(continuity_submit_decision_t.clone(), Ty::string()),
+        )),
+    );
+    env.insert(
+        "continuity_submit_declared_work".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string(), Ty::string(), Ty::int()],
+            Ty::result(continuity_submit_decision_t.clone(), Ty::string()),
+        )),
+    );
+    env.insert(
+        "continuity_status".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(continuity_record_t.clone(), Ty::string()),
+        )),
+    );
+    env.insert(
+        "continuity_authority_status".into(),
+        Scheme::mono(Ty::fun(
+            vec![],
+            Ty::result(continuity_authority_status_t.clone(), Ty::string()),
+        )),
+    );
+    env.insert(
+        "continuity_mark_completed".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string(), Ty::string()],
+            Ty::result(continuity_record_t.clone(), Ty::string()),
+        )),
+    );
+    env.insert(
+        "continuity_acknowledge_replica".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string()],
+            Ty::result(continuity_record_t, Ty::string()),
+        )),
+    );
+
     // ── Standard library: Collection types (Phase 8) ─────────────────
 
     // Type constructors for collection types (bare names).

@@ -20,9 +20,11 @@ use mesh_parser::ast::AstNode;
 use mesh_parser::syntax_kind::SyntaxKind;
 use mesh_parser::Parse;
 use mesh_typeck::ty::Ty;
-use mesh_typeck::{TraitRegistry, TypeckResult};
+use mesh_typeck::{ClusteredRouteWrapperMetadata, TraitRegistry, TypeckResult};
 use rowan::TextRange;
 use rustc_hash::FxHashMap;
+
+use crate::declared::declared_route_wrapper_name;
 
 use super::types::{mangle_type_name, mir_type_to_impl_name, mir_type_to_ty, resolve_type};
 use super::{
@@ -295,6 +297,12 @@ struct Lowerer<'a> {
     /// Detected in the lower_source_file pre-pass; used in lower_fn_def
     /// to emit the mangled MIR function name (e.g. "slugify__1").
     overloaded_pub_fn_names: std::collections::HashSet<String>,
+    /// Metadata for `HTTP.clustered(...)` wrappers keyed by wrapper call range.
+    clustered_route_wrappers: &'a FxHashMap<TextRange, ClusteredRouteWrapperMetadata>,
+    /// Wrapper spans that successfully lowered to a concrete bare route shim.
+    consumed_clustered_route_wrappers: HashSet<TextRange>,
+    /// Fail-closed lowering errors gathered while rewriting clustered routes.
+    lowering_errors: Vec<String>,
 }
 
 /// Walk through Let/Block wrappers to find the effective return type of a MIR expression.
@@ -370,6 +378,9 @@ impl<'a> Lowerer<'a> {
                 .map(|(k, v)| (*k, v.clone()))
                 .collect(),
             overloaded_pub_fn_names: std::collections::HashSet::new(),
+            clustered_route_wrappers: &typeck.clustered_route_wrappers,
+            consumed_clustered_route_wrappers: HashSet::new(),
+            lowering_errors: Vec::new(),
         }
     }
 
@@ -391,6 +402,19 @@ impl<'a> Lowerer<'a> {
 
     fn lookup_var(&self, name: &str) -> Option<MirType> {
         for scope in self.scopes.iter().rev() {
+            if let Some(ty) = scope.get(name) {
+                return Some(ty.clone());
+            }
+        }
+        None
+    }
+
+    fn lookup_non_global_var(&self, name: &str) -> Option<MirType> {
+        if self.scopes.len() <= 1 {
+            return None;
+        }
+
+        for scope in self.scopes.iter().skip(1).rev() {
             if let Some(ty) = scope.get(name) {
                 return Some(ty.clone());
             }
@@ -791,6 +815,82 @@ impl<'a> Lowerer<'a> {
             }
             _ => base_name.to_string(),
         }
+    }
+
+    fn lower_clustered_route_wrapper(
+        &mut self,
+        call: &CallExpr,
+        metadata: &ClusteredRouteWrapperMetadata,
+    ) -> Result<MirExpr, String> {
+        let args = call
+            .arg_list()
+            .map(|arg_list| arg_list.args().collect::<Vec<_>>())
+            .unwrap_or_default();
+        let handler_expr = match args.as_slice() {
+            [handler_expr] | [_, handler_expr] => handler_expr.clone(),
+            _ => {
+                return Err(format!(
+                    "clustered route wrapper `{}` lowered from unexpected argument shape",
+                    metadata.runtime_name
+                ))
+            }
+        };
+
+        let lowered_handler = self.lower_expr(&handler_expr);
+        let handler_ty = lowered_handler.ty().clone();
+        let (param_types, return_type) = match handler_ty.clone() {
+            MirType::FnPtr(params, ret)
+                if params.as_slice() == [MirType::Ptr] && *ret == MirType::Ptr =>
+            {
+                (params, *ret)
+            }
+            MirType::FnPtr(params, ret) => {
+                return Err(format!(
+                    "clustered route wrapper `{}` must lower to `fn(Request) -> Response`, found `fn({}) -> {}`",
+                    metadata.runtime_name,
+                    params
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    ret
+                ))
+            }
+            other => {
+                return Err(format!(
+                    "clustered route wrapper `{}` must lower to a bare handler function, found `{}`",
+                    metadata.runtime_name, other
+                ))
+            }
+        };
+
+        let shim_name = declared_route_wrapper_name(&metadata.runtime_name);
+        let shim_ty = MirType::FnPtr(param_types.clone(), Box::new(return_type.clone()));
+        if !self.known_functions.contains_key(&shim_name) {
+            let request_name = "__request".to_string();
+            let request_var = MirExpr::Var(request_name.clone(), MirType::Ptr);
+            let body = MirExpr::Call {
+                func: Box::new(lowered_handler),
+                args: vec![request_var],
+                ty: return_type.clone(),
+            };
+
+            self.functions.push(MirFunction {
+                name: shim_name.clone(),
+                params: vec![(request_name, MirType::Ptr)],
+                return_type: return_type.clone(),
+                body,
+                is_closure_fn: false,
+                captures: Vec::new(),
+                has_tail_calls: false,
+            });
+            self.known_functions
+                .insert(shim_name.clone(), shim_ty.clone());
+        }
+
+        self.consumed_clustered_route_wrappers
+            .insert(call.syntax().text_range());
+        Ok(MirExpr::Var(shim_name, shim_ty))
     }
 
     fn is_inferred_specialization_name(&self, name: &str) -> bool {
@@ -7973,9 +8073,14 @@ impl<'a> Lowerer<'a> {
             }
         }
 
-        // Check scope first for local variables. This ensures pattern bindings
-        // (e.g., `head` from `head :: tail`) take precedence over builtin function
-        // name mappings (e.g., `head` -> `mesh_list_head`).
+        // Check non-global scopes first for local variables. This ensures pattern
+        // bindings and params (e.g., `head` from `head :: tail`, or a local
+        // `node_name`) shadow top-level function names without breaking normal
+        // function references registered in the root scope.
+        if let Some(scope_ty) = self.lookup_non_global_var(&name) {
+            return MirExpr::Var(name, scope_ty);
+        }
+
         if let Some(scope_ty) = self.lookup_var(&name) {
             if self.user_fn_defs.contains(&name) {
                 let resolved_ty = self.resolve_range(range);
@@ -8381,6 +8486,20 @@ impl<'a> Lowerer<'a> {
     // ── Call expression lowering ─────────────────────────────────────
 
     fn lower_call_expr(&mut self, call: &CallExpr) -> MirExpr {
+        if let Some(metadata) = self
+            .clustered_route_wrappers
+            .get(&call.syntax().text_range())
+            .cloned()
+        {
+            return match self.lower_clustered_route_wrapper(call, &metadata) {
+                Ok(expr) => expr,
+                Err(err) => {
+                    self.lowering_errors.push(err);
+                    MirExpr::Unit
+                }
+            };
+        }
+
         // Method call interception: if callee is a FieldAccess (expr.method(...)),
         // extract receiver + method name, prepend receiver to args, and route
         // through trait dispatch. This MUST happen BEFORE lower_expr on the callee,
@@ -13201,22 +13320,23 @@ const STDLIB_MODULES: &[&str] = &[
     "Ws",
     "Pool",
     "Node",
-    "Process",   // Phase 67
-    "Global",    // Phase 68
-    "Iter",      // Phase 76
-    "Orm",       // Phase 97
-    "Expr",      // M033/S01
-    "Query",     // Phase 98
-    "Repo",      // Phase 98
-    "Changeset", // Phase 99
-    "Migration", // Phase 101
-    "Regex",     // Phase 119
-    "Crypto",    // Phase 135
-    "Base64",    // Phase 135
-    "Hex",       // Phase 135
-    "DateTime",  // Phase 136
-    "Http",      // Phase 137
-    "Test",      // Phase 138
+    "Process",    // Phase 67
+    "Global",     // Phase 68
+    "Iter",       // Phase 76
+    "Orm",        // Phase 97
+    "Expr",       // M033/S01
+    "Query",      // Phase 98
+    "Repo",       // Phase 98
+    "Changeset",  // Phase 99
+    "Migration",  // Phase 101
+    "Regex",      // Phase 119
+    "Crypto",     // Phase 135
+    "Base64",     // Phase 135
+    "Hex",        // Phase 135
+    "DateTime",   // Phase 136
+    "Http",       // Phase 137
+    "Test",       // Phase 138
+    "Continuity", // M042
 ];
 
 /// Map Mesh builtin function names to their runtime equivalents.
@@ -13682,6 +13802,7 @@ fn map_builtin_name(name: &str) -> String {
         "ws_broadcast_except" => "mesh_ws_broadcast_except".to_string(),
         // ── Phase 67: Node distribution functions ─────────────────────────
         "node_start" => "mesh_node_start".to_string(),
+        "node_start_from_env" => "mesh_node_start_from_env".to_string(),
         "node_connect" => "mesh_node_connect".to_string(),
         "node_self" => "mesh_node_self".to_string(),
         "node_list" => "mesh_node_list".to_string(),
@@ -13697,6 +13818,13 @@ fn map_builtin_name(name: &str) -> String {
         "global_register" => "mesh_global_register".to_string(),
         "global_whereis" => "mesh_global_whereis".to_string(),
         "global_unregister" => "mesh_global_unregister".to_string(),
+        // ── M042: Continuity runtime functions ───────────────────────────
+        "continuity_submit" => "mesh_continuity_submit_with_durability".to_string(),
+        "continuity_submit_declared_work" => "mesh_continuity_submit_declared_work".to_string(),
+        "continuity_status" => "mesh_continuity_status".to_string(),
+        "continuity_authority_status" => "mesh_continuity_authority_status".to_string(),
+        "continuity_mark_completed" => "mesh_continuity_mark_completed".to_string(),
+        "continuity_acknowledge_replica" => "mesh_continuity_acknowledge_replica".to_string(),
         // ── Phase 88: WebSocket functions (handled above in Phase 60)
         // ── Phase 76: Iterator functions ──────────────────────────────
         "iter_from" => "mesh_iter_from".to_string(),
@@ -14298,14 +14426,64 @@ pub fn lower_to_mir(
         });
     }
 
-    // Pre-seed HttpResponse struct for Http.send field access (Phase 137)
-    // Layout MUST match MeshClientResponse in compiler/mesh-rt/src/http/client.rs.
+    // Pre-seed stdlib structs for builtin field access (Phase 137+ / M044).
+    // Layouts MUST match the Mesh-facing runtime structs in mesh-rt exactly.
     lowerer.structs.push(MirStructDef {
         name: "HttpResponse".to_string(),
         fields: vec![
             ("status".to_string(), MirType::Int),
             ("body".to_string(), MirType::Ptr), // *mut MeshString
             ("headers".to_string(), MirType::Ptr), // *mut MeshMap
+        ],
+    });
+    lowerer.structs.push(MirStructDef {
+        name: "BootstrapStatus".to_string(),
+        fields: vec![
+            ("mode".to_string(), MirType::String),
+            ("node_name".to_string(), MirType::String),
+            ("cluster_port".to_string(), MirType::Int),
+            ("discovery_seed".to_string(), MirType::String),
+        ],
+    });
+    lowerer.structs.push(MirStructDef {
+        name: "ContinuityAuthorityStatus".to_string(),
+        fields: vec![
+            ("cluster_role".to_string(), MirType::String),
+            ("promotion_epoch".to_string(), MirType::Int),
+            ("replication_health".to_string(), MirType::String),
+        ],
+    });
+    lowerer.structs.push(MirStructDef {
+        name: "ContinuityRecord".to_string(),
+        fields: vec![
+            ("request_key".to_string(), MirType::String),
+            ("payload_hash".to_string(), MirType::String),
+            ("attempt_id".to_string(), MirType::String),
+            ("phase".to_string(), MirType::String),
+            ("result".to_string(), MirType::String),
+            ("ingress_node".to_string(), MirType::String),
+            ("owner_node".to_string(), MirType::String),
+            ("replica_node".to_string(), MirType::String),
+            ("replication_count".to_string(), MirType::Int),
+            ("replica_status".to_string(), MirType::String),
+            ("cluster_role".to_string(), MirType::String),
+            ("promotion_epoch".to_string(), MirType::Int),
+            ("replication_health".to_string(), MirType::String),
+            ("execution_node".to_string(), MirType::String),
+            ("routed_remotely".to_string(), MirType::Bool),
+            ("fell_back_locally".to_string(), MirType::Bool),
+            ("error".to_string(), MirType::String),
+        ],
+    });
+    lowerer.structs.push(MirStructDef {
+        name: "ContinuitySubmitDecision".to_string(),
+        fields: vec![
+            ("outcome".to_string(), MirType::String),
+            ("conflict_reason".to_string(), MirType::String),
+            (
+                "record".to_string(),
+                MirType::Struct("ContinuityRecord".to_string()),
+            ),
         ],
     });
 
@@ -14429,6 +14607,30 @@ pub fn lower_to_mir(
 
     lowerer.lower_source_file(source_file);
 
+    if !lowerer.lowering_errors.is_empty() {
+        return Err(lowerer.lowering_errors.join("\n"));
+    }
+
+    let unlowered_clustered_routes = typeck
+        .clustered_route_wrappers
+        .iter()
+        .filter_map(|(range, metadata)| {
+            (!lowerer.consumed_clustered_route_wrappers.contains(range))
+                .then(|| metadata.runtime_name.clone())
+        })
+        .collect::<Vec<_>>();
+    if !unlowered_clustered_routes.is_empty() {
+        return Err(unlowered_clustered_routes
+            .into_iter()
+            .map(|runtime_name| {
+                format!(
+                    "clustered route wrapper `{runtime_name}` did not lower to a concrete route shim"
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n"));
+    }
+
     // Build service dispatch tables from the generated functions.
     let mut service_dispatch = HashMap::new();
     for func in &lowerer.functions {
@@ -14521,8 +14723,13 @@ pub fn lower_to_mir(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashMap;
+
+    use rustc_hash::{FxHashMap, FxHashSet};
+
+    use super::*;
+    use mesh_typeck::ty::{Scheme, Ty, TyCon};
+    use mesh_typeck::{ImportContext, ModuleExports};
 
     /// Helper to parse and type-check a Mesh source, then lower to MIR.
     fn lower(source: &str) -> MirModule {
@@ -14534,12 +14741,55 @@ mod tests {
             .expect("MIR lowering failed")
     }
 
+    fn route_handler_ty() -> Ty {
+        Ty::fun(
+            vec![Ty::Con(TyCon::new("Request"))],
+            Ty::Con(TyCon::new("Response")),
+        )
+    }
+
+    fn route_handler_scheme() -> Scheme {
+        Scheme::mono(route_handler_ty())
+    }
+
+    fn route_module_exports(module_name: &str, exported_handlers: &[&str]) -> ModuleExports {
+        let mut functions = FxHashMap::default();
+        for handler in exported_handlers {
+            functions.insert((*handler).to_string(), route_handler_scheme());
+        }
+
+        ModuleExports {
+            module_name: module_name.to_string(),
+            functions,
+            struct_defs: FxHashMap::default(),
+            sum_type_defs: FxHashMap::default(),
+            service_defs: FxHashMap::default(),
+            actor_defs: FxHashMap::default(),
+            private_names: FxHashSet::default(),
+            type_aliases: FxHashMap::default(),
+        }
+    }
+
+    fn lower_with_imports(source: &str, import_ctx: ImportContext) -> MirModule {
+        let parse = mesh_parser::parse(source);
+        let typeck = mesh_typeck::check_with_imports(&parse, &import_ctx);
+        assert!(
+            typeck.errors.is_empty(),
+            "expected clustered route lowering fixture to type-check cleanly, got {:?}",
+            typeck.errors
+        );
+        let empty_pub_fns = HashSet::new();
+        lower_to_mir(&parse, &typeck, "", &empty_pub_fns, &HashMap::new())
+            .expect("MIR lowering failed")
+    }
+
     #[test]
     fn lower_int_literal() {
         let mir = lower("let x = 42");
-        // The top-level let should not produce a function, but we should have
-        // at least the builtin sum types in the module.
-        assert!(mir.functions.is_empty() || mir.functions.len() >= 0);
+        assert!(
+            !mir.sum_types.is_empty(),
+            "expected builtin sum types to survive MIR lowering"
+        );
     }
 
     #[test]
@@ -14579,6 +14829,141 @@ mod tests {
             }
             other => panic!("Expected Call, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn m047_s07_lower_clustered_route_wrapper_rewrites_direct_and_pipe_forms_to_one_bare_shim() {
+        let mut import_ctx = ImportContext::empty();
+        import_ctx.current_module = Some("App.Router".to_string());
+        let mir = lower_with_imports(
+            r#"
+pub fn handle_local(req :: Request) -> Response do
+  HTTP.response(200, "ok")
+end
+
+fn build() do
+  let router = HTTP.router()
+  let router = HTTP.on_get(router, "/one", HTTP.clustered(handle_local))
+  router |> HTTP.on_get("/two", HTTP.clustered(handle_local))
+end
+"#,
+            import_ctx,
+        );
+
+        let shim_name = "__declared_route_app_router_handle_local";
+        let shim_fns = mir
+            .functions
+            .iter()
+            .filter(|func| func.name == shim_name)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            shim_fns.len(),
+            1,
+            "expected one deduped clustered route shim, got {:?}",
+            mir.functions
+                .iter()
+                .map(|func| &func.name)
+                .collect::<Vec<_>>()
+        );
+
+        let shim = shim_fns[0];
+        assert_eq!(shim.params, vec![("__request".to_string(), MirType::Ptr)]);
+        assert_eq!(shim.return_type, MirType::Ptr);
+        assert!(
+            has_call_to(&shim.body, "handle_local"),
+            "expected shim body to call the real handler, got {:?}",
+            shim.body
+        );
+
+        let build = mir
+            .functions
+            .iter()
+            .find(|func| func.name == "build")
+            .expect("expected build function to lower");
+        fn count_var_refs(expr: &MirExpr, target: &str) -> usize {
+            match expr {
+                MirExpr::Var(name, _) => usize::from(name == target),
+                MirExpr::Call { func, args, .. } => {
+                    count_var_refs(func, target)
+                        + args
+                            .iter()
+                            .map(|arg| count_var_refs(arg, target))
+                            .sum::<usize>()
+                }
+                MirExpr::Block(exprs, _) => {
+                    exprs.iter().map(|expr| count_var_refs(expr, target)).sum()
+                }
+                MirExpr::Let { value, body, .. } => {
+                    count_var_refs(value, target) + count_var_refs(body, target)
+                }
+                _ => 0,
+            }
+        }
+        assert!(
+            has_call_to(&build.body, "mesh_http_route_get"),
+            "expected lowered route registration call, got {:?}",
+            build.body
+        );
+        assert!(
+            !has_call_to(&build.body, "http_clustered"),
+            "clustered route wrappers must not survive as runtime calls: {:?}",
+            build.body
+        );
+        assert_eq!(
+            count_var_refs(&build.body, shim_name),
+            2,
+            "expected both direct and pipe routes to reference the same shim: {:?}",
+            build.body
+        );
+    }
+
+    #[test]
+    fn m047_s07_lower_clustered_route_wrapper_uses_imported_runtime_identity_for_shim_name() {
+        let mut import_ctx = ImportContext::empty();
+        import_ctx.current_module = Some("App.Router".to_string());
+        import_ctx.module_exports.insert(
+            "Todos".to_string(),
+            route_module_exports("Api.Todos", &["handle_list_todos"]),
+        );
+        let mir = lower_with_imports(
+            r#"
+from Api.Todos import handle_list_todos
+
+fn build() do
+  HTTP.router() |> HTTP.on_get("/todos", HTTP.clustered(handle_list_todos))
+end
+"#,
+            import_ctx,
+        );
+
+        let shim = mir
+            .functions
+            .iter()
+            .find(|func| func.name == "__declared_route_api_todos_handle_list_todos")
+            .expect("expected imported route shim to preserve defining-module runtime identity");
+        assert_eq!(shim.params, vec![("__request".to_string(), MirType::Ptr)]);
+        assert_eq!(shim.return_type, MirType::Ptr);
+        assert!(
+            has_call_to(&shim.body, "handle_list_todos"),
+            "expected imported route shim to call the lowered handler symbol, got {:?}",
+            shim.body
+        );
+
+        let build = mir
+            .functions
+            .iter()
+            .find(|func| func.name == "build")
+            .expect("expected build function to lower");
+        assert!(
+            has_var_ref(&build.body, "__declared_route_api_todos_handle_list_todos"),
+            "expected route registration to use imported shim, got {:?}",
+            build.body
+        );
+        assert!(
+            !has_call_to(&build.body, "http_clustered"),
+            "clustered route wrappers must lower away from runtime calls: {:?}",
+            build.body
+        );
     }
 
     #[test]
@@ -14720,7 +15105,6 @@ end
 
     #[test]
     fn lower_pid_type_resolves() {
-        use crate::mir::MirType;
         let source = r#"
 actor echo() do
   receive do

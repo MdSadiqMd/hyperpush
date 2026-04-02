@@ -682,6 +682,11 @@ pub(crate) fn parse_item_or_stmt(p: &mut Parser) {
 
         SyntaxKind::IMPORT_KW => items::parse_import_decl(p),
 
+        // Source-first `@cluster` prefixes and legacy `clustered(work)` cutover diagnostics before fn/def.
+        _ if items::starts_clustered_fn_def(p) => {
+            items::parse_fn_def(p);
+        }
+
         // "from" is an IDENT, not a keyword -- check text
         SyntaxKind::IDENT if p.current_text() == "from" => {
             items::parse_from_import_decl(p);

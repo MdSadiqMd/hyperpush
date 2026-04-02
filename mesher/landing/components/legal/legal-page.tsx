@@ -1,11 +1,10 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { ChevronRight, Menu, X } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { ChevronRight } from "lucide-react"
+import { motion } from "framer-motion"
+import { Header } from "@/components/landing/header"
 import { Footer } from "@/components/landing/footer"
 
 const legalNav = [
@@ -24,69 +23,17 @@ export function LegalPage({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50">
-        <nav className="mx-auto max-w-7xl px-6 py-4">
-          <div className="flex items-center justify-between rounded-full border border-border bg-background/80 backdrop-blur-md px-6 py-3">
-            <Link href="/" className="flex items-center gap-3">
-              <img src="/logo-light.svg" alt="hyperpush" className="h-7" />
-              <span className="text-sm text-muted-foreground font-mono hidden sm:inline">/legal</span>
-            </Link>
-
-            <div className="hidden md:flex items-center gap-8">
-              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-              <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</Link>
-              <Link href="/#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
-            </div>
-
-            <div className="hidden md:flex items-center gap-4">
-              <Button size="sm">Join Waitlist</Button>
-            </div>
-
-            {/* Mobile menu button */}
-            <button
-              type="button"
-              className="md:hidden p-2 text-muted-foreground hover:text-foreground"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-
-          {/* Mobile menu */}
-          <AnimatePresence>
-            {mobileMenuOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="md:hidden mt-2 rounded-2xl border border-border bg-background/95 backdrop-blur-md p-6"
-              >
-                <div className="space-y-4">
-                  <Link href="/" className="block text-lg text-muted-foreground hover:text-foreground transition-colors" onClick={() => setMobileMenuOpen(false)}>Home</Link>
-                  <Link href="/docs" className="block text-lg text-muted-foreground hover:text-foreground transition-colors" onClick={() => setMobileMenuOpen(false)}>Docs</Link>
-                  <Link href="/#pricing" className="block text-lg text-muted-foreground hover:text-foreground transition-colors" onClick={() => setMobileMenuOpen(false)}>Pricing</Link>
-                  <div className="pt-4 border-t border-border">
-                    <Button className="w-full">Join Waitlist</Button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </nav>
-      </header>
+      <Header section="/legal" />
 
       {/* Content */}
-      <div className="flex-1 max-w-7xl mx-auto px-6 pt-28 pb-24 w-full">
+      <div className="flex-1 max-w-7xl mx-auto px-6 pt-8 pb-24 w-full">
         <div className="flex gap-0">
           {/* Sidebar */}
           <div className="hidden md:block w-56 shrink-0">
-            <div className="sticky top-28 pr-4">
+            <div className="sticky top-16 pr-4">
               <p className="text-xs font-mono text-accent uppercase tracking-wider mb-3 px-3">Legal</p>
               <ul className="space-y-0.5">
                 {legalNav.map((item) => (
@@ -170,7 +117,7 @@ export function LegalPage({
 
 export function Section({ id, number, title, children }: { id?: string; number?: string; title: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-28">
+    <section id={id} className="scroll-mt-16">
       <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-baseline gap-3">
         {number && <span className="text-accent font-mono text-lg">{number}</span>}
         {title}

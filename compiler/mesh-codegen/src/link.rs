@@ -75,7 +75,12 @@ pub(crate) fn prepare_link(
     let linker_program = match target.linker_program() {
         Ok(path) => path,
         Err(error) => {
-            build_trace::set_link_context(&target.display_triple(), Some(&rt_path), Some(runtime_exists), None);
+            build_trace::set_link_context(
+                &target.display_triple(),
+                Some(&rt_path),
+                Some(runtime_exists),
+                None,
+            );
             build_trace::record_error(&error);
             return Err(error);
         }
@@ -167,7 +172,10 @@ pub(crate) fn link_with_plan(
         } else if !stdout.is_empty() {
             format!("stdout:\n{stdout}")
         } else {
-            format!("linker exited with status {} without emitting output", output.status)
+            format!(
+                "linker exited with status {} without emitting output",
+                output.status
+            )
         };
 
         let error = format!(
@@ -488,7 +496,8 @@ mod tests {
         fs::write(&runtime, b"fake").unwrap();
 
         let target = LinkTarget::detect(Some("x86_64-pc-windows-msvc")).unwrap();
-        let found = find_mesh_rt_in(&[temp_target.clone()], &target, &["debug", "release"]).unwrap();
+        let found =
+            find_mesh_rt_in(&[temp_target.clone()], &target, &["debug", "release"]).unwrap();
         assert_eq!(found, runtime);
 
         fs::remove_dir_all(temp_target).unwrap();
@@ -502,7 +511,8 @@ mod tests {
         fs::write(&runtime, b"fake").unwrap();
 
         let target = LinkTarget::detect(Some("x86_64-unknown-linux-gnu")).unwrap();
-        let found = find_mesh_rt_in(&[temp_target.clone()], &target, &["debug", "release"]).unwrap();
+        let found =
+            find_mesh_rt_in(&[temp_target.clone()], &target, &["debug", "release"]).unwrap();
         assert_eq!(found, runtime);
 
         fs::remove_dir_all(temp_target).unwrap();
@@ -513,7 +523,8 @@ mod tests {
         let temp_target = unique_temp_target_dir("windows-missing-runtime");
         let target = LinkTarget::detect(Some("x86_64-pc-windows-msvc")).unwrap();
 
-        let error = find_mesh_rt_in(&[temp_target.clone()], &target, &["debug", "release"]).unwrap_err();
+        let error =
+            find_mesh_rt_in(&[temp_target.clone()], &target, &["debug", "release"]).unwrap_err();
         assert!(
             error.contains("mesh_rt.lib"),
             "missing runtime error should name mesh_rt.lib: {error}"
@@ -539,7 +550,10 @@ mod tests {
     #[test]
     fn windows_clang_path_from_prefix_should_append_bin_clang_exe() {
         let actual = windows_clang_path_from_prefix(Path::new("C:/llvm"));
-        assert_eq!(actual, PathBuf::from("C:/llvm").join("bin").join("clang.exe"));
+        assert_eq!(
+            actual,
+            PathBuf::from("C:/llvm").join("bin").join("clang.exe")
+        );
     }
 
     fn find_mesh_rt_in(

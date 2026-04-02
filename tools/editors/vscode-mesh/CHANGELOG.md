@@ -5,6 +5,12 @@ All notable changes to the Mesh Language extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Repaired the shared VS Code/docs TextMate grammar so `#{...}` and `${...}` interpolation scopes now match in double- and triple-quoted strings, including nested-brace expressions.
+
 ## [0.3.0] - 2026-02-28
 
 ### Added

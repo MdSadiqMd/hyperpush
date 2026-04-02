@@ -40,9 +40,15 @@ fn file_uri(path: &Path) -> String {
 }
 
 fn source_position(source: &str, needle: &str, occurrence: usize) -> (u64, u64) {
-    let (byte_index, _) = source.match_indices(needle).nth(occurrence).unwrap_or_else(|| {
-        panic!("could not find occurrence {} of {:?} in source", occurrence, needle)
-    });
+    let (byte_index, _) = source
+        .match_indices(needle)
+        .nth(occurrence)
+        .unwrap_or_else(|| {
+            panic!(
+                "could not find occurrence {} of {:?} in source",
+                occurrence, needle
+            )
+        });
     let prefix = &source[..byte_index];
     let line = prefix.bytes().filter(|byte| *byte == b'\n').count() as u64;
     let character = prefix

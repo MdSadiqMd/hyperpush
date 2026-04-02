@@ -20,11 +20,13 @@
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
+use sha2::{Digest, Sha256};
 
 use crate::actor;
 use crate::collections::map;
@@ -172,6 +174,346 @@ pub extern "C" fn mesh_http_response_with_headers(
         (*ptr).body = body as *mut u8;
         (*ptr).headers = headers;
         ptr as *mut u8
+    }
+}
+
+const CLUSTERED_ROUTE_FAILURE_STATUS: i64 = 503;
+static CLUSTERED_HTTP_ROUTE_REQUEST_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct TransportHttpRequest {
+    method: String,
+    path: String,
+    body: String,
+    query_params: Vec<(String, String)>,
+    headers: Vec<(String, String)>,
+    path_params: Vec<(String, String)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct TransportHttpResponse {
+    status: i64,
+    body: String,
+    headers: Vec<(String, String)>,
+}
+
+fn mesh_string_ptr_to_owned(ptr: *mut u8) -> String {
+    if ptr.is_null() {
+        String::new()
+    } else {
+        unsafe { (*(ptr as *const MeshString)).as_str().to_string() }
+    }
+}
+
+fn mesh_string_to_ptr(value: &str) -> *mut u8 {
+    mesh_string_new(value.as_ptr(), value.len() as u64) as *mut u8
+}
+
+fn mesh_map_to_pairs(map_ptr: *mut u8) -> Result<Vec<(String, String)>, String> {
+    if map_ptr.is_null() {
+        return Ok(Vec::new());
+    }
+
+    let len = map::mesh_map_size(map_ptr);
+    if len < 0 {
+        return Err("mesh_http_map_size_invalid".to_string());
+    }
+
+    let mut pairs = Vec::with_capacity(len as usize);
+    for index in 0..len {
+        let key_ptr = map::mesh_map_entry_key(map_ptr, index) as *mut u8;
+        let value_ptr = map::mesh_map_entry_value(map_ptr, index) as *mut u8;
+        if key_ptr.is_null() || value_ptr.is_null() {
+            return Err(format!("mesh_http_map_entry_missing:{index}"));
+        }
+        pairs.push((
+            mesh_string_ptr_to_owned(key_ptr),
+            mesh_string_ptr_to_owned(value_ptr),
+        ));
+    }
+    Ok(pairs)
+}
+
+fn pairs_to_mesh_map(pairs: &[(String, String)]) -> *mut u8 {
+    let mut map_ptr = map::mesh_map_new_typed(1);
+    for (key, value) in pairs {
+        let key_ptr = mesh_string_to_ptr(key);
+        let value_ptr = mesh_string_to_ptr(value);
+        map_ptr = map::mesh_map_put(map_ptr, key_ptr as u64, value_ptr as u64);
+    }
+    map_ptr
+}
+
+fn mesh_request_to_transport(request_ptr: *mut u8) -> Result<TransportHttpRequest, String> {
+    if request_ptr.is_null() {
+        return Err("mesh_http_request_missing".to_string());
+    }
+
+    let request = unsafe { &*(request_ptr as *const MeshHttpRequest) };
+    Ok(TransportHttpRequest {
+        method: mesh_string_ptr_to_owned(request.method),
+        path: mesh_string_ptr_to_owned(request.path),
+        body: mesh_string_ptr_to_owned(request.body),
+        query_params: mesh_map_to_pairs(request.query_params)?,
+        headers: mesh_map_to_pairs(request.headers)?,
+        path_params: mesh_map_to_pairs(request.path_params)?,
+    })
+}
+
+fn transport_request_to_mesh(request: &TransportHttpRequest) -> *mut u8 {
+    unsafe {
+        let req_ptr = mesh_gc_alloc_actor(
+            std::mem::size_of::<MeshHttpRequest>() as u64,
+            std::mem::align_of::<MeshHttpRequest>() as u64,
+        ) as *mut MeshHttpRequest;
+        (*req_ptr).method = mesh_string_to_ptr(&request.method);
+        (*req_ptr).path = mesh_string_to_ptr(&request.path);
+        (*req_ptr).body = mesh_string_to_ptr(&request.body);
+        (*req_ptr).query_params = pairs_to_mesh_map(&request.query_params);
+        (*req_ptr).headers = pairs_to_mesh_map(&request.headers);
+        (*req_ptr).path_params = pairs_to_mesh_map(&request.path_params);
+        req_ptr as *mut u8
+    }
+}
+
+fn mesh_response_to_transport(response_ptr: *mut u8) -> Result<TransportHttpResponse, String> {
+    if response_ptr.is_null() {
+        return Err("mesh_http_response_missing".to_string());
+    }
+
+    let response = unsafe { &*(response_ptr as *const MeshHttpResponse) };
+    Ok(TransportHttpResponse {
+        status: response.status,
+        body: mesh_string_ptr_to_owned(response.body),
+        headers: mesh_map_to_pairs(response.headers)?,
+    })
+}
+
+fn transport_response_to_mesh(response: &TransportHttpResponse) -> *mut u8 {
+    let body = mesh_string_to_ptr(&response.body) as *const MeshString;
+    if response.headers.is_empty() {
+        mesh_http_response_new(response.status, body)
+    } else {
+        let headers = pairs_to_mesh_map(&response.headers);
+        mesh_http_response_with_headers(response.status, body, headers)
+    }
+}
+
+fn encode_len_prefixed_string(
+    payload: &mut Vec<u8>,
+    value: &str,
+    label: &str,
+) -> Result<(), String> {
+    let len = u32::try_from(value.len())
+        .map_err(|_| format!("mesh_http_transport_{}_too_large:{}", label, value.len()))?;
+    payload.extend_from_slice(&len.to_le_bytes());
+    payload.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn decode_len_prefixed_string(
+    payload: &[u8],
+    pos: &mut usize,
+    label: &str,
+) -> Result<String, String> {
+    if *pos + 4 > payload.len() {
+        return Err(format!("mesh_http_transport_{}_len_missing", label));
+    }
+    let len = u32::from_le_bytes(payload[*pos..*pos + 4].try_into().unwrap()) as usize;
+    *pos += 4;
+    if *pos + len > payload.len() {
+        return Err(format!("mesh_http_transport_{}_truncated", label));
+    }
+    let value = std::str::from_utf8(&payload[*pos..*pos + len])
+        .map_err(|_| format!("mesh_http_transport_{}_invalid_utf8", label))?
+        .to_string();
+    *pos += len;
+    Ok(value)
+}
+
+fn encode_string_pairs(
+    payload: &mut Vec<u8>,
+    pairs: &[(String, String)],
+    label: &str,
+) -> Result<(), String> {
+    let len = u32::try_from(pairs.len()).map_err(|_| {
+        format!(
+            "mesh_http_transport_{}_count_too_large:{}",
+            label,
+            pairs.len()
+        )
+    })?;
+    payload.extend_from_slice(&len.to_le_bytes());
+    for (index, (key, value)) in pairs.iter().enumerate() {
+        encode_len_prefixed_string(payload, key, &format!("{}_key_{index}", label))?;
+        encode_len_prefixed_string(payload, value, &format!("{}_value_{index}", label))?;
+    }
+    Ok(())
+}
+
+fn decode_string_pairs(
+    payload: &[u8],
+    pos: &mut usize,
+    label: &str,
+) -> Result<Vec<(String, String)>, String> {
+    if *pos + 4 > payload.len() {
+        return Err(format!("mesh_http_transport_{}_count_missing", label));
+    }
+    let count = u32::from_le_bytes(payload[*pos..*pos + 4].try_into().unwrap()) as usize;
+    *pos += 4;
+    let mut pairs = Vec::with_capacity(count);
+    for index in 0..count {
+        let key = decode_len_prefixed_string(payload, pos, &format!("{}_key_{index}", label))?;
+        let value = decode_len_prefixed_string(payload, pos, &format!("{}_value_{index}", label))?;
+        pairs.push((key, value));
+    }
+    Ok(pairs)
+}
+
+fn encode_transport_request(request: &TransportHttpRequest) -> Result<Vec<u8>, String> {
+    let mut payload = Vec::new();
+    encode_len_prefixed_string(&mut payload, &request.method, "request_method")?;
+    encode_len_prefixed_string(&mut payload, &request.path, "request_path")?;
+    encode_len_prefixed_string(&mut payload, &request.body, "request_body")?;
+    encode_string_pairs(&mut payload, &request.query_params, "request_query_params")?;
+    encode_string_pairs(&mut payload, &request.headers, "request_headers")?;
+    encode_string_pairs(&mut payload, &request.path_params, "request_path_params")?;
+    Ok(payload)
+}
+
+fn decode_transport_request(payload: &[u8]) -> Result<TransportHttpRequest, String> {
+    if payload.is_empty() {
+        return Err("mesh_http_transport_request_empty".to_string());
+    }
+    let mut pos = 0usize;
+    let request = TransportHttpRequest {
+        method: decode_len_prefixed_string(payload, &mut pos, "request_method")?,
+        path: decode_len_prefixed_string(payload, &mut pos, "request_path")?,
+        body: decode_len_prefixed_string(payload, &mut pos, "request_body")?,
+        query_params: decode_string_pairs(payload, &mut pos, "request_query_params")?,
+        headers: decode_string_pairs(payload, &mut pos, "request_headers")?,
+        path_params: decode_string_pairs(payload, &mut pos, "request_path_params")?,
+    };
+    if pos != payload.len() {
+        return Err("mesh_http_transport_request_trailing_bytes".to_string());
+    }
+    Ok(request)
+}
+
+fn encode_transport_response(response: &TransportHttpResponse) -> Result<Vec<u8>, String> {
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&response.status.to_le_bytes());
+    encode_len_prefixed_string(&mut payload, &response.body, "response_body")?;
+    encode_string_pairs(&mut payload, &response.headers, "response_headers")?;
+    Ok(payload)
+}
+
+fn decode_transport_response(payload: &[u8]) -> Result<TransportHttpResponse, String> {
+    if payload.len() < 8 {
+        return Err("mesh_http_transport_response_too_short".to_string());
+    }
+    let mut pos = 0usize;
+    let status = i64::from_le_bytes(payload[pos..pos + 8].try_into().unwrap());
+    pos += 8;
+    let response = TransportHttpResponse {
+        status,
+        body: decode_len_prefixed_string(payload, &mut pos, "response_body")?,
+        headers: decode_string_pairs(payload, &mut pos, "response_headers")?,
+    };
+    if pos != payload.len() {
+        return Err("mesh_http_transport_response_trailing_bytes".to_string());
+    }
+    Ok(response)
+}
+
+pub(crate) fn encode_http_request_payload(request_ptr: *mut u8) -> Result<Vec<u8>, String> {
+    encode_transport_request(&mesh_request_to_transport(request_ptr)?)
+}
+
+pub(crate) fn decode_http_request_payload(payload: &[u8]) -> Result<*mut u8, String> {
+    let request = decode_transport_request(payload)?;
+    Ok(transport_request_to_mesh(&request))
+}
+
+pub(crate) fn encode_http_response_payload(response_ptr: *mut u8) -> Result<Vec<u8>, String> {
+    encode_transport_response(&mesh_response_to_transport(response_ptr)?)
+}
+
+pub(crate) fn decode_http_response_payload(payload: &[u8]) -> Result<*mut u8, String> {
+    let response = decode_transport_response(payload)?;
+    Ok(transport_response_to_mesh(&response))
+}
+
+pub(crate) fn invoke_route_handler_from_payload(
+    fn_ptr: *mut u8,
+    request_payload: &[u8],
+) -> Result<Vec<u8>, String> {
+    let request_ptr = decode_http_request_payload(request_payload)
+        .map_err(|reason| format!("clustered_route_request_decode_failed:{reason}"))?;
+    let response_ptr = call_handler(fn_ptr, std::ptr::null_mut(), request_ptr);
+    encode_http_response_payload(response_ptr)
+        .map_err(|reason| format!("clustered_route_response_encode_failed:{reason}"))
+}
+
+pub(crate) fn build_clustered_http_route_identity(
+    runtime_name: &str,
+    request_payload: &[u8],
+) -> Result<(String, String), String> {
+    let runtime_name = runtime_name.trim();
+    if runtime_name.is_empty() {
+        return Err("clustered_route_runtime_name_missing".to_string());
+    }
+    if request_payload.is_empty() {
+        return Err("clustered_route_request_payload_missing".to_string());
+    }
+
+    let digest = Sha256::digest(request_payload);
+    let payload_hash = digest
+        .iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<String>();
+    if payload_hash.is_empty() {
+        return Err("payload_hash_missing".to_string());
+    }
+
+    let request_id = CLUSTERED_HTTP_ROUTE_REQUEST_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let request_key = format!("http-route::{runtime_name}::{request_id}");
+    if request_key.is_empty() {
+        return Err("request_key_missing".to_string());
+    }
+
+    Ok((request_key, payload_hash))
+}
+
+fn escape_json_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn clustered_route_failure_response(reason: &str) -> *mut u8 {
+    let body = format!("{{\"error\":\"{}\"}}", escape_json_string(reason));
+    mesh_http_response_new(
+        CLUSTERED_ROUTE_FAILURE_STATUS,
+        mesh_string_to_ptr(&body) as *const MeshString,
+    )
+}
+
+fn clustered_route_response_from_request(runtime_name: &str, request_ptr: *mut u8) -> *mut u8 {
+    let result = encode_http_request_payload(request_ptr)
+        .and_then(|request_payload| {
+            let (request_key, payload_hash) =
+                build_clustered_http_route_identity(runtime_name, &request_payload)?;
+            crate::dist::node::execute_clustered_http_route(
+                runtime_name,
+                &request_key,
+                &payload_hash,
+                &request_payload,
+            )
+        })
+        .and_then(|response_payload| decode_http_response_payload(&response_payload));
+
+    match result {
+        Ok(response_ptr) => response_ptr,
+        Err(reason) => clustered_route_failure_response(&reason),
     }
 }
 
@@ -370,6 +712,7 @@ fn write_response(
         405 => "Method Not Allowed",
         429 => "Too Many Requests",
         500 => "Internal Server Error",
+        503 => "Service Unavailable",
         _ => "OK",
     };
 
@@ -623,6 +966,7 @@ struct ChainState {
     index: usize,
     handler_fn: *mut u8,
     handler_env: *mut u8,
+    declared_handler_runtime_name: Option<String>,
 }
 
 /// Trampoline for the middleware `next` function.
@@ -634,16 +978,19 @@ extern "C" fn chain_next(env_ptr: *mut u8, request_ptr: *mut u8) -> *mut u8 {
     unsafe {
         let state = &*(env_ptr as *const ChainState);
         if state.index >= state.middlewares.len() {
-            // End of chain: call the route handler.
-            call_handler(state.handler_fn, state.handler_env, request_ptr)
+            if let Some(runtime_name) = state.declared_handler_runtime_name.as_deref() {
+                clustered_route_response_from_request(runtime_name, request_ptr)
+            } else {
+                call_handler(state.handler_fn, state.handler_env, request_ptr)
+            }
         } else {
-            // Call the current middleware with a new next closure.
             let mw = &state.middlewares[state.index];
             let next_state = Box::new(ChainState {
                 middlewares: state.middlewares.clone(),
                 index: state.index + 1,
                 handler_fn: state.handler_fn,
                 handler_env: state.handler_env,
+                declared_handler_runtime_name: state.declared_handler_runtime_name.clone(),
             });
             let next_env = Box::into_raw(next_state) as *mut u8;
             let next_closure = build_mesh_closure(chain_next as *mut u8, next_env);
@@ -778,8 +1125,7 @@ fn process_request(
         let matched = router.match_route(path_str, &method_str);
         let has_middleware = !router.middlewares.is_empty();
 
-        let response_ptr = if let Some((handler_fn, handler_env, params)) = matched {
-            // Convert captured path params into a MeshMap.
+        let response_ptr = if let Some((entry, params)) = matched {
             let mut path_params_map = map::mesh_map_new_typed(1);
             for (k, v) in &params {
                 let key = mesh_string_new(k.as_ptr(), k.len() as u64);
@@ -788,26 +1134,26 @@ fn process_request(
             }
 
             let req_ptr = build_mesh_request(path_params_map);
+            let clustered_runtime_name = entry.declared_handler_runtime_name.clone();
 
             if has_middleware {
-                // Execute middleware chain wrapping the matched handler.
                 let state = Box::new(ChainState {
                     middlewares: router.middlewares.clone(),
                     index: 0,
-                    handler_fn,
-                    handler_env,
+                    handler_fn: entry.handler_fn,
+                    handler_env: entry.handler_env,
+                    declared_handler_runtime_name: clustered_runtime_name,
                 });
                 chain_next(Box::into_raw(state) as *mut u8, req_ptr)
+            } else if let Some(runtime_name) = clustered_runtime_name.as_deref() {
+                clustered_route_response_from_request(runtime_name, req_ptr)
             } else {
-                // Fast path: no middleware, call handler directly.
-                call_handler(handler_fn, handler_env, req_ptr)
+                call_handler(entry.handler_fn, entry.handler_env, req_ptr)
             }
         } else if has_middleware {
-            // 404 with middleware: wrap a synthetic 404 handler in the middleware chain.
             let path_params_map = map::mesh_map_new_typed(1);
             let req_ptr = build_mesh_request(path_params_map);
 
-            // Synthetic 404 handler: returns a 404 response.
             extern "C" fn not_found_handler(_request: *mut u8) -> *mut u8 {
                 let body_text = b"Not Found";
                 let body = mesh_string_new(body_text.as_ptr(), body_text.len() as u64);
@@ -819,10 +1165,10 @@ fn process_request(
                 index: 0,
                 handler_fn: not_found_handler as *mut u8,
                 handler_env: std::ptr::null_mut(),
+                declared_handler_runtime_name: None,
             });
             chain_next(Box::into_raw(state) as *mut u8, req_ptr)
         } else {
-            // 404 without middleware: respond directly.
             return (404, b"Not Found".to_vec(), None);
         };
 
@@ -869,7 +1215,81 @@ fn process_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::continuity::{continuity_registry, ContinuityPhase, ContinuityResult};
+    use crate::dist::node::{
+        clear_declared_handler_registry_for_test, mesh_register_declared_handler,
+    };
     use crate::gc::mesh_rt_init;
+    use crate::http::router::{mesh_http_route_get, mesh_http_router};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    fn http_server_test_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
+
+    fn reset_clustered_runtime_state() {
+        clear_declared_handler_registry_for_test();
+        continuity_registry().clear_for_test();
+    }
+
+    fn owned_pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        pairs
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+            .collect()
+    }
+
+    fn build_test_request(
+        method: &str,
+        path: &str,
+        body: &str,
+        query_params: &[(&str, &str)],
+        headers: &[(&str, &str)],
+        path_params: &[(&str, &str)],
+    ) -> *mut u8 {
+        unsafe {
+            let req_ptr = mesh_gc_alloc_actor(
+                std::mem::size_of::<MeshHttpRequest>() as u64,
+                std::mem::align_of::<MeshHttpRequest>() as u64,
+            ) as *mut MeshHttpRequest;
+            (*req_ptr).method = mesh_string_to_ptr(method);
+            (*req_ptr).path = mesh_string_to_ptr(path);
+            (*req_ptr).body = mesh_string_to_ptr(body);
+            (*req_ptr).query_params = pairs_to_mesh_map(&owned_pairs(query_params));
+            (*req_ptr).headers = pairs_to_mesh_map(&owned_pairs(headers));
+            (*req_ptr).path_params = pairs_to_mesh_map(&owned_pairs(path_params));
+            req_ptr as *mut u8
+        }
+    }
+
+    fn build_test_response(status: i64, body: &str, headers: &[(&str, &str)]) -> *mut u8 {
+        let body_ptr = mesh_string_to_ptr(body) as *const MeshString;
+        if headers.is_empty() {
+            mesh_http_response_new(status, body_ptr)
+        } else {
+            let headers_ptr = pairs_to_mesh_map(&owned_pairs(headers));
+            mesh_http_response_with_headers(status, body_ptr, headers_ptr)
+        }
+    }
+
+    extern "C" fn simple_ok_handler(_request: *mut u8) -> *mut u8 {
+        build_test_response(200, "ok", &[])
+    }
+
+    static CLUSTERED_ROUTE_HANDLER_CALLS: AtomicU64 = AtomicU64::new(0);
+
+    extern "C" fn clustered_route_test_handler(request: *mut u8) -> *mut u8 {
+        CLUSTERED_ROUTE_HANDLER_CALLS.fetch_add(1, Ordering::Relaxed);
+        let request = unsafe { &*(request as *const MeshHttpRequest) };
+        let body = mesh_string_ptr_to_owned(request.body);
+        build_test_response(
+            200,
+            &format!("{{\"echo\":\"{}\"}}", body),
+            &[("X-Clustered", "true")],
+        )
+    }
 
     #[test]
     fn test_response_creation() {
@@ -882,7 +1302,6 @@ mod tests {
             assert_eq!(resp.status, 200);
             let body_str = &*(resp.body as *const MeshString);
             assert_eq!(body_str.as_str(), "Hello");
-            // Old constructor sets headers to null (backward compatible).
             assert!(resp.headers.is_null());
         }
     }
@@ -890,24 +1309,14 @@ mod tests {
     #[test]
     fn test_response_with_headers() {
         mesh_rt_init();
-        let body = mesh_string_new(b"{\"retry_after\":60}".as_ptr(), 18);
-
-        // Build a headers map with a Retry-After header.
-        let mut headers_map = map::mesh_map_new_typed(1);
-        let key = mesh_string_new(b"Retry-After".as_ptr(), 11);
-        let val = mesh_string_new(b"60".as_ptr(), 2);
-        headers_map = map::mesh_map_put(headers_map, key as u64, val as u64);
-
-        let resp_ptr = mesh_http_response_with_headers(429, body, headers_map);
+        let resp_ptr = build_test_response(429, "{\"retry_after\":60}", &[("Retry-After", "60")]);
         assert!(!resp_ptr.is_null());
         unsafe {
             let resp = &*(resp_ptr as *const MeshHttpResponse);
             assert_eq!(resp.status, 429);
             let body_str = &*(resp.body as *const MeshString);
             assert_eq!(body_str.as_str(), "{\"retry_after\":60}");
-            // Headers should be non-null.
             assert!(!resp.headers.is_null());
-            // Verify the headers map has one entry.
             assert_eq!(map::mesh_map_size(resp.headers), 1);
         }
     }
@@ -915,43 +1324,154 @@ mod tests {
     #[test]
     fn test_request_accessors() {
         mesh_rt_init();
-
-        // Build a request manually.
-        let method = mesh_string_new(b"GET".as_ptr(), 3) as *mut u8;
-        let path = mesh_string_new(b"/test".as_ptr(), 5) as *mut u8;
-        let body = mesh_string_new(b"".as_ptr(), 0) as *mut u8;
-        let query_params = map::mesh_map_new();
-        let headers = map::mesh_map_new();
-        let path_params = map::mesh_map_new();
+        let req = build_test_request("GET", "/test", "", &[], &[], &[]);
 
         unsafe {
-            let req_ptr = mesh_gc_alloc_actor(
-                std::mem::size_of::<MeshHttpRequest>() as u64,
-                std::mem::align_of::<MeshHttpRequest>() as u64,
-            ) as *mut MeshHttpRequest;
-            (*req_ptr).method = method;
-            (*req_ptr).path = path;
-            (*req_ptr).body = body;
-            (*req_ptr).query_params = query_params;
-            (*req_ptr).headers = headers;
-            (*req_ptr).path_params = path_params;
-
-            let req = req_ptr as *mut u8;
-
-            // Test method accessor.
             let m = mesh_http_request_method(req);
             let m_str = &*(m as *const MeshString);
             assert_eq!(m_str.as_str(), "GET");
 
-            // Test path accessor.
             let p = mesh_http_request_path(req);
             let p_str = &*(p as *const MeshString);
             assert_eq!(p_str.as_str(), "/test");
 
-            // Test body accessor.
             let b = mesh_http_request_body(req);
             let b_str = &*(b as *const MeshString);
             assert_eq!(b_str.as_str(), "");
         }
+    }
+
+    #[test]
+    fn m047_s07_http_request_transport_roundtrip_preserves_method_body_headers_and_params() {
+        mesh_rt_init();
+        let request_ptr = build_test_request(
+            "POST",
+            "/todos/42",
+            "{\"title\":\"mesh\"}",
+            &[("limit", "10")],
+            &[("Content-Type", "application/json")],
+            &[("id", "42")],
+        );
+
+        let encoded = encode_http_request_payload(request_ptr).expect("encode request payload");
+        let decoded_ptr = decode_http_request_payload(&encoded).expect("decode request payload");
+        let decoded = mesh_request_to_transport(decoded_ptr).expect("decoded request");
+
+        assert_eq!(decoded.method, "POST");
+        assert_eq!(decoded.path, "/todos/42");
+        assert_eq!(decoded.body, "{\"title\":\"mesh\"}");
+        assert_eq!(decoded.query_params, owned_pairs(&[("limit", "10")]));
+        assert_eq!(
+            decoded.headers,
+            owned_pairs(&[("Content-Type", "application/json")])
+        );
+        assert_eq!(decoded.path_params, owned_pairs(&[("id", "42")]));
+    }
+
+    #[test]
+    fn m047_s07_http_response_transport_roundtrip_preserves_status_body_and_headers() {
+        mesh_rt_init();
+        let response_ptr = build_test_response(201, "{\"created\":true}", &[("X-Test", "yes")]);
+
+        let encoded = encode_http_response_payload(response_ptr).expect("encode response payload");
+        let decoded_ptr = decode_http_response_payload(&encoded).expect("decode response payload");
+        let decoded = mesh_response_to_transport(decoded_ptr).expect("decoded response");
+
+        assert_eq!(decoded.status, 201);
+        assert_eq!(decoded.body, "{\"created\":true}");
+        assert_eq!(decoded.headers, owned_pairs(&[("X-Test", "yes")]));
+    }
+
+    #[test]
+    fn m047_s07_http_transport_rejects_malformed_request_and_response_payloads() {
+        assert!(decode_http_request_payload(&[]).is_err());
+        assert!(decode_http_response_payload(&[1, 2, 3]).is_err());
+    }
+
+    #[test]
+    fn m047_s07_clustered_route_identity_rejects_empty_runtime_name_and_payload() {
+        assert!(build_clustered_http_route_identity("", b"payload").is_err());
+        assert!(build_clustered_http_route_identity("Api.Todos.handle", b"").is_err());
+    }
+
+    #[test]
+    fn m047_s07_process_request_returns_503_and_durable_rejection_for_unsupported_clustered_route_count(
+    ) {
+        let _guard = http_server_test_lock();
+        mesh_rt_init();
+        reset_clustered_runtime_state();
+        CLUSTERED_ROUTE_HANDLER_CALLS.store(0, Ordering::Relaxed);
+
+        let runtime_name = "Api.Todos.handle_list_todos";
+        let executable_name = "__declared_route_api_todos_handle_list_todos";
+        mesh_register_declared_handler(
+            runtime_name.as_ptr(),
+            runtime_name.len() as u64,
+            executable_name.as_ptr(),
+            executable_name.len() as u64,
+            3,
+            clustered_route_test_handler as *const u8,
+        );
+
+        let router = mesh_http_router();
+        let pattern = mesh_string_new(b"/todos".as_ptr(), 6);
+        let router = mesh_http_route_get(router, pattern, clustered_route_test_handler as *mut u8);
+
+        let (status, body, headers) = process_request(
+            router,
+            ParsedRequest {
+                method: "GET".to_string(),
+                path: "/todos".to_string(),
+                headers: vec![],
+                body: Vec::new(),
+            },
+        );
+
+        assert_eq!(status, 503);
+        assert_eq!(headers, None);
+        let body = String::from_utf8(body).expect("response body utf8");
+        assert!(body.contains("unsupported_replication_count:3"), "{body}");
+        assert_eq!(CLUSTERED_ROUTE_HANDLER_CALLS.load(Ordering::Relaxed), 0);
+
+        let snapshot = continuity_registry().snapshot();
+        assert_eq!(snapshot.records.len(), 1);
+        let record = &snapshot.records[0];
+        assert_eq!(record.phase, ContinuityPhase::Rejected);
+        assert_eq!(record.result, ContinuityResult::Rejected);
+        assert_eq!(record.error, "unsupported_replication_count:3");
+        assert_eq!(record.declared_handler_runtime_name(), runtime_name);
+        assert_eq!(record.replication_count, 3);
+
+        reset_clustered_runtime_state();
+    }
+
+    #[test]
+    fn m047_s07_invoke_route_handler_from_payload_executes_real_handler_boundary() {
+        let _guard = http_server_test_lock();
+        mesh_rt_init();
+        CLUSTERED_ROUTE_HANDLER_CALLS.store(0, Ordering::Relaxed);
+
+        let request_ptr = build_test_request(
+            "POST",
+            "/clustered",
+            "payload",
+            &[],
+            &[("Content-Type", "text/plain")],
+            &[],
+        );
+        let request_payload = encode_http_request_payload(request_ptr).expect("encode request");
+        let response_payload = invoke_route_handler_from_payload(
+            clustered_route_test_handler as *mut u8,
+            &request_payload,
+        )
+        .expect("invoke clustered handler from payload");
+        let response_ptr =
+            decode_http_response_payload(&response_payload).expect("decode response");
+        let response = mesh_response_to_transport(response_ptr).expect("transport response");
+
+        assert_eq!(CLUSTERED_ROUTE_HANDLER_CALLS.load(Ordering::Relaxed), 1);
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, "{\"echo\":\"payload\"}");
+        assert_eq!(response.headers, owned_pairs(&[("X-Clustered", "true")]));
     }
 }

@@ -31,6 +31,8 @@ use inkwell::OptimizationLevel;
 use rustc_hash::FxHashMap;
 
 use crate::mir::{MirFunction, MirModule, MirStructDef, MirSumTypeDef, MirType};
+use crate::DeclaredRuntimeRegistration;
+use crate::StartupWorkRegistration;
 
 use self::types::{create_sum_type_layout, llvm_closure_fn_type, llvm_fn_type, llvm_type};
 
@@ -89,6 +91,12 @@ pub struct CodeGen<'ctx> {
     /// Each entry: (type_tag, handler_fn_name, num_args).
     pub(crate) service_dispatch:
         std::collections::HashMap<String, (Vec<(u64, String, usize)>, Vec<(u64, String, usize)>)>,
+
+    /// Manifest-approved declared handler registrations to install at startup.
+    pub(crate) declared_handlers: Vec<DeclaredRuntimeRegistration>,
+
+    /// Clustered work registrations that should auto-trigger after `mesh_main`.
+    pub(crate) startup_work_registrations: Vec<StartupWorkRegistration>,
 
     /// TCE loop header block for the current tail-recursive function.
     /// Set during compile_function when has_tail_calls is true. NOT on loop_stack
@@ -174,9 +182,24 @@ impl<'ctx> CodeGen<'ctx> {
             mir_struct_defs: FxHashMap::default(),
             loop_stack: Vec::new(),
             service_dispatch: std::collections::HashMap::new(),
+            declared_handlers: Vec::new(),
+            startup_work_registrations: Vec::new(),
             tce_loop_header: None,
             tce_param_names: Vec::new(),
         })
+    }
+
+    /// Set manifest-approved declared handler registrations for startup.
+    pub fn set_declared_handlers(&mut self, declared_handlers: &[DeclaredRuntimeRegistration]) {
+        self.declared_handlers = declared_handlers.to_vec();
+    }
+
+    /// Set clustered work registrations that should auto-trigger after `mesh_main`.
+    pub fn set_startup_work_registrations(
+        &mut self,
+        startup_work_registrations: &[StartupWorkRegistration],
+    ) {
+        self.startup_work_registrations = startup_work_registrations.to_vec();
     }
 
     /// Compile a MIR module to LLVM IR.
@@ -653,10 +676,24 @@ impl<'ctx> CodeGen<'ctx> {
         // Must happen before the entry function runs because the entry function
         // may call Node.spawn which needs the registry populated.
         let register_fn = intrinsics::get_intrinsic(&self.module, "mesh_register_function");
+        let declared_remote_spawnables = self
+            .declared_handlers
+            .iter()
+            .map(|handler| handler.executable_symbol.as_str())
+            .collect::<std::collections::HashSet<_>>();
         for mir_fn in &self.mir_functions {
+            let is_declared_remote_spawnable =
+                declared_remote_spawnables.contains(mir_fn.name.as_str());
+
             // Skip closure/lambda functions (they capture environment pointers,
             // cannot be spawned remotely) and compiler-internal functions.
-            if mir_fn.is_closure_fn || mir_fn.name.starts_with("__") {
+            // Manifest-approved declared wrappers are the one internal exception:
+            // they are intentionally private-looking symbols, but the remote
+            // DIST_SPAWN path must still be able to resolve them by executable
+            // name on the owner node.
+            if mir_fn.is_closure_fn
+                || (mir_fn.name.starts_with("__") && !is_declared_remote_spawnable)
+            {
                 continue;
             }
 
@@ -687,6 +724,114 @@ impl<'ctx> CodeGen<'ctx> {
             }
         }
 
+        let register_declared_handler =
+            intrinsics::get_intrinsic(&self.module, "mesh_register_declared_handler");
+        for handler in &self.declared_handlers {
+            let Some(fn_val) = self.functions.get(&handler.executable_symbol) else {
+                return Err(format!(
+                    "Declared handler executable '{}' was not lowered into the LLVM module",
+                    handler.executable_symbol
+                ));
+            };
+
+            let runtime_name_global = self
+                .builder
+                .build_global_string_ptr(
+                    &handler.runtime_registration_name,
+                    &format!(
+                        "declared_runtime_reg_{}",
+                        handler
+                            .runtime_registration_name
+                            .replace(|c: char| !c.is_ascii_alphanumeric(), "_")
+                    ),
+                )
+                .map_err(|e| e.to_string())?;
+            let runtime_name_len = self
+                .context
+                .i64_type()
+                .const_int(handler.runtime_registration_name.len() as u64, false);
+            let executable_name_global = self
+                .builder
+                .build_global_string_ptr(
+                    &handler.executable_symbol,
+                    &format!("declared_exec_reg_{}", handler.executable_symbol),
+                )
+                .map_err(|e| e.to_string())?;
+            let executable_name_len = self
+                .context
+                .i64_type()
+                .const_int(handler.executable_symbol.len() as u64, false);
+            let replication_count = self
+                .context
+                .i64_type()
+                .const_int(handler.replication_count, false);
+
+            self.builder
+                .build_call(
+                    register_declared_handler,
+                    &[
+                        runtime_name_global.as_pointer_value().into(),
+                        runtime_name_len.into(),
+                        executable_name_global.as_pointer_value().into(),
+                        executable_name_len.into(),
+                        replication_count.into(),
+                        fn_val.as_global_value().as_pointer_value().into(),
+                    ],
+                    "",
+                )
+                .map_err(|e| e.to_string())?;
+        }
+
+        if !self.startup_work_registrations.is_empty() {
+            let register_startup_work =
+                intrinsics::get_intrinsic(&self.module, "mesh_register_startup_work");
+            for registration in &self.startup_work_registrations {
+                let Some(handler) = self.declared_handlers.iter().find(|handler| {
+                    handler.runtime_registration_name == registration.runtime_registration_name
+                }) else {
+                    return Err(format!(
+                        "Startup work `{}` is missing declared-handler metadata; clustered work declarations must lower both startup and declared-handler registrations",
+                        registration.runtime_registration_name
+                    ));
+                };
+
+                if !self.functions.contains_key(&handler.executable_symbol) {
+                    return Err(format!(
+                        "Startup work `{}` resolved to undeclared executable `{}` in the LLVM module",
+                        registration.runtime_registration_name, handler.executable_symbol
+                    ));
+                }
+
+                let runtime_name_global = self
+                    .builder
+                    .build_global_string_ptr(
+                        &registration.runtime_registration_name,
+                        &format!(
+                            "startup_work_reg_{}",
+                            registration
+                                .runtime_registration_name
+                                .replace(|c: char| !c.is_ascii_alphanumeric(), "_")
+                        ),
+                    )
+                    .map_err(|e| e.to_string())?;
+                let runtime_name_len = self
+                    .context
+                    .i64_type()
+                    .const_int(registration.runtime_registration_name.len() as u64, false);
+
+                self.builder
+                    .build_call(
+                        register_startup_work,
+                        &[
+                            runtime_name_global.as_pointer_value().into(),
+                            runtime_name_len.into(),
+                        ],
+                        "",
+                    )
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+
         // Call the Mesh entry function on the main thread.
         // mesh_main runs synchronously, spawning service/job actors along the way.
         // The runtime handles service calls from the main thread context by using
@@ -698,6 +843,14 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder
             .build_call(*mesh_main, &[], "")
             .map_err(|e| e.to_string())?;
+
+        if !self.startup_work_registrations.is_empty() {
+            let trigger_startup_work =
+                intrinsics::get_intrinsic(&self.module, "mesh_trigger_startup_work");
+            self.builder
+                .build_call(trigger_startup_work, &[], "")
+                .map_err(|e| e.to_string())?;
+        }
 
         // Run the actor scheduler to process all spawned actors.
         // This blocks until all actors have completed.
@@ -922,6 +1075,171 @@ mod tests {
         let mut codegen = CodeGen::new(&context, "test", 0, None).unwrap();
         codegen.compile(&mir).unwrap();
         codegen.get_llvm_ir()
+    }
+
+    /// Helper: compile a module with declared-handler registrations and return LLVM IR.
+    fn compile_with_declared_handlers_to_ir(
+        mir: MirModule,
+        declared_handlers: Vec<DeclaredRuntimeRegistration>,
+    ) -> String {
+        let context = Context::create();
+        let mut codegen = CodeGen::new(&context, "test", 0, None).unwrap();
+        codegen.set_declared_handlers(&declared_handlers);
+        codegen.compile(&mir).unwrap();
+        codegen.get_llvm_ir()
+    }
+
+    /// Helper: compile a module with declared-handler registrations and return any error.
+    fn compile_with_declared_handlers_error(
+        mir: MirModule,
+        declared_handlers: Vec<DeclaredRuntimeRegistration>,
+    ) -> String {
+        let context = Context::create();
+        let mut codegen = CodeGen::new(&context, "test", 0, None).unwrap();
+        codegen.set_declared_handlers(&declared_handlers);
+        codegen
+            .compile(&mir)
+            .expect_err("declared handler drift should fail compilation")
+    }
+
+    #[test]
+    fn m047_s02_codegen_declared_handler_registration_emits_replication_count_marker() {
+        let mir = MirModule {
+            functions: vec![
+                MirFunction {
+                    name: "mesh_main".to_string(),
+                    params: vec![],
+                    return_type: MirType::Unit,
+                    body: MirExpr::Unit,
+                    is_closure_fn: false,
+                    captures: vec![],
+                    has_tail_calls: false,
+                },
+                MirFunction {
+                    name: "__declared_work_work_handle_submit".to_string(),
+                    params: vec![("__args_ptr".to_string(), MirType::Ptr)],
+                    return_type: MirType::Unit,
+                    body: MirExpr::Unit,
+                    is_closure_fn: false,
+                    captures: vec![],
+                    has_tail_calls: false,
+                },
+                MirFunction {
+                    name: "__declared_work_work_handle_retry".to_string(),
+                    params: vec![("__args_ptr".to_string(), MirType::Ptr)],
+                    return_type: MirType::Unit,
+                    body: MirExpr::Unit,
+                    is_closure_fn: false,
+                    captures: vec![],
+                    has_tail_calls: false,
+                },
+            ],
+            structs: vec![],
+            sum_types: vec![],
+            entry_function: Some("mesh_main".to_string()),
+            service_dispatch: std::collections::HashMap::new(),
+        };
+
+        let ir = compile_with_declared_handlers_to_ir(
+            mir,
+            vec![
+                DeclaredRuntimeRegistration {
+                    runtime_registration_name: "Work.handle_submit".to_string(),
+                    executable_symbol: "__declared_work_work_handle_submit".to_string(),
+                    replication_count: 2,
+                },
+                DeclaredRuntimeRegistration {
+                    runtime_registration_name: "Work.handle_retry".to_string(),
+                    executable_symbol: "__declared_work_work_handle_retry".to_string(),
+                    replication_count: 3,
+                },
+            ],
+        );
+
+        assert!(
+            ir.contains("@mesh_register_declared_handler"),
+            "expected declared handler registration call in IR: {ir}"
+        );
+        assert!(
+            ir.contains("i64 2, ptr @__declared_work_work_handle_submit"),
+            "expected defaulted replication count marker in IR: {ir}"
+        );
+        assert!(
+            ir.contains("i64 3, ptr @__declared_work_work_handle_retry"),
+            "expected explicit replication count marker in IR: {ir}"
+        );
+    }
+
+    #[test]
+    fn m047_s07_codegen_declared_route_registration_emits_runtime_name_and_count_marker() {
+        let mir = MirModule {
+            functions: vec![
+                MirFunction {
+                    name: "mesh_main".to_string(),
+                    params: vec![],
+                    return_type: MirType::Unit,
+                    body: MirExpr::Unit,
+                    is_closure_fn: false,
+                    captures: vec![],
+                    has_tail_calls: false,
+                },
+                MirFunction {
+                    name: "__declared_route_api_todos_handle_list_todos".to_string(),
+                    params: vec![("__request".to_string(), MirType::Ptr)],
+                    return_type: MirType::Ptr,
+                    body: MirExpr::Var("__request".to_string(), MirType::Ptr),
+                    is_closure_fn: false,
+                    captures: vec![],
+                    has_tail_calls: false,
+                },
+            ],
+            structs: vec![],
+            sum_types: vec![],
+            entry_function: Some("mesh_main".to_string()),
+            service_dispatch: std::collections::HashMap::new(),
+        };
+
+        let ir = compile_with_declared_handlers_to_ir(
+            mir,
+            vec![DeclaredRuntimeRegistration {
+                runtime_registration_name: "Api.Todos.handle_list_todos".to_string(),
+                executable_symbol: "__declared_route_api_todos_handle_list_todos".to_string(),
+                replication_count: 2,
+            }],
+        );
+
+        assert!(
+            ir.contains("@mesh_register_declared_handler"),
+            "expected declared route registration call in IR: {ir}"
+        );
+        assert!(
+            ir.contains("i64 2, ptr @__declared_route_api_todos_handle_list_todos"),
+            "expected route replication count marker in IR: {ir}"
+        );
+        assert!(
+            ir.contains("Api.Todos.handle_list_todos"),
+            "expected real handler runtime name in IR globals: {ir}"
+        );
+    }
+
+    #[test]
+    fn m047_s02_codegen_rejects_declared_handler_without_lowered_symbol() {
+        let mir = hello_world_mir();
+        let error = compile_with_declared_handlers_error(
+            mir,
+            vec![DeclaredRuntimeRegistration {
+                runtime_registration_name: "Work.handle_submit".to_string(),
+                executable_symbol: "__declared_work_work_handle_submit".to_string(),
+                replication_count: 2,
+            }],
+        );
+
+        assert!(
+            error.contains(
+                "Declared handler executable '__declared_work_work_handle_submit' was not lowered into the LLVM module"
+            ),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
@@ -1986,6 +2304,73 @@ mod tests {
         assert!(
             ir.contains("store ptr %variant_box"),
             "Should store heap pointer into variant ptr slot: {}",
+            ir
+        );
+    }
+
+    /// Verify that constructing a variant with a scalar payload in the generic
+    /// {i8, ptr} Result layout boxes the scalar before storing it.
+    ///
+    /// This covers helpers like:
+    /// `let applied = Sqlite.execute(...)?; Ok(applied)`
+    /// where the runtime returns a boxed integer pointer but source-level `Ok`
+    /// reconstruction would previously write the raw i64 into the ptr slot.
+    #[test]
+    fn test_int_in_result_pointer_boxing() {
+        let mir = MirModule {
+            functions: vec![MirFunction {
+                name: "make_ok_int".to_string(),
+                params: vec![],
+                return_type: MirType::SumType("Result".to_string()),
+                body: MirExpr::ConstructVariant {
+                    type_name: "Result".to_string(),
+                    variant: "Ok".to_string(),
+                    fields: vec![MirExpr::IntLit(42, MirType::Int)],
+                    ty: MirType::SumType("Result".to_string()),
+                },
+                is_closure_fn: false,
+                captures: vec![],
+                has_tail_calls: false,
+            }],
+            structs: vec![],
+            sum_types: vec![MirSumTypeDef {
+                name: "Result".to_string(),
+                variants: vec![
+                    MirVariantDef {
+                        name: "Ok".to_string(),
+                        fields: vec![MirType::Ptr],
+                        tag: 0,
+                    },
+                    MirVariantDef {
+                        name: "Err".to_string(),
+                        fields: vec![MirType::Ptr],
+                        tag: 1,
+                    },
+                ],
+            }],
+            entry_function: None,
+            service_dispatch: std::collections::HashMap::new(),
+        };
+
+        let context = Context::create();
+        let mut codegen = CodeGen::new(&context, "test", 0, None).unwrap();
+        codegen.compile(&mir).unwrap();
+
+        let ir = codegen.get_llvm_ir();
+
+        assert!(
+            ir.contains("variant_box") && ir.contains("mesh_gc_alloc_actor"),
+            "Should heap-allocate scalar payload via mesh_gc_alloc_actor (variant_box): {}",
+            ir
+        );
+        assert!(
+            ir.contains("store i64 42, ptr %variant_box"),
+            "Should store the scalar into the boxed payload allocation: {}",
+            ir
+        );
+        assert!(
+            ir.contains("store ptr %variant_box"),
+            "Should store the boxed payload pointer into the Result ptr slot: {}",
             ir
         );
     }

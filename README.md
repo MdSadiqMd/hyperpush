@@ -9,7 +9,7 @@
 **Expressive, readable concurrency.**
 *Elixir-style syntax. Static type inference. Native single binaries.*
 
-[Documentation](https://meshlang.dev) • [Production Proof](https://meshlang.dev/docs/production-backend-proof/) • [Get Started](#quick-start) • [Contributing](#contributing)
+[Documentation](https://meshlang.dev) • [Production Proof](https://meshlang.dev/docs/production-backend-proof/) • [Distributed Proof](https://meshlang.dev/docs/distributed-proof/) • [Get Started](#quick-start) • [Contributing](#contributing)
 
 </div>
 
@@ -94,6 +94,35 @@ cd hello_mesh
 
 This creates a Mesh project directory with a `mesh.toml` manifest and `main.mpl` entrypoint.
 
+If you want the public clustered-app scaffold instead of the hello-world app, generate it explicitly:
+
+```bash
+meshc init --clustered hello_cluster
+cd hello_cluster
+```
+
+The clustered scaffold keeps `mesh.toml` package-only, declares `@cluster pub fn add()` in `work.mpl`, derives the runtime-owned handler name as `Work.add`, uses the generic `MESH_*` runtime contract, and points operators at the runtime-owned inspection commands:
+
+```bash
+meshc cluster status <node-name@host:port> --json
+meshc cluster continuity <node-name@host:port> --json
+meshc cluster continuity <node-name@host:port> <request_key> --json
+meshc cluster diagnostics <node-name@host:port> --json
+```
+
+If you want a fuller starter that keeps the same source-first clustered contract while adding a SQLite HTTP app, generate the Todo template instead:
+
+```bash
+meshc init --template todo-api todo_api
+cd todo_api
+```
+
+That template keeps `work.mpl` on the ordinary source-first declaration `@cluster pub fn sync_todos()`, adds several `HTTP.on_get`/`HTTP.on_post`/`HTTP.on_put`/`HTTP.on_delete` routes, dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, keeps `GET /health` plus mutating routes local, wires in actor-backed rate limiting, and ships a Dockerfile that packages the binary produced by `meshc build .` instead of assuming access to the Mesh repo.
+
+If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
+
+The primary clustered-app story still starts with `meshc init --clustered`, but it now shares one canonical route-free contract with [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) and [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md). The Todo template is the fuller starter layered on top of that same contract, not a replacement for the route-free public surfaces. Use the continuity list form first to discover startup or request keys, then inspect a single continuity record.
+
 ### 3. Hello World
 
 Create a file named `hello.mpl`:
@@ -147,6 +176,37 @@ The quick-start examples above are intentionally small. If you want the real bac
 
 - [Production Backend Proof](https://meshlang.dev/docs/production-backend-proof/) — public map of the named build, deploy, supervision, and documentation-proof checks
 - [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md) — the deepest repo runbook with the authoritative backend commands and proof targets
+
+## Distributed Proof
+
+The public clustered-app story follows one runtime-owned inspection flow:
+
+```bash
+meshc cluster status <node-name@host:port> --json
+meshc cluster continuity <node-name@host:port> --json
+meshc cluster continuity <node-name@host:port> <request_key> --json
+meshc cluster diagnostics <node-name@host:port> --json
+```
+
+New clustered packages should declare route-free startup work with `@cluster` in `work.mpl` while keeping `mesh.toml` package-only. If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
+
+When you need the public clustered story, start with any of the three canonical route-free surfaces, then use the proof rails when you need verifier coverage behind those runtime-owned commands or the fuller Todo starter:
+
+- [Clustered Example](https://meshlang.dev/docs/getting-started/clustered-example/) — public scaffold-first walkthrough for `meshc init --clustered`
+- [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) — the smallest repo-owned route-free package surface
+- [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md) — the deeper packaged failover/operator runbook
+- `meshc init --template todo-api <name>` — the fuller starter that keeps the same source-first `@cluster` contract while adding local SQLite/HTTP routes, explicit-count `HTTP.clustered(1, ...)` on the selected read routes, and Docker packaging
+- [Distributed Proof](https://meshlang.dev/docs/distributed-proof/) — public map of the route-free canonical surfaces, the fuller Todo starter, bounded automatic promotion, runtime-owned authority fields, stale-primary fencing, and the read-only Fly evidence path
+- `bash scripts/verify-m047-s04.sh` — the authoritative cutover rail for the source-first route-free clustered contract
+- `bash scripts/verify-m047-s05.sh` — the lower-level Todo/runtime subrail that proves the fuller starter natively and inside Docker
+- `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` — the repo S07 rail for default-count and two-node `HTTP.clustered(...)` behavior beyond the Todo starter's explicit-count read routes
+- `bash scripts/verify-m047-s06.sh` — the final closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle
+- `bash scripts/verify-m046-s06.sh` — the historical M046 closeout wrapper retained as a compatibility alias into the M047 cutover rail
+- `bash scripts/verify-m046-s05.sh` — the historical M046 equal-surface wrapper retained as a compatibility alias into the M047 cutover rail
+- `bash scripts/verify-m046-s04.sh` — the historical M046 package/startup wrapper retained as a compatibility alias into the M047 cutover rail
+- `bash scripts/verify-m045-s05.sh` — the historical M045 closeout wrapper retained as a compatibility alias into the M047 cutover rail
+- `bash scripts/verify-m045-s04.sh` — the historical M045 assembled wrapper retained as a compatibility alias into the M047 cutover rail
+- `bash scripts/verify-m045-s03.sh` — the historical failover-specific subrail
 
 ## Public Release Candidate Runbook
 
@@ -204,6 +264,8 @@ Full documentation, including guides and API references, is available at **[mesh
 
 For the canonical backend proof story, use **[Production Backend Proof](https://meshlang.dev/docs/production-backend-proof/)** and the repo runbook at [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md).
 
+For the canonical distributed clustered-work proof story, use **[Distributed Proof](https://meshlang.dev/docs/distributed-proof/)** plus the equal-surface runbooks at [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) and [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md).
+
 ## Project Status
 
 Mesh is currently in active development.
@@ -221,12 +283,6 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
 ## License

@@ -39,7 +39,9 @@ use crate::traits::{
 };
 use crate::ty::{Scheme, Ty, TyCon, TyVar};
 use crate::unify::InferCtx;
-use crate::{ImportContext, TypeckResult};
+use crate::{
+    ClusteredRouteReplicationCount, ClusteredRouteWrapperMetadata, ImportContext, TypeckResult,
+};
 
 use rustc_hash::FxHashMap;
 
@@ -1851,6 +1853,14 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         "start".to_string(),
         Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::int())),
     );
+    // Node.start_from_env: fn() -> Result<BootstrapStatus, String>
+    node_mod.insert(
+        "start_from_env".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![],
+            Ty::result(Ty::Con(TyCon::new("BootstrapStatus")), Ty::string()),
+        )),
+    );
     // Node.connect: fn(String) -> Int  (node_name -> 0 on success)
     node_mod.insert(
         "connect".to_string(),
@@ -1927,6 +1937,64 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         Scheme::mono(Ty::fun(vec![Ty::string()], Ty::int())),
     );
     modules.insert("Global".to_string(), global_mod);
+
+    // ── Continuity module (M042/M044) ─────────────────────────────────
+    let continuity_authority_status_t = Ty::Con(TyCon::new("ContinuityAuthorityStatus"));
+    let continuity_record_t = Ty::Con(TyCon::new("ContinuityRecord"));
+    let continuity_submit_decision_t = Ty::Con(TyCon::new("ContinuitySubmitDecision"));
+    let mut continuity_mod = HashMap::new();
+    continuity_mod.insert(
+        "submit".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                Ty::string(),
+                Ty::string(),
+                Ty::string(),
+                Ty::string(),
+                Ty::string(),
+                Ty::int(),
+                Ty::bool(),
+                Ty::bool(),
+            ],
+            Ty::result(continuity_submit_decision_t.clone(), Ty::string()),
+        )),
+    );
+    continuity_mod.insert(
+        "submit_declared_work".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string(), Ty::string(), Ty::int()],
+            Ty::result(continuity_submit_decision_t.clone(), Ty::string()),
+        )),
+    );
+    continuity_mod.insert(
+        "status".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(continuity_record_t.clone(), Ty::string()),
+        )),
+    );
+    continuity_mod.insert(
+        "authority_status".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![],
+            Ty::result(continuity_authority_status_t.clone(), Ty::string()),
+        )),
+    );
+    continuity_mod.insert(
+        "mark_completed".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string(), Ty::string()],
+            Ty::result(continuity_record_t.clone(), Ty::string()),
+        )),
+    );
+    continuity_mod.insert(
+        "acknowledge_replica".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string()],
+            Ty::result(continuity_record_t, Ty::string()),
+        )),
+    );
+    modules.insert("Continuity".to_string(), continuity_mod);
 
     // ── Ws (WebSocket) module (Phase 88) ─────────────────────────
     let mut ws_mod = HashMap::new();
@@ -2959,23 +3027,24 @@ const STDLIB_MODULE_NAMES: &[&str] = &[
     "Pg",
     "Pool",
     "Node",
-    "Process",   // Phase 67
-    "Global",    // Phase 68
-    "Iter",      // Phase 76
-    "Ws",        // Phase 88
-    "Orm",       // Phase 97
-    "Expr",      // M033/S01
-    "Query",     // Phase 98
-    "Repo",      // Phase 98
-    "Changeset", // Phase 99
-    "Migration", // Phase 101
-    "Regex",     // Phase 119
-    "Crypto",    // Phase 135
-    "Base64",    // Phase 135
-    "Hex",       // Phase 135
-    "DateTime",  // Phase 136
-    "Http",      // Phase 137
-    "Test",      // Phase 138
+    "Process",    // Phase 67
+    "Global",     // Phase 68
+    "Iter",       // Phase 76
+    "Ws",         // Phase 88
+    "Orm",        // Phase 97
+    "Expr",       // M033/S01
+    "Query",      // Phase 98
+    "Repo",       // Phase 98
+    "Changeset",  // Phase 99
+    "Migration",  // Phase 101
+    "Regex",      // Phase 119
+    "Crypto",     // Phase 135
+    "Base64",     // Phase 135
+    "Hex",        // Phase 135
+    "DateTime",   // Phase 136
+    "Http",       // Phase 137
+    "Test",       // Phase 138
+    "Continuity", // M042
 ];
 
 /// Check if a name is a known stdlib module.
@@ -3005,8 +3074,8 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
     builtins::register_builtins(&mut ctx, &mut env, &mut trait_registry);
     register_builtin_sum_types(&mut ctx, &mut env, &mut type_registry);
 
-    // Register stdlib struct types for field access (Phase 137+)
-    // HttpResponse is the return type of Http.send — enables resp.status, resp.body, resp.headers
+    // Register stdlib struct types for field access (Phase 137+ / M044)
+    // Layouts MUST match the Mesh-facing runtime structs allocated in mesh-rt.
     type_registry.register_struct(StructDefInfo {
         name: "HttpResponse".to_string(),
         generic_params: vec![],
@@ -3014,6 +3083,60 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
             ("status".to_string(), Ty::int()),
             ("body".to_string(), Ty::string()),
             ("headers".to_string(), Ty::map(Ty::string(), Ty::string())),
+        ],
+    });
+    type_registry.register_struct(StructDefInfo {
+        name: "BootstrapStatus".to_string(),
+        generic_params: vec![],
+        fields: vec![
+            ("mode".to_string(), Ty::string()),
+            ("node_name".to_string(), Ty::string()),
+            ("cluster_port".to_string(), Ty::int()),
+            ("discovery_seed".to_string(), Ty::string()),
+        ],
+    });
+    type_registry.register_struct(StructDefInfo {
+        name: "ContinuityAuthorityStatus".to_string(),
+        generic_params: vec![],
+        fields: vec![
+            ("cluster_role".to_string(), Ty::string()),
+            ("promotion_epoch".to_string(), Ty::int()),
+            ("replication_health".to_string(), Ty::string()),
+        ],
+    });
+    type_registry.register_struct(StructDefInfo {
+        name: "ContinuityRecord".to_string(),
+        generic_params: vec![],
+        fields: vec![
+            ("request_key".to_string(), Ty::string()),
+            ("payload_hash".to_string(), Ty::string()),
+            ("attempt_id".to_string(), Ty::string()),
+            ("phase".to_string(), Ty::string()),
+            ("result".to_string(), Ty::string()),
+            ("ingress_node".to_string(), Ty::string()),
+            ("owner_node".to_string(), Ty::string()),
+            ("replica_node".to_string(), Ty::string()),
+            ("replication_count".to_string(), Ty::int()),
+            ("replica_status".to_string(), Ty::string()),
+            ("cluster_role".to_string(), Ty::string()),
+            ("promotion_epoch".to_string(), Ty::int()),
+            ("replication_health".to_string(), Ty::string()),
+            ("execution_node".to_string(), Ty::string()),
+            ("routed_remotely".to_string(), Ty::bool()),
+            ("fell_back_locally".to_string(), Ty::bool()),
+            ("error".to_string(), Ty::string()),
+        ],
+    });
+    type_registry.register_struct(StructDefInfo {
+        name: "ContinuitySubmitDecision".to_string(),
+        generic_params: vec![],
+        fields: vec![
+            ("outcome".to_string(), Ty::string()),
+            ("conflict_reason".to_string(), Ty::string()),
+            (
+                "record".to_string(),
+                Ty::Con(TyCon::new("ContinuityRecord")),
+            ),
         ],
     });
 
@@ -3176,6 +3299,12 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
                 ),
                 _ => (None, false),
             };
+            if let Some(name) = name_opt.clone() {
+                ctx.top_level_function_visibility
+                    .entry(name.clone())
+                    .and_modify(|visible| *visible |= is_pub)
+                    .or_insert(is_pub);
+            }
             if is_pub {
                 if let Some(name) = name_opt {
                     *pub_fn_counts.entry(name).or_insert(0) += 1;
@@ -3319,6 +3448,21 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
         }
     }
 
+    for wrapper_span in ctx
+        .clustered_route_wrappers
+        .keys()
+        .copied()
+        .collect::<Vec<_>>()
+    {
+        if !ctx
+            .consumed_clustered_route_wrappers
+            .contains(&wrapper_span)
+        {
+            ctx.errors
+                .push(TypeError::HttpClusteredOutsideRouteHandlerPosition { span: wrapper_span });
+        }
+    }
+
     // Resolve all types in the type table through the union-find.
     let resolved_types: FxHashMap<TextRange, Ty> = types
         .into_iter()
@@ -3348,6 +3492,7 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
         imported_service_methods: ctx.imported_service_methods,
         local_service_exports: ctx.local_service_exports,
         overloaded_call_targets: ctx.overloaded_call_targets,
+        clustered_route_wrappers: ctx.clustered_route_wrappers,
     }
 }
 
@@ -4125,6 +4270,10 @@ fn infer_item(
                     // Register the module namespace for qualified access
                     ctx.qualified_modules
                         .insert(last_segment.clone(), mod_exports.functions.clone());
+                    ctx.qualified_module_origins
+                        .insert(last_segment.clone(), mod_exports.module_name.clone());
+                    ctx.qualified_module_private_names
+                        .insert(last_segment.clone(), mod_exports.private_names.clone());
                     // Also register struct constructor types for qualified access
                     for (name, struct_def) in &mod_exports.struct_defs {
                         let tycon = TyCon::with_module(name, last_segment.as_str());
@@ -4196,6 +4345,8 @@ fn infer_item(
                                 if let Some(scheme) = mod_exports.functions.get(&name) {
                                     env.insert(name.clone(), scheme.clone());
                                     ctx.imported_functions.push(name.clone());
+                                    ctx.imported_function_origins
+                                        .insert(name.clone(), mod_exports.module_name.clone());
                                 }
                                 // Check arity-overloaded function variants (name__N mangled keys)
                                 else if mod_exports.functions.keys().any(|k| {
@@ -4211,6 +4362,10 @@ fn infer_item(
                                         {
                                             env.insert(key.clone(), scheme.clone());
                                             ctx.imported_functions.push(key.clone());
+                                            ctx.imported_function_origins.insert(
+                                                key.clone(),
+                                                mod_exports.module_name.clone(),
+                                            );
                                         }
                                     }
                                 }
@@ -4294,6 +4449,8 @@ fn infer_item(
                                 else if let Some(scheme) = mod_exports.actor_defs.get(&name) {
                                     env.insert(name.clone(), scheme.clone());
                                     ctx.imported_functions.push(name.clone());
+                                    ctx.imported_function_origins
+                                        .insert(name.clone(), mod_exports.module_name.clone());
                                 }
                                 // Check service definitions (importing a service brings its helpers)
                                 else if let Some(service_info) =
@@ -6528,6 +6685,461 @@ fn infer_unary(
     }
 }
 
+#[derive(Debug, Clone)]
+struct ClusteredRouteHandlerRef {
+    handler_name: String,
+    defining_module: Option<String>,
+    runtime_name: String,
+}
+
+fn http_field_access_name(expr: &Expr) -> Option<(String, String)> {
+    let Expr::FieldAccess(field_access) = expr else {
+        return None;
+    };
+    let base_expr = field_access.base()?;
+    let Expr::NameRef(base_name_ref) = base_expr else {
+        return None;
+    };
+
+    Some((
+        base_name_ref.text()?,
+        field_access.field()?.text().to_string(),
+    ))
+}
+
+fn is_http_clustered_callee(expr: &Expr) -> bool {
+    matches!(
+        http_field_access_name(expr),
+        Some((base_name, field_name)) if base_name == "HTTP" && field_name == "clustered"
+    )
+}
+
+fn is_http_route_registration_callee(expr: &Expr) -> bool {
+    matches!(
+        http_field_access_name(expr),
+        Some((base_name, field_name))
+            if base_name == "HTTP"
+                && matches!(field_name.as_str(), "route" | "on_get" | "on_post" | "on_put" | "on_delete")
+    )
+}
+
+fn clustered_wrapper_call_range(expr: &Expr) -> Option<TextRange> {
+    let Expr::CallExpr(call) = expr else {
+        return None;
+    };
+    let callee_expr = call.callee()?;
+    if is_http_clustered_callee(&callee_expr) {
+        Some(call.syntax().text_range())
+    } else {
+        None
+    }
+}
+
+fn mark_http_clustered_wrapper_consumed(ctx: &mut InferCtx, expr: &Expr) {
+    if let Some(range) = clustered_wrapper_call_range(expr) {
+        ctx.consumed_clustered_route_wrappers.insert(range);
+    }
+}
+
+fn route_handler_function_ty() -> Ty {
+    Ty::fun(
+        vec![Ty::Con(TyCon::new("Request"))],
+        Ty::Con(TyCon::new("Response")),
+    )
+}
+
+fn is_route_handler_function_ty(ty: &Ty) -> bool {
+    match ty {
+        Ty::Fun(params, ret) if params.len() == 1 => {
+            matches!(&params[0], Ty::Con(con) if con.name == "Request")
+                && matches!(ret.as_ref(), Ty::Con(con) if con.name == "Response")
+        }
+        _ => false,
+    }
+}
+
+fn qualify_clustered_route_runtime_name(
+    defining_module: Option<&str>,
+    handler_name: &str,
+) -> String {
+    match defining_module {
+        Some(module_name) if !module_name.is_empty() => format!("{}.{}", module_name, handler_name),
+        _ => handler_name.to_string(),
+    }
+}
+
+fn parse_http_clustered_replication_count(expr: &Expr) -> Option<u32> {
+    let Expr::Literal(lit) = expr else {
+        return None;
+    };
+    let token = lit.token()?;
+    if token.kind() != SyntaxKind::INT_LITERAL {
+        return None;
+    }
+
+    token.text().parse::<u32>().ok().filter(|value| *value > 0)
+}
+
+fn push_http_clustered_error(ctx: &mut InferCtx, error: TypeError) -> TypeError {
+    ctx.errors.push(error.clone());
+    error
+}
+
+fn resolve_clustered_route_handler_ref(
+    ctx: &mut InferCtx,
+    env: &mut TypeEnv,
+    handler_expr: &Expr,
+    wrapper_span: TextRange,
+    types: &mut FxHashMap<TextRange, Ty>,
+    type_registry: &TypeRegistry,
+    trait_registry: &TraitRegistry,
+    fn_constraints: &FxHashMap<String, FnConstraints>,
+) -> Result<(Ty, ClusteredRouteHandlerRef), TypeError> {
+    match handler_expr {
+        Expr::NameRef(name_ref) => {
+            let handler_name = name_ref.text().unwrap_or_else(|| "<unknown>".to_string());
+
+            if let Some(is_public) = ctx
+                .top_level_function_visibility
+                .get(&handler_name)
+                .copied()
+            {
+                if !is_public {
+                    let err = TypeError::HttpClusteredPrivateHandler {
+                        handler_name,
+                        span: wrapper_span,
+                    };
+                    return Err(push_http_clustered_error(ctx, err));
+                }
+                if env.lookup(&handler_name).is_none() {
+                    let err = TypeError::HttpClusteredInvalidArguments {
+                        reason: format!(
+                            "`{}` must resolve to a single public top-level route handler reference",
+                            handler_name
+                        ),
+                        span: wrapper_span,
+                    };
+                    return Err(push_http_clustered_error(ctx, err));
+                }
+
+                let handler_ty = infer_expr(
+                    ctx,
+                    env,
+                    handler_expr,
+                    types,
+                    type_registry,
+                    trait_registry,
+                    fn_constraints,
+                )?;
+                let resolved_handler_ty = ctx.resolve(handler_ty.clone());
+                if !is_route_handler_function_ty(&resolved_handler_ty) {
+                    let expected_ty = route_handler_function_ty();
+                    let err = TypeError::HttpClusteredInvalidArguments {
+                        reason: format!("`{}` must have type `{}`", handler_name, expected_ty),
+                        span: wrapper_span,
+                    };
+                    return Err(push_http_clustered_error(ctx, err));
+                }
+
+                let defining_module = ctx.current_module.clone();
+                let runtime_name =
+                    qualify_clustered_route_runtime_name(defining_module.as_deref(), &handler_name);
+                return Ok((
+                    handler_ty,
+                    ClusteredRouteHandlerRef {
+                        handler_name,
+                        defining_module,
+                        runtime_name,
+                    },
+                ));
+            }
+
+            if ctx
+                .imported_functions
+                .iter()
+                .any(|name| name == &handler_name)
+            {
+                let Some(defining_module) =
+                    ctx.imported_function_origins.get(&handler_name).cloned()
+                else {
+                    let err = TypeError::HttpClusteredImportedOriginMissing {
+                        handler_name,
+                        span: wrapper_span,
+                    };
+                    return Err(push_http_clustered_error(ctx, err));
+                };
+                if defining_module.is_empty() {
+                    let err = TypeError::HttpClusteredImportedOriginMissing {
+                        handler_name,
+                        span: wrapper_span,
+                    };
+                    return Err(push_http_clustered_error(ctx, err));
+                }
+                if env.lookup(&handler_name).is_none() {
+                    let err = TypeError::HttpClusteredInvalidArguments {
+                        reason: format!(
+                            "`{}` must resolve to a single imported public route handler reference",
+                            handler_name
+                        ),
+                        span: wrapper_span,
+                    };
+                    return Err(push_http_clustered_error(ctx, err));
+                }
+
+                let handler_ty = infer_expr(
+                    ctx,
+                    env,
+                    handler_expr,
+                    types,
+                    type_registry,
+                    trait_registry,
+                    fn_constraints,
+                )?;
+                let resolved_handler_ty = ctx.resolve(handler_ty.clone());
+                if !is_route_handler_function_ty(&resolved_handler_ty) {
+                    let expected_ty = route_handler_function_ty();
+                    let err = TypeError::HttpClusteredInvalidArguments {
+                        reason: format!("`{}` must have type `{}`", handler_name, expected_ty),
+                        span: wrapper_span,
+                    };
+                    return Err(push_http_clustered_error(ctx, err));
+                }
+
+                let runtime_name = qualify_clustered_route_runtime_name(
+                    Some(defining_module.as_str()),
+                    &handler_name,
+                );
+                return Ok((
+                    handler_ty,
+                    ClusteredRouteHandlerRef {
+                        handler_name,
+                        defining_module: Some(defining_module),
+                        runtime_name,
+                    },
+                ));
+            }
+
+            let reason = if env.lookup(&handler_name).is_some() {
+                format!(
+                    "`{}` must be a public top-level function reference, not a local binding or unsupported value",
+                    handler_name
+                )
+            } else {
+                format!(
+                    "`{}` must resolve to a public top-level route handler reference",
+                    handler_name
+                )
+            };
+            let err = TypeError::HttpClusteredInvalidArguments {
+                reason,
+                span: wrapper_span,
+            };
+            Err(push_http_clustered_error(ctx, err))
+        }
+        Expr::FieldAccess(field_access) => {
+            let Some(base_expr) = field_access.base() else {
+                let err = TypeError::HttpClusteredInvalidArguments {
+                    reason: "expected a module-qualified handler reference like `Module.handle`"
+                        .to_string(),
+                    span: wrapper_span,
+                };
+                return Err(push_http_clustered_error(ctx, err));
+            };
+            let Expr::NameRef(base_name_ref) = base_expr else {
+                let err = TypeError::HttpClusteredInvalidArguments {
+                    reason: "expected a module-qualified handler reference like `Module.handle`"
+                        .to_string(),
+                    span: wrapper_span,
+                };
+                return Err(push_http_clustered_error(ctx, err));
+            };
+            let module_alias = base_name_ref
+                .text()
+                .unwrap_or_else(|| "<unknown>".to_string());
+            let handler_name = field_access
+                .field()
+                .map(|token| token.text().to_string())
+                .unwrap_or_else(|| "<unknown>".to_string());
+
+            let Some(defining_module) = ctx.qualified_module_origins.get(&module_alias).cloned()
+            else {
+                let err = TypeError::HttpClusteredInvalidArguments {
+                    reason: format!(
+                        "`{}.{}` must reference a function from an imported user module",
+                        module_alias, handler_name
+                    ),
+                    span: wrapper_span,
+                };
+                return Err(push_http_clustered_error(ctx, err));
+            };
+
+            if ctx
+                .qualified_module_private_names
+                .get(&module_alias)
+                .map(|names| names.contains(&handler_name))
+                .unwrap_or(false)
+            {
+                let err = TypeError::HttpClusteredPrivateHandler {
+                    handler_name,
+                    span: wrapper_span,
+                };
+                return Err(push_http_clustered_error(ctx, err));
+            }
+
+            let exported = ctx
+                .qualified_modules
+                .get(&module_alias)
+                .map(|exports| exports.contains_key(&handler_name))
+                .unwrap_or(false);
+            if !exported {
+                let err = TypeError::HttpClusteredInvalidArguments {
+                    reason: format!(
+                        "`{}.{}` is not an exported public handler in module `{}`",
+                        module_alias, handler_name, defining_module
+                    ),
+                    span: wrapper_span,
+                };
+                return Err(push_http_clustered_error(ctx, err));
+            }
+
+            let handler_ty = infer_expr(
+                ctx,
+                env,
+                handler_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
+            let resolved_handler_ty = ctx.resolve(handler_ty.clone());
+            if !is_route_handler_function_ty(&resolved_handler_ty) {
+                let expected_ty = route_handler_function_ty();
+                let err = TypeError::HttpClusteredInvalidArguments {
+                    reason: format!(
+                        "`{}.{}` must have type `{}`",
+                        module_alias, handler_name, expected_ty
+                    ),
+                    span: wrapper_span,
+                };
+                return Err(push_http_clustered_error(ctx, err));
+            }
+
+            let runtime_name =
+                qualify_clustered_route_runtime_name(Some(defining_module.as_str()), &handler_name);
+            Ok((
+                handler_ty,
+                ClusteredRouteHandlerRef {
+                    handler_name,
+                    defining_module: Some(defining_module),
+                    runtime_name,
+                },
+            ))
+        }
+        _ => {
+            let err = TypeError::HttpClusteredInvalidArguments {
+                reason: "expected a bare handler reference or module-qualified handler reference"
+                    .to_string(),
+                span: wrapper_span,
+            };
+            Err(push_http_clustered_error(ctx, err))
+        }
+    }
+}
+
+fn infer_http_clustered_wrapper_call(
+    ctx: &mut InferCtx,
+    env: &mut TypeEnv,
+    call: &CallExpr,
+    types: &mut FxHashMap<TextRange, Ty>,
+    type_registry: &TypeRegistry,
+    trait_registry: &TraitRegistry,
+    fn_constraints: &FxHashMap<String, FnConstraints>,
+) -> Result<Ty, TypeError> {
+    let wrapper_span = call.syntax().text_range();
+    let args: Vec<Expr> = call
+        .arg_list()
+        .map(|arg_list| arg_list.args().collect())
+        .unwrap_or_default();
+
+    let (replication_count, handler_expr) = match args.as_slice() {
+        [handler_expr] => (ClusteredRouteReplicationCount::defaulted(), handler_expr),
+        [count_expr, handler_expr] => {
+            let Some(value) = parse_http_clustered_replication_count(count_expr) else {
+                let err = TypeError::HttpClusteredInvalidArguments {
+                    reason:
+                        "the replication count must be a positive integer literal, e.g. `HTTP.clustered(3, handler)`"
+                            .to_string(),
+                    span: wrapper_span,
+                };
+                return Err(push_http_clustered_error(ctx, err));
+            };
+            (
+                ClusteredRouteReplicationCount::explicit(value),
+                handler_expr,
+            )
+        }
+        _ => {
+            let err = TypeError::HttpClusteredInvalidArguments {
+                reason: "expected `HTTP.clustered(handler)` or `HTTP.clustered(<int>, handler)`"
+                    .to_string(),
+                span: wrapper_span,
+            };
+            return Err(push_http_clustered_error(ctx, err));
+        }
+    };
+
+    let (handler_ty, handler_ref) = resolve_clustered_route_handler_ref(
+        ctx,
+        env,
+        handler_expr,
+        wrapper_span,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
+
+    if let Some(existing_count) = ctx
+        .clustered_route_replication_counts
+        .get(&handler_ref.runtime_name)
+        .copied()
+    {
+        if existing_count.value != replication_count.value {
+            let first_span = ctx
+                .clustered_route_wrappers
+                .iter()
+                .find_map(|(span, metadata)| {
+                    (metadata.runtime_name == handler_ref.runtime_name).then_some(*span)
+                })
+                .unwrap_or(wrapper_span);
+            let err = TypeError::HttpClusteredConflictingReplicationCount {
+                runtime_name: handler_ref.runtime_name,
+                first_count: existing_count.value,
+                current_count: replication_count.value,
+                first_span,
+                span: wrapper_span,
+            };
+            return Err(push_http_clustered_error(ctx, err));
+        }
+    }
+
+    ctx.clustered_route_replication_counts
+        .entry(handler_ref.runtime_name.clone())
+        .or_insert(replication_count);
+    ctx.clustered_route_wrappers.insert(
+        wrapper_span,
+        ClusteredRouteWrapperMetadata {
+            handler_name: handler_ref.handler_name,
+            defining_module: handler_ref.defining_module,
+            runtime_name: handler_ref.runtime_name,
+            handler_span: handler_expr.syntax().text_range(),
+            replication_count,
+        },
+    );
+
+    Ok(handler_ty)
+}
+
 /// Infer the type of a function call expression with where-clause enforcement.
 fn infer_call(
     ctx: &mut InferCtx,
@@ -6547,6 +7159,18 @@ fn infer_call(
         ctx.errors.push(err.clone());
         err
     })?;
+
+    if is_http_clustered_callee(&callee_expr) {
+        return infer_http_clustered_wrapper_call(
+            ctx,
+            env,
+            call,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        );
+    }
 
     // Arity dispatch: check for overloaded functions (name__N mangled keys) first.
     // This handles both plain NameRef calls (slugify(str)) and qualified FieldAccess
@@ -6701,6 +7325,12 @@ fn infer_call(
                 fn_constraints,
             )?;
             arg_types.push(arg_ty);
+        }
+    }
+
+    if is_http_route_registration_callee(&callee_expr) {
+        if let Some(handler_arg) = call.arg_list().and_then(|args| args.args().nth(2)) {
+            mark_http_clustered_wrapper_consumed(ctx, &handler_arg);
         }
     }
 
@@ -6883,6 +7513,14 @@ fn infer_pipe(
                 err
             })?;
 
+            if is_http_clustered_callee(&callee_expr) {
+                let err = TypeError::HttpClusteredOutsideRouteHandlerPosition {
+                    span: call.syntax().text_range(),
+                };
+                ctx.errors.push(err.clone());
+                return Err(err);
+            }
+
             let callee_ty = infer_expr(
                 ctx,
                 env,
@@ -6907,6 +7545,12 @@ fn infer_pipe(
                         fn_constraints,
                     )?;
                     arg_types.push(arg_ty);
+                }
+            }
+
+            if is_http_route_registration_callee(&callee_expr) {
+                if let Some(handler_arg) = call.arg_list().and_then(|args| args.args().nth(1)) {
+                    mark_http_clustered_wrapper_consumed(ctx, &handler_arg);
                 }
             }
 
@@ -7114,6 +7758,14 @@ fn infer_slot_pipe(
                 ctx.errors.push(err.clone());
                 err
             })?;
+
+            if is_http_clustered_callee(&callee_expr) {
+                let err = TypeError::HttpClusteredOutsideRouteHandlerPosition {
+                    span: call.syntax().text_range(),
+                };
+                ctx.errors.push(err.clone());
+                return Err(err);
+            }
 
             let callee_ty = infer_expr(
                 ctx,
@@ -8616,6 +9268,14 @@ fn infer_field_access(
     // e.g. Vector.add (user module), String.length (stdlib) -- module-qualified function reference.
     if let Expr::NameRef(ref name_ref) = base_expr {
         if let Some(base_name) = name_ref.text() {
+            if base_name == "Continuity" && field_name == "promote" {
+                let err = TypeError::ManualContinuityPromotionDisabled {
+                    span: fa.syntax().text_range(),
+                };
+                ctx.errors.push(err.clone());
+                return Err(err);
+            }
+
             // Check user-defined modules first (from import context via ctx.qualified_modules)
             if let Some(mod_fns) = ctx.qualified_modules.get(&base_name) {
                 if let Some(scheme) = mod_fns.get(&field_name) {
@@ -10256,7 +10916,7 @@ fn infer_service_def(
 
     // ── Build service export info for cross-module export ──────────────
     {
-        use crate::ServiceExportInfo;
+        use crate::{ServiceExportInfo, ServiceMethodExport, ServiceMethodExportKind};
         use rustc_hash::FxHashMap as FxMap;
 
         let name_lower = service_name.to_lowercase();
@@ -10264,16 +10924,21 @@ fn infer_service_def(
             name: service_name.clone(),
             helpers: FxMap::default(),
             methods: Vec::new(),
+            method_exports: Vec::new(),
         };
 
         // Start helper
         let resolved_start = ctx.resolve(start_fn_ty.clone());
         info.helpers
             .insert("start".to_string(), Scheme::mono(resolved_start));
-        info.methods.push((
-            "start".to_string(),
-            format!("__service_{}_start", name_lower),
-        ));
+        let start_generated_name = format!("__service_{}_start", name_lower);
+        info.methods
+            .push(("start".to_string(), start_generated_name.clone()));
+        info.method_exports.push(ServiceMethodExport {
+            method_name: "start".to_string(),
+            generated_name: start_generated_name,
+            kind: ServiceMethodExportKind::Start,
+        });
 
         // Call handler helpers
         for (variant_name, param_types, reply_ty) in &call_handler_info {
@@ -10285,14 +10950,18 @@ fn infer_service_def(
             let resolved_fn = ctx.resolve(fn_ty);
             info.helpers
                 .insert(snake_name.clone(), Scheme::mono(resolved_fn));
-            info.methods.push((
-                snake_name,
-                format!(
-                    "__service_{}_call_{}",
-                    name_lower,
-                    to_snake_case(variant_name)
-                ),
-            ));
+            let generated_name = format!(
+                "__service_{}_call_{}",
+                name_lower,
+                to_snake_case(variant_name)
+            );
+            info.methods
+                .push((snake_name.clone(), generated_name.clone()));
+            info.method_exports.push(ServiceMethodExport {
+                method_name: snake_name,
+                generated_name,
+                kind: ServiceMethodExportKind::Call,
+            });
         }
 
         // Cast handler helpers
@@ -10304,14 +10973,18 @@ fn infer_service_def(
             let resolved_fn = ctx.resolve(fn_ty);
             info.helpers
                 .insert(snake_name.clone(), Scheme::mono(resolved_fn));
-            info.methods.push((
-                snake_name,
-                format!(
-                    "__service_{}_cast_{}",
-                    name_lower,
-                    to_snake_case(variant_name)
-                ),
-            ));
+            let generated_name = format!(
+                "__service_{}_cast_{}",
+                name_lower,
+                to_snake_case(variant_name)
+            );
+            info.methods
+                .push((snake_name.clone(), generated_name.clone()));
+            info.method_exports.push(ServiceMethodExport {
+                method_name: snake_name,
+                generated_name,
+                kind: ServiceMethodExportKind::Cast,
+            });
         }
 
         ctx.local_service_exports.insert(service_name.clone(), info);

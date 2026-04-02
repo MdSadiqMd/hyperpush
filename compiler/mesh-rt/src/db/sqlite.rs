@@ -66,6 +66,24 @@ fn err_result(msg: &str) -> *mut u8 {
     alloc_result(1, s) as *mut u8
 }
 
+fn box_u64_payload(value: u64) -> *mut u8 {
+    Box::into_raw(Box::new(value)) as *mut u8
+}
+
+fn box_i64_payload(value: i64) -> *mut u8 {
+    Box::into_raw(Box::new(value)) as *mut u8
+}
+
+#[cfg(test)]
+unsafe fn unbox_u64_payload(ptr: *mut u8) -> u64 {
+    *(ptr as *const u64)
+}
+
+#[cfg(test)]
+unsafe fn unbox_i64_payload(ptr: *mut u8) -> i64 {
+    *(ptr as *const i64)
+}
+
 /// Create an error MeshResult from a sqlite3 error message.
 unsafe fn sqlite_err_result(db: *mut sqlite3) -> *mut u8 {
     let c_msg = sqlite3_errmsg(db);
@@ -154,7 +172,7 @@ pub extern "C" fn mesh_sqlite_open(path: *const MeshString) -> *mut u8 {
 
         let conn = Box::new(SqliteConn { db });
         let handle = Box::into_raw(conn) as u64;
-        alloc_result(0, handle as *mut u8) as *mut u8
+        alloc_result(0, box_u64_payload(handle)) as *mut u8
     }
 }
 
@@ -224,7 +242,7 @@ pub extern "C" fn mesh_sqlite_execute(
         }
 
         let changes = sqlite3_changes(conn.db) as i64;
-        alloc_result(0, changes as *mut u8) as *mut u8
+        alloc_result(0, box_i64_payload(changes)) as *mut u8
     }
 }
 
@@ -413,7 +431,7 @@ mod tests {
         let r = unsafe { &*(result as *const MeshResult) };
         assert_eq!(r.tag, 0, "open should succeed");
 
-        let handle = r.value as u64;
+        let handle = unsafe { unbox_u64_payload(r.value) };
         assert_ne!(handle, 0, "handle should be non-zero");
 
         // Close it
@@ -429,7 +447,7 @@ mod tests {
         let result = mesh_sqlite_open(path);
         let r = unsafe { &*(result as *const MeshResult) };
         assert_eq!(r.tag, 0);
-        let handle = r.value as u64;
+        let handle = unsafe { unbox_u64_payload(r.value) };
 
         // Create table
         let sql = mk_str(b"CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)");
@@ -450,7 +468,7 @@ mod tests {
         let result = mesh_sqlite_open(path);
         let r = unsafe { &*(result as *const MeshResult) };
         assert_eq!(r.tag, 0);
-        let handle = r.value as u64;
+        let handle = unsafe { unbox_u64_payload(r.value) };
 
         // Create table
         let sql = mk_str(b"CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age TEXT)");
@@ -470,7 +488,11 @@ mod tests {
         let insert_result = mesh_sqlite_execute(handle, insert_sql, params);
         let ir = unsafe { &*(insert_result as *const MeshResult) };
         assert_eq!(ir.tag, 0, "INSERT should succeed");
-        assert_eq!(ir.value as i64, 1, "should affect 1 row");
+        assert_eq!(
+            unsafe { unbox_i64_payload(ir.value) },
+            1,
+            "should affect 1 row"
+        );
 
         // Query
         let query_sql = mk_str(b"SELECT name, age FROM users");

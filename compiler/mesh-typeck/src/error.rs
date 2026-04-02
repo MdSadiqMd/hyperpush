@@ -145,6 +145,8 @@ pub enum TypeError {
         method_name: String,
         span: TextRange,
     },
+    /// Manual continuity promotion is not part of the Mesh surface anymore.
+    ManualContinuityPromotionDisabled { span: TextRange },
     /// A variant name was used in a pattern but does not exist.
     UnknownVariant { name: String, span: TextRange },
     /// Or-pattern alternatives bind different sets of variables.
@@ -276,6 +278,28 @@ pub enum TypeError {
     PrivateItem {
         module_name: String,
         name: String,
+        span: TextRange,
+    },
+    /// `HTTP.clustered(...)` received malformed arguments or a non-handler reference.
+    HttpClusteredInvalidArguments { reason: String, span: TextRange },
+    /// `HTTP.clustered(...)` referenced a private handler.
+    HttpClusteredPrivateHandler {
+        handler_name: String,
+        span: TextRange,
+    },
+    /// `HTTP.clustered(...)` was not used in the route-handler position.
+    HttpClusteredOutsideRouteHandlerPosition { span: TextRange },
+    /// The same clustered route handler was declared with conflicting counts.
+    HttpClusteredConflictingReplicationCount {
+        runtime_name: String,
+        first_count: u32,
+        current_count: u32,
+        first_span: TextRange,
+        span: TextRange,
+    },
+    /// Imported bare handler resolution lost the defining-module origin.
+    HttpClusteredImportedOriginMissing {
+        handler_name: String,
         span: TextRange,
     },
     /// `?` operator used in function that doesn't return Result or Option.
@@ -440,6 +464,12 @@ impl fmt::Display for TypeError {
                 ty, method_name, ..
             } => {
                 write!(f, "no method `{}` on type `{}`", method_name, ty)
+            }
+            TypeError::ManualContinuityPromotionDisabled { .. } => {
+                write!(
+                    f,
+                    "`Continuity.promote()` is disabled; failover is automatic-only"
+                )
             }
             TypeError::UnknownVariant { name, .. } => {
                 write!(f, "unknown variant `{}`", name)
@@ -660,6 +690,41 @@ impl fmt::Display for TypeError {
                     f,
                     "`{}` is private in module `{}`; add `pub` to make it accessible",
                     name, module_name
+                )
+            }
+            TypeError::HttpClusteredInvalidArguments { reason, .. } => {
+                write!(f, "invalid HTTP.clustered(...) usage: {}", reason)
+            }
+            TypeError::HttpClusteredPrivateHandler { handler_name, .. } => {
+                write!(
+                    f,
+                    "route handler `{}` must be public to use HTTP.clustered(...)",
+                    handler_name
+                )
+            }
+            TypeError::HttpClusteredOutsideRouteHandlerPosition { .. } => {
+                write!(
+                    f,
+                    "HTTP.clustered(...) can only appear in the route handler position of HTTP.route(...) or HTTP.on_*(...)"
+                )
+            }
+            TypeError::HttpClusteredConflictingReplicationCount {
+                runtime_name,
+                first_count,
+                current_count,
+                ..
+            } => {
+                write!(
+                    f,
+                    "clustered route handler `{}` already uses replication count {}; found conflicting count {}",
+                    runtime_name, first_count, current_count
+                )
+            }
+            TypeError::HttpClusteredImportedOriginMissing { handler_name, .. } => {
+                write!(
+                    f,
+                    "imported route handler `{}` is missing defining-module metadata for HTTP.clustered(...)",
+                    handler_name
                 )
             }
             TypeError::TryIncompatibleReturn { fn_return_ty, .. } => {

@@ -92,19 +92,38 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Tabular numbers for counts and version strings */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
-/* Reveal animations — matches landing page */
+/* Reveal animations */
 .reveal {
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  transform: translateY(16px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
 }
 .reveal.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
-.reveal-delay-1 { transition-delay: 0.1s; }
-.reveal-delay-2 { transition-delay: 0.2s; }
-.reveal-delay-3 { transition-delay: 0.3s; }
-.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-1 { transition-delay: 0.05s; }
+.reveal-delay-2 { transition-delay: 0.1s; }
+.reveal-delay-3 { transition-delay: 0.15s; }
+.reveal-delay-4 { transition-delay: 0.2s; }
+
+/* Prose overrides for dark mode README rendering */
+.dark .prose pre {
+  background-color: oklch(0.17 0 0);
+  border: 1px solid oklch(0.22 0 0);
+}
+.dark .prose code {
+  color: oklch(0.85 0 0);
+}
+.prose pre {
+  overflow-x: auto;
+}
+.prose img {
+  border-radius: 0.5rem;
+}

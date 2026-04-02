@@ -18,11 +18,17 @@ use super::{MirExpr, MirModule};
 /// Run the monomorphization pass on a MIR module.
 ///
 /// This collects all reachable functions starting from the entry point
-/// (or all top-level functions if no entry point exists), and removes
-/// any unreachable functions. In the future, this will also specialize
-/// generic functions for each concrete type instantiation.
+/// (or all top-level functions if no entry point exists), plus any explicit
+/// extra roots that the caller needs to preserve, and removes any unreachable
+/// functions. In the future, this will also specialize generic functions for each
+/// concrete type instantiation.
 pub fn monomorphize(module: &mut MirModule) {
-    let reachable = collect_reachable_functions(module);
+    monomorphize_with_roots(module, &[]);
+}
+
+/// Run the monomorphization pass while preserving additional root symbols.
+pub fn monomorphize_with_roots(module: &mut MirModule, extra_roots: &[String]) {
+    let reachable = collect_reachable_functions(module, extra_roots);
 
     // Keep only reachable functions (plus closure functions that may be
     // referenced transitively).
@@ -30,7 +36,7 @@ pub fn monomorphize(module: &mut MirModule) {
 }
 
 /// Collect the names of all reachable functions starting from the entry point.
-fn collect_reachable_functions(module: &MirModule) -> HashSet<String> {
+fn collect_reachable_functions(module: &MirModule, extra_roots: &[String]) -> HashSet<String> {
     let mut reachable = HashSet::new();
     let mut worklist: Vec<String> = Vec::new();
 
@@ -42,6 +48,9 @@ fn collect_reachable_functions(module: &MirModule) -> HashSet<String> {
         for f in &module.functions {
             worklist.push(f.name.clone());
         }
+    }
+    for root in extra_roots {
+        worklist.push(root.clone());
     }
 
     while let Some(name) = worklist.pop() {

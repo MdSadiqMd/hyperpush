@@ -1,12 +1,14 @@
 //! Typed AST nodes for declarations and items.
 //!
-//! Covers: SourceFile, FnDef, ParamList, Param, TypeAnnotation, ModuleDef,
-//! ImportDecl, FromImportDecl, ImportList, StructDef, StructField, LetBinding,
-//! Visibility, Block, Name, NameRef, Path, SumTypeDef, VariantDef, VariantField.
+//! Covers: SourceFile, FnDef, ClusteredDecl, ClusteredWorkDecl, ParamList, Param,
+//! TypeAnnotation, ModuleDef, ImportDecl, FromImportDecl, ImportList,
+//! StructDef, StructField, LetBinding, Visibility, Block, Name, NameRef,
+//! Path, SumTypeDef, VariantDef, VariantField.
 
 use crate::ast::{ast_node, child_node, child_nodes, child_token, AstNode};
 use crate::cst::{SyntaxNode, SyntaxToken};
 use crate::syntax_kind::SyntaxKind;
+use mesh_common::span::Span;
 
 // ── Source File ──────────────────────────────────────────────────────────
 
@@ -74,11 +76,109 @@ impl Item {
 
 // ── Function Definition ──────────────────────────────────────────────────
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusteredDeclKind {
+    Work,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusteredDeclSyntax {
+    SourceDecorator,
+    LegacyCompat,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClusteredDecl {
+    syntax: SyntaxNode,
+}
+
+impl AstNode for ClusteredDecl {
+    fn cast(node: SyntaxNode) -> Option<Self> {
+        match node.kind() {
+            SyntaxKind::CLUSTER_DECORATOR_DECL | SyntaxKind::CLUSTERED_WORK_DECL => {
+                Some(Self { syntax: node })
+            }
+            _ => None,
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+
+fn parse_u32_literal_text(text: &str) -> Option<u32> {
+    let normalized = text.replace('_', "");
+    if let Some(hex) = normalized
+        .strip_prefix("0x")
+        .or_else(|| normalized.strip_prefix("0X"))
+    {
+        u32::from_str_radix(hex, 16).ok()
+    } else if let Some(binary) = normalized
+        .strip_prefix("0b")
+        .or_else(|| normalized.strip_prefix("0B"))
+    {
+        u32::from_str_radix(binary, 2).ok()
+    } else if let Some(octal) = normalized
+        .strip_prefix("0o")
+        .or_else(|| normalized.strip_prefix("0O"))
+    {
+        u32::from_str_radix(octal, 8).ok()
+    } else {
+        normalized.parse::<u32>().ok()
+    }
+}
+
+impl ClusteredDecl {
+    pub fn syntax_style(&self) -> ClusteredDeclSyntax {
+        match self.syntax.kind() {
+            SyntaxKind::CLUSTER_DECORATOR_DECL => ClusteredDeclSyntax::SourceDecorator,
+            SyntaxKind::CLUSTERED_WORK_DECL => ClusteredDeclSyntax::LegacyCompat,
+            _ => unreachable!("ClusteredDecl only casts clustered declaration nodes"),
+        }
+    }
+
+    pub fn kind(&self) -> ClusteredDeclKind {
+        ClusteredDeclKind::Work
+    }
+
+    pub fn explicit_replica_count_token(&self) -> Option<SyntaxToken> {
+        if self.syntax.kind() != SyntaxKind::CLUSTER_DECORATOR_DECL {
+            return None;
+        }
+
+        self.syntax
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|t| t.kind() == SyntaxKind::INT_LITERAL)
+    }
+
+    pub fn explicit_replica_count(&self) -> Option<u32> {
+        self.explicit_replica_count_token()
+            .and_then(|token| parse_u32_literal_text(token.text()))
+    }
+
+    pub fn declaration_span(&self) -> Span {
+        let range = self.syntax.text_range();
+        Span::new(range.start().into(), range.end().into())
+    }
+}
+
 ast_node!(FnDef, FN_DEF);
 
 impl FnDef {
     /// The visibility modifier (`pub`), if present.
     pub fn visibility(&self) -> Option<Visibility> {
+        child_node(&self.syntax)
+    }
+
+    /// Any supported clustered declaration decorator decorating this function.
+    pub fn clustered_decl(&self) -> Option<ClusteredDecl> {
+        child_node(&self.syntax)
+    }
+
+    /// The legacy `clustered(work)` declaration marker, if present in older CSTs.
+    pub fn clustered_work_decl(&self) -> Option<ClusteredWorkDecl> {
         child_node(&self.syntax)
     }
 
@@ -134,6 +234,20 @@ impl FnDef {
 }
 
 // ── Parameter List ───────────────────────────────────────────────────────
+
+ast_node!(ClusteredWorkDecl, CLUSTERED_WORK_DECL);
+
+impl ClusteredWorkDecl {
+    /// The declared clustered target.
+    pub fn target(&self) -> Option<String> {
+        self.syntax
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .filter(|t| t.kind() == SyntaxKind::IDENT && t.text() != "clustered")
+            .map(|t| t.text().to_string())
+            .next()
+    }
+}
 
 ast_node!(ParamList, PARAM_LIST);
 

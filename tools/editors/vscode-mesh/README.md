@@ -5,9 +5,11 @@
 
 Language support for [Mesh](https://meshlang.dev) -- an expressive, readable programming language with built-in concurrency via actors and supervision trees.
 
+VS Code is a **first-class** editor host in the public Mesh tooling contract. The contract lives at [meshlang.dev/docs/tooling](https://meshlang.dev/docs/tooling/) and keeps this README scoped to the VS Code install, packaging, and run path.
+
 ## Features
 
-- **Syntax Highlighting** -- comprehensive TextMate grammar with scoping for keywords, types, literals, comments, and module-qualified calls
+- **Syntax Highlighting** -- shared TextMate grammar with verified scoping for keywords, types, literals, comments, module-qualified calls, and both `#{...}` plus `${...}` interpolation in double- and triple-quoted strings
 - **Language Configuration** -- bracket matching, auto-closing pairs, and Mesh-specific indentation for `do`/`end` blocks
 - **Verified LSP Diagnostics** -- real-time parse and type errors from the Mesh compiler
 - **Verified Hover** -- inferred type information on hover
@@ -15,7 +17,7 @@ Language support for [Mesh](https://meshlang.dev) -- an expressive, readable pro
 - **Verified Document Formatting** -- format the current Mesh document through `meshc lsp`
 - **Verified Signature Help** -- parameter hints with active-parameter tracking for function calls
 
-The current transport-level regression suite exercises the LSP path over real stdio JSON-RPC against `reference-backend/`, so the documented editor experience is tied to the same backend-shaped proof as the CLI tooling.
+The current transport-level regression suite exercises the LSP path over real stdio JSON-RPC against `reference-backend/`, so the documented editor experience is tied to the same backend-shaped proof as the CLI tooling. The bundled syntax grammar is also verified through the shared VS Code/docs parity corpus, including `#{...}` and `${...}` inside double- and triple-quoted strings.
 
 ## Installation
 
@@ -55,6 +57,16 @@ The package step writes the current versioned artifact to `dist/mesh-lang-<versi
 ```sh
 npm run install-local
 ```
+
+## Verification
+
+When you need the full repo-root public tooling/editor proof chain instead of only the extension-local package/install loop, run this from the repository root:
+
+```bash
+bash scripts/verify-m036-s03.sh
+```
+
+That verifier replays the docs contract, VitePress build, existing VSIX/public README proof, this real Extension Development Host smoke, and the repo-owned Neovim replay from one named-phase command.
 
 ## Requirements
 

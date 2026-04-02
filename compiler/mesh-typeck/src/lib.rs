@@ -127,6 +127,22 @@ pub struct ExportedSymbols {
     pub type_aliases: FxHashMap<String, TypeAliasInfo>,
 }
 
+/// Kind of executable helper exported for a service method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServiceMethodExportKind {
+    Start,
+    Call,
+    Cast,
+}
+
+/// One exported service helper and its runtime-callable symbol.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceMethodExport {
+    pub method_name: String,
+    pub generated_name: String,
+    pub kind: ServiceMethodExportKind,
+}
+
 /// Information about an exported service, containing the helper function
 /// signatures and method mappings needed by importing modules.
 #[derive(Debug, Default, Clone)]
@@ -140,6 +156,47 @@ pub struct ServiceExportInfo {
     /// Method names with their generated function names for MIR resolution.
     /// Maps (method_name, generated_fn_name), e.g., ("start", "__service_counter_start").
     pub methods: Vec<(String, String)>,
+    /// Richer exported service helper metadata for clustered execution planning.
+    pub method_exports: Vec<ServiceMethodExport>,
+}
+
+pub const DEFAULT_CLUSTERED_ROUTE_REPLICATION_COUNT: u32 = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusteredRouteReplicationCountSource {
+    Default,
+    Explicit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClusteredRouteReplicationCount {
+    pub value: u32,
+    pub source: ClusteredRouteReplicationCountSource,
+}
+
+impl ClusteredRouteReplicationCount {
+    pub fn defaulted() -> Self {
+        Self {
+            value: DEFAULT_CLUSTERED_ROUTE_REPLICATION_COUNT,
+            source: ClusteredRouteReplicationCountSource::Default,
+        }
+    }
+
+    pub fn explicit(value: u32) -> Self {
+        Self {
+            value,
+            source: ClusteredRouteReplicationCountSource::Explicit,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClusteredRouteWrapperMetadata {
+    pub handler_name: String,
+    pub defining_module: Option<String>,
+    pub runtime_name: String,
+    pub handler_span: TextRange,
+    pub replication_count: ClusteredRouteReplicationCount,
 }
 
 // ── TypeckResult ────────────────────────────────────────────────────────
@@ -192,6 +249,10 @@ pub struct TypeckResult {
     /// Non-empty only when the source file has arity-overloaded pub fns.
     /// Consumed by the MIR lowerer to emit the correct mangled function reference.
     pub overloaded_call_targets: FxHashMap<TextRange, String>,
+    /// Metadata for `HTTP.clustered(...)` wrappers keyed by wrapper call range.
+    /// Consumed by later lowering so clustered routes reuse declared-handler
+    /// runtime-name/count truth instead of inventing an HTTP-only path.
+    pub clustered_route_wrappers: FxHashMap<TextRange, ClusteredRouteWrapperMetadata>,
 }
 
 impl TypeckResult {

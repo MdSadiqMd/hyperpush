@@ -3,7 +3,8 @@
 //! Provides the `meshc` command with the following subcommands:
 //!
 //! - `meshc build <dir>` - Compile a Mesh project to a native binary
-//! - `meshc init <name>` - Initialize a new Mesh project
+//! - `meshc init [--clustered] [--template <name>] <name>` - Initialize a new Mesh project
+//! - `meshc cluster <status|continuity|diagnostics> ...` - Inspect runtime-owned clustered operator surfaces
 //! - `meshc deps [dir]` - Resolve and fetch dependencies
 //! - `meshc fmt <path>` - Format Mesh source files in-place
 //! - `meshc test [path]` - Run *.test.mpl files from a project root, tests directory, or specific test file
@@ -23,6 +24,7 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+mod cluster;
 mod discovery;
 mod migrate;
 mod test_runner;
@@ -35,6 +37,11 @@ use clap::{Parser, Subcommand};
 use mesh_parser::ast::expr::{FieldAccess, NameRef};
 use mesh_parser::ast::AstNode;
 use mesh_parser::syntax_kind::SyntaxKind;
+use mesh_pkg::manifest::{
+    build_clustered_export_surface, collect_source_cluster_declarations,
+    validate_cluster_declarations_with_source, ClusteredDeclarationError,
+    ClusteredExecutionMetadata, Manifest,
+};
 
 use mesh_typeck::diagnostics::DiagnosticOptions;
 use mesh_typeck::ty::Ty;
@@ -79,8 +86,21 @@ enum Commands {
     },
     /// Initialize a new Mesh project
     Init {
+        /// Generate the clustered app scaffold instead of the hello-world app
+        #[arg(long)]
+        clustered: bool,
+
+        /// Generate a named starter template (currently: todo-api)
+        #[arg(long)]
+        template: Option<String>,
+
         /// Project name (creates directory with this name)
         name: String,
+    },
+    /// Inspect runtime-owned clustered operator surfaces
+    Cluster {
+        #[command(subcommand)]
+        action: cluster::ClusterCommand,
     },
     /// Resolve and fetch dependencies
     Deps {
@@ -190,9 +210,28 @@ fn main() {
                 process::exit(1);
             }
         }
-        Commands::Init { name } => {
+        Commands::Init {
+            clustered,
+            template,
+            name,
+        } => {
             let dir = std::env::current_dir().unwrap_or_default();
-            if let Err(e) = mesh_pkg::scaffold_project(&name, &dir) {
+            let result = match template.as_deref() {
+                Some("todo-api") => mesh_pkg::scaffold_todo_api_project(&name, &dir),
+                Some(other) => Err(format!(
+                    "unknown init template '{}'; supported templates: todo-api",
+                    other
+                )),
+                None if clustered => mesh_pkg::scaffold_clustered_project(&name, &dir),
+                None => mesh_pkg::scaffold_project(&name, &dir),
+            };
+            if let Err(e) = result {
+                eprintln!("error: {}", e);
+                process::exit(1);
+            }
+        }
+        Commands::Cluster { action } => {
+            if let Err(e) = cluster::run_cluster_command(action) {
                 eprintln!("error: {}", e);
                 process::exit(1);
             }
@@ -271,6 +310,12 @@ fn main() {
     }
 }
 
+pub(crate) struct PreparedBuild {
+    pub(crate) merged_mir: mesh_codegen::mir::MirModule,
+    pub(crate) clustered_execution_plan: Vec<ClusteredExecutionMetadata>,
+    pub(crate) clustered_route_handler_plan: Vec<mesh_codegen::DeclaredHandlerPlanEntry>,
+}
+
 /// Execute the build pipeline: discover all .mpl files -> parse -> typecheck entry -> codegen -> link.
 pub(crate) fn build(
     dir: &Path,
@@ -280,6 +325,86 @@ pub(crate) fn build(
     target: Option<&str>,
     diag_opts: &DiagnosticOptions,
 ) -> Result<(), String> {
+    let mut prepared = prepare_project_build(dir, diag_opts)?;
+    let declared_handler_plan = prepare_declared_handler_plan(
+        &prepared.clustered_execution_plan,
+        &prepared.clustered_route_handler_plan,
+    );
+    let startup_work_registrations =
+        mesh_codegen::prepare_startup_work_registrations(&declared_handler_plan);
+    let declared_handlers = mesh_codegen::prepare_declared_runtime_handlers(
+        &mut prepared.merged_mir,
+        &declared_handler_plan,
+    )?;
+
+    // Determine output path
+    let project_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("output");
+    let output_path = match output {
+        Some(p) => p.to_path_buf(),
+        None => dir.join(project_name),
+    };
+
+    // Emit LLVM IR if requested
+    if emit_llvm {
+        let ll_path = output_path.with_extension("ll");
+        mesh_codegen::compile_mir_to_llvm_ir(
+            &prepared.merged_mir,
+            &declared_handlers,
+            &startup_work_registrations,
+            &ll_path,
+            target,
+        )?;
+        eprintln!("  LLVM IR: {}", ll_path.display());
+    }
+
+    // Compile to native binary
+    let runtime_override = runtime_lib_override_from_env()?;
+    mesh_codegen::compile_mir_to_binary(
+        &prepared.merged_mir,
+        &declared_handlers,
+        &startup_work_registrations,
+        &output_path,
+        opt_level,
+        target,
+        runtime_override.as_deref(),
+    )?;
+
+    eprintln!("  Compiled: {}", output_path.display());
+
+    Ok(())
+}
+
+fn prepare_declared_handler_plan(
+    entries: &[ClusteredExecutionMetadata],
+    clustered_route_entries: &[mesh_codegen::DeclaredHandlerPlanEntry],
+) -> Vec<mesh_codegen::DeclaredHandlerPlanEntry> {
+    let mut plan = entries
+        .iter()
+        .map(|entry| mesh_codegen::DeclaredHandlerPlanEntry {
+            kind: match entry.kind {
+                mesh_pkg::manifest::ClusteredDeclarationKind::Work => {
+                    mesh_codegen::DeclaredHandlerKind::Work
+                }
+                mesh_pkg::manifest::ClusteredDeclarationKind::ServiceCall => {
+                    mesh_codegen::DeclaredHandlerKind::ServiceCall
+                }
+                mesh_pkg::manifest::ClusteredDeclarationKind::ServiceCast => {
+                    mesh_codegen::DeclaredHandlerKind::ServiceCast
+                }
+            },
+            runtime_registration_name: entry.runtime_registration_name.clone(),
+            executable_symbol: entry.executable_symbol.clone(),
+            replication_count: entry.replication_count.value as u64,
+        })
+        .collect::<Vec<_>>();
+    plan.extend(clustered_route_entries.iter().cloned());
+    plan
+}
+
+pub(crate) fn prepare_project_build(
+    dir: &Path,
+    diag_opts: &DiagnosticOptions,
+) -> Result<PreparedBuild, String> {
     // Validate the project directory
     if !dir.exists() {
         return Err(format!(
@@ -300,6 +425,13 @@ pub(crate) fn build(
         ));
     }
 
+    let manifest_path = dir.join("mesh.toml");
+    let manifest = if manifest_path.exists() {
+        Some(Manifest::from_file(&manifest_path)?)
+    } else {
+        None
+    };
+
     // Build the project: discover all files, parse, build module graph
     let project = discovery::build_project(dir)?;
 
@@ -310,7 +442,6 @@ pub(crate) fn build(
         .copied()
         .find(|id| project.graph.get(*id).is_entry)
         .ok_or("No entry module found in module graph")?;
-    let _entry_idx = entry_id.0 as usize;
 
     // Check parse errors in ALL modules (not just entry)
     let mut has_errors = false;
@@ -417,6 +548,36 @@ pub(crate) fn build(
         return Err("Compilation failed due to errors above.".to_string());
     }
 
+    let source_cluster_declarations =
+        collect_source_cluster_declarations(&project.graph, &project.module_parses);
+    let clustered_execution_plan = if manifest
+        .as_ref()
+        .and_then(|manifest| manifest.cluster.as_ref())
+        .is_some()
+        || !source_cluster_declarations.is_empty()
+    {
+        let surface =
+            build_clustered_export_surface(&project.graph, &project.module_parses, &all_exports);
+        match validate_cluster_declarations_with_source(
+            manifest
+                .as_ref()
+                .and_then(|manifest| manifest.cluster.as_ref()),
+            &source_cluster_declarations,
+            &surface,
+        ) {
+            Ok(metadata) => metadata,
+            Err(issues) => {
+                emit_clustered_declaration_diagnostics(&manifest_path, &issues, diag_opts);
+                return Err("Compilation failed due to errors above.".to_string());
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    let clustered_route_handler_plan = mesh_codegen::prepare_clustered_route_handler_plan(
+        all_typeck.iter().filter_map(|typeck| typeck.as_ref()),
+    )?;
+
     let inferred_export_names: HashSet<String> = all_exports
         .iter()
         .filter_map(|exports_opt| exports_opt.as_ref())
@@ -436,7 +597,7 @@ pub(crate) fn build(
         &inferred_export_names,
     );
 
-    // Lower ALL modules to MIR and merge into a single module for codegen
+    // Lower ALL modules to MIR and merge into a single module for codegen.
     let mut mir_modules = Vec::new();
     let mut entry_mir_idx = 0;
     for (i, &id) in project.compilation_order.iter().enumerate() {
@@ -465,35 +626,23 @@ pub(crate) fn build(
         }
         mir_modules.push(mir);
     }
-    let merged_mir = mesh_codegen::merge_mir_modules(mir_modules, entry_mir_idx);
+    let declared_executable_symbols = clustered_execution_plan
+        .iter()
+        .map(|entry| entry.executable_symbol.clone())
+        .chain(
+            clustered_route_handler_plan
+                .iter()
+                .map(|entry| entry.executable_symbol.clone()),
+        )
+        .collect::<Vec<_>>();
+    let merged_mir =
+        mesh_codegen::merge_mir_modules(mir_modules, entry_mir_idx, &declared_executable_symbols);
 
-    // Determine output path
-    let project_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("output");
-    let output_path = match output {
-        Some(p) => p.to_path_buf(),
-        None => dir.join(project_name),
-    };
-
-    // Emit LLVM IR if requested
-    if emit_llvm {
-        let ll_path = output_path.with_extension("ll");
-        mesh_codegen::compile_mir_to_llvm_ir(&merged_mir, &ll_path, target)?;
-        eprintln!("  LLVM IR: {}", ll_path.display());
-    }
-
-    // Compile to native binary
-    let runtime_override = runtime_lib_override_from_env()?;
-    mesh_codegen::compile_mir_to_binary(
-        &merged_mir,
-        &output_path,
-        opt_level,
-        target,
-        runtime_override.as_deref(),
-    )?;
-
-    eprintln!("  Compiled: {}", output_path.display());
-
-    Ok(())
+    Ok(PreparedBuild {
+        merged_mir,
+        clustered_execution_plan,
+        clustered_route_handler_plan,
+    })
 }
 
 fn runtime_lib_override_from_env() -> Result<Option<PathBuf>, String> {
@@ -659,6 +808,104 @@ fn build_import_context(
     }
 
     ctx
+}
+
+fn clustered_issue_file_and_span(
+    manifest_path: &Path,
+    issue: &ClusteredDeclarationError,
+) -> (String, Option<String>, Option<std::ops::Range<usize>>) {
+    let Some(provenance) = issue.origin.provenance() else {
+        return (manifest_path.display().to_string(), None, None);
+    };
+
+    let project_root = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let file_path = project_root.join(&provenance.file);
+    let file_name = file_path.display().to_string();
+    let source = std::fs::read_to_string(&file_path).ok();
+    let span = source
+        .as_ref()
+        .map(|source| clustered_issue_range(source, provenance.span));
+    (file_name, source, span)
+}
+
+fn clustered_issue_range(source: &str, span: mesh_common::span::Span) -> std::ops::Range<usize> {
+    if source.is_empty() {
+        return 0..0;
+    }
+
+    let mut start = (span.start as usize).min(source.len() - 1);
+    let mut end = (span.end as usize).min(source.len());
+    if end <= start {
+        end = (start + 1).min(source.len());
+    }
+    start = start.min(end.saturating_sub(1));
+    start..end
+}
+
+fn offset_to_line_col(source: &str, offset: usize) -> (usize, usize) {
+    let offset = offset.min(source.len());
+    let prefix = &source[..offset];
+    let line = prefix.bytes().filter(|byte| *byte == b'\n').count() + 1;
+    let col = prefix
+        .rsplit_once('\n')
+        .map(|(_, line_text)| line_text.chars().count() + 1)
+        .unwrap_or_else(|| prefix.chars().count() + 1);
+    (line, col)
+}
+
+fn emit_clustered_declaration_diagnostics(
+    manifest_path: &Path,
+    issues: &[ClusteredDeclarationError],
+    diag_opts: &DiagnosticOptions,
+) {
+    for issue in issues {
+        let (file_name, source, span) = clustered_issue_file_and_span(manifest_path, issue);
+
+        if diag_opts.json {
+            let spans = span
+                .as_ref()
+                .map(|span| {
+                    vec![serde_json::json!({
+                        "start": span.start,
+                        "end": span.end,
+                        "label": issue.reason
+                    })]
+                })
+                .unwrap_or_default();
+            let json_diag = serde_json::json!({
+                "code": "CFG0001",
+                "severity": "error",
+                "message": issue.to_string(),
+                "file": file_name,
+                "spans": spans,
+                "fix": null
+            });
+            eprintln!("{}", json_diag);
+            continue;
+        }
+
+        if let (Some(source), Some(span)) = (source.as_ref(), span.as_ref()) {
+            use ariadne::{Config, Label, Report, ReportKind, Source};
+
+            let config = if diag_opts.color {
+                Config::default()
+            } else {
+                Config::default().with_color(false)
+            };
+            let (line, col) = offset_to_line_col(source, span.start);
+            eprintln!("error: {}", issue);
+            eprintln!("  --> {}:{}:{}", file_name, line, col);
+            let _ = Report::<std::ops::Range<usize>>::build(ReportKind::Error, span.clone())
+                .with_message("Invalid clustered declaration")
+                .with_config(config)
+                .with_label(Label::new(span.clone()).with_message(&issue.reason))
+                .finish()
+                .eprint(Source::from(source.as_str()));
+        } else {
+            eprintln!("error: {}", issue);
+            eprintln!("  --> {}", file_name);
+        }
+    }
 }
 
 /// Report parse and type-check diagnostics.

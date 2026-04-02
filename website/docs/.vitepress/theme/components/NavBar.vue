@@ -36,6 +36,12 @@ const { isDark } = useData()
           Docs
         </a>
         <a
+          href="/packages/"
+          class="pointer-events-auto rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent"
+        >
+          Packages
+        </a>
+        <a
           href="https://github.com/snowdamiz/mesh-lang"
           class="pointer-events-auto rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent"
         >

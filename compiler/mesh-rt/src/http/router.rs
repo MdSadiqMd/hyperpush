@@ -31,6 +31,10 @@ pub struct RouteEntry {
     pub handler_fn: *mut u8,
     /// Pointer to the handler closure environment (null for bare functions).
     pub handler_env: *mut u8,
+    /// Declared handler runtime name when this route was lowered through HTTP.clustered(...).
+    pub declared_handler_runtime_name: Option<String>,
+    /// Registered replication count for a clustered route shim.
+    pub replication_count: Option<u64>,
 }
 
 /// Router holding an ordered list of route entries and middleware.
@@ -90,7 +94,7 @@ fn is_wildcard(pattern: &str) -> bool {
 impl MeshRouter {
     /// Find the first route matching the given path and HTTP method.
     ///
-    /// Returns (handler_fn, handler_env, params) or None.
+    /// Returns (matched route entry, params) or None.
     /// Uses three-pass matching for priority:
     ///   1. Exact routes (no `:param`, no `*`) -- highest priority
     ///   2. Parameterized routes (`:param` segments) -- medium priority
@@ -100,7 +104,7 @@ impl MeshRouter {
         &self,
         path: &str,
         method: &str,
-    ) -> Option<(*mut u8, *mut u8, Vec<(String, String)>)> {
+    ) -> Option<(&RouteEntry, Vec<(String, String)>)> {
         // First pass: exact routes only (no `:param` segments, no wildcards).
         for entry in &self.routes {
             if has_param_segments(&entry.pattern) || is_wildcard(&entry.pattern) {
@@ -112,7 +116,7 @@ impl MeshRouter {
                 }
             }
             if matches_pattern(&entry.pattern, path) {
-                return Some((entry.handler_fn, entry.handler_env, Vec::new()));
+                return Some((entry, Vec::new()));
             }
         }
 
@@ -127,7 +131,7 @@ impl MeshRouter {
                 }
             }
             if let Some(params) = match_segments(&entry.pattern, path) {
-                return Some((entry.handler_fn, entry.handler_env, params));
+                return Some((entry, params));
             }
         }
 
@@ -142,7 +146,7 @@ impl MeshRouter {
                 }
             }
             if matches_pattern(&entry.pattern, path) {
-                return Some((entry.handler_fn, entry.handler_env, Vec::new()));
+                return Some((entry, Vec::new()));
             }
         }
 
@@ -161,6 +165,7 @@ fn route_with_method(
     method: Option<&str>,
 ) -> *mut u8 {
     let handler_env: *mut u8 = std::ptr::null_mut();
+    let clustered_metadata = crate::dist::node::lookup_declared_handler_route_metadata(handler_fn);
     unsafe {
         let old = &*(router as *const MeshRouter);
         let pat_str = (*pattern).as_str().to_string();
@@ -172,6 +177,8 @@ fn route_with_method(
                 method: entry.method.clone(),
                 handler_fn: entry.handler_fn,
                 handler_env: entry.handler_env,
+                declared_handler_runtime_name: entry.declared_handler_runtime_name.clone(),
+                replication_count: entry.replication_count,
             });
         }
         new_routes.push(RouteEntry {
@@ -179,6 +186,10 @@ fn route_with_method(
             method: method.map(|m| m.to_string()),
             handler_fn,
             handler_env,
+            declared_handler_runtime_name: clustered_metadata
+                .as_ref()
+                .map(|metadata| metadata.runtime_name.clone()),
+            replication_count: clustered_metadata.map(|metadata| metadata.replication_count),
         });
 
         let new_middlewares = old.middlewares.clone();
@@ -273,6 +284,8 @@ pub extern "C" fn mesh_http_use_middleware(router: *mut u8, middleware_fn: *mut 
                 method: entry.method.clone(),
                 handler_fn: entry.handler_fn,
                 handler_env: entry.handler_env,
+                declared_handler_runtime_name: entry.declared_handler_runtime_name.clone(),
+                replication_count: entry.replication_count,
             });
         }
 
@@ -294,8 +307,33 @@ pub extern "C" fn mesh_http_use_middleware(router: *mut u8, middleware_fn: *mut 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dist::node::{
+        clear_declared_handler_registry_for_test, mesh_register_declared_handler,
+    };
     use crate::gc::mesh_rt_init;
     use crate::string::mesh_string_new;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    fn plain_route(pattern: &str, method: Option<&str>, handler_fn: usize) -> RouteEntry {
+        RouteEntry {
+            pattern: pattern.to_string(),
+            method: method.map(str::to_string),
+            handler_fn: handler_fn as *mut u8,
+            handler_env: std::ptr::null_mut(),
+            declared_handler_runtime_name: None,
+            replication_count: None,
+        }
+    }
+
+    fn clustered_route_test_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
+
+    extern "C" fn clustered_route_handler(_request: *mut u8) -> *mut u8 {
+        let body = mesh_string_new(b"ok".as_ptr(), 2);
+        crate::http::server::mesh_http_response_new(200, body)
+    }
 
     #[test]
     fn test_exact_match() {
@@ -309,7 +347,6 @@ mod tests {
         assert!(matches_pattern("/api/*", "/api/users"));
         assert!(matches_pattern("/api/*", "/api/users/123"));
         assert!(matches_pattern("/api/*", "/api/"));
-        // Exact prefix without trailing slash
         assert!(matches_pattern("/api/*", "/api"));
         assert!(!matches_pattern("/api/*", "/other"));
     }
@@ -322,13 +359,11 @@ mod tests {
 
     #[test]
     fn test_segment_matching() {
-        // Basic param capture
         let params = match_segments("/users/:id", "/users/42").unwrap();
         assert_eq!(params.len(), 1);
         assert_eq!(params[0].0, "id");
         assert_eq!(params[0].1, "42");
 
-        // Multiple params
         let params = match_segments("/users/:user_id/posts/:post_id", "/users/7/posts/99").unwrap();
         assert_eq!(params.len(), 2);
         assert_eq!(params[0].0, "user_id");
@@ -336,7 +371,6 @@ mod tests {
         assert_eq!(params[1].0, "post_id");
         assert_eq!(params[1].1, "99");
 
-        // Mixed literal and param
         let params = match_segments("/api/users/:id/profile", "/api/users/42/profile").unwrap();
         assert_eq!(params.len(), 1);
         assert_eq!(params[0].0, "id");
@@ -345,11 +379,8 @@ mod tests {
 
     #[test]
     fn test_segment_no_match() {
-        // Too many segments
         assert!(match_segments("/users/:id", "/users/42/extra").is_none());
-        // Too few segments
         assert!(match_segments("/users/:id/posts", "/users/42").is_none());
-        // Literal mismatch
         assert!(match_segments("/users/:id", "/posts/42").is_none());
     }
 
@@ -357,30 +388,17 @@ mod tests {
     fn test_exact_beats_param() {
         let router = MeshRouter {
             routes: vec![
-                RouteEntry {
-                    pattern: "/users/:id".to_string(),
-                    method: None,
-                    handler_fn: 1 as *mut u8,
-                    handler_env: std::ptr::null_mut(),
-                },
-                RouteEntry {
-                    pattern: "/users/me".to_string(),
-                    method: None,
-                    handler_fn: 2 as *mut u8,
-                    handler_env: std::ptr::null_mut(),
-                },
+                plain_route("/users/:id", None, 1),
+                plain_route("/users/me", None, 2),
             ],
             middlewares: vec![],
         };
-        // Exact route "/users/me" should win over parameterized "/users/:id"
-        // even though the parameterized route was registered first.
-        let (fn_ptr, _, params) = router.match_route("/users/me", "GET").unwrap();
-        assert_eq!(fn_ptr as usize, 2);
+        let (entry, params) = router.match_route("/users/me", "GET").unwrap();
+        assert_eq!(entry.handler_fn as usize, 2);
         assert!(params.is_empty());
 
-        // Other paths should match the parameterized route.
-        let (fn_ptr, _, params) = router.match_route("/users/42", "GET").unwrap();
-        assert_eq!(fn_ptr as usize, 1);
+        let (entry, params) = router.match_route("/users/42", "GET").unwrap();
+        assert_eq!(entry.handler_fn as usize, 1);
         assert_eq!(params[0].0, "id");
         assert_eq!(params[0].1, "42");
     }
@@ -389,45 +407,26 @@ mod tests {
     fn test_method_filtering() {
         let router = MeshRouter {
             routes: vec![
-                RouteEntry {
-                    pattern: "/users".to_string(),
-                    method: Some("GET".to_string()),
-                    handler_fn: 1 as *mut u8,
-                    handler_env: std::ptr::null_mut(),
-                },
-                RouteEntry {
-                    pattern: "/users".to_string(),
-                    method: Some("POST".to_string()),
-                    handler_fn: 2 as *mut u8,
-                    handler_env: std::ptr::null_mut(),
-                },
+                plain_route("/users", Some("GET"), 1),
+                plain_route("/users", Some("POST"), 2),
             ],
             middlewares: vec![],
         };
-        // GET request should match the GET handler.
-        let (fn_ptr, _, _) = router.match_route("/users", "GET").unwrap();
-        assert_eq!(fn_ptr as usize, 1);
+        let (entry, _) = router.match_route("/users", "GET").unwrap();
+        assert_eq!(entry.handler_fn as usize, 1);
 
-        // POST request should match the POST handler.
-        let (fn_ptr, _, _) = router.match_route("/users", "POST").unwrap();
-        assert_eq!(fn_ptr as usize, 2);
+        let (entry, _) = router.match_route("/users", "POST").unwrap();
+        assert_eq!(entry.handler_fn as usize, 2);
 
-        // DELETE request should NOT match either.
         assert!(router.match_route("/users", "DELETE").is_none());
     }
 
     #[test]
     fn test_method_agnostic_route() {
         let router = MeshRouter {
-            routes: vec![RouteEntry {
-                pattern: "/health".to_string(),
-                method: None,
-                handler_fn: 1 as *mut u8,
-                handler_env: std::ptr::null_mut(),
-            }],
+            routes: vec![plain_route("/health", None, 1)],
             middlewares: vec![],
         };
-        // Method-agnostic route should match any method.
         assert!(router.match_route("/health", "GET").is_some());
         assert!(router.match_route("/health", "POST").is_some());
         assert!(router.match_route("/health", "DELETE").is_some());
@@ -436,40 +435,20 @@ mod tests {
     #[test]
     fn test_router_match_order() {
         let router = MeshRouter {
-            routes: vec![
-                RouteEntry {
-                    pattern: "/exact".to_string(),
-                    method: None,
-                    handler_fn: 1 as *mut u8,
-                    handler_env: std::ptr::null_mut(),
-                },
-                RouteEntry {
-                    pattern: "/*".to_string(),
-                    method: None,
-                    handler_fn: 2 as *mut u8,
-                    handler_env: std::ptr::null_mut(),
-                },
-            ],
+            routes: vec![plain_route("/exact", None, 1), plain_route("/*", None, 2)],
             middlewares: vec![],
         };
-        // Exact match should win (first in order).
-        let (fn_ptr, _, _) = router.match_route("/exact", "GET").unwrap();
-        assert_eq!(fn_ptr as usize, 1);
+        let (entry, _) = router.match_route("/exact", "GET").unwrap();
+        assert_eq!(entry.handler_fn as usize, 1);
 
-        // Wildcard catches the rest.
-        let (fn_ptr, _, _) = router.match_route("/other", "GET").unwrap();
-        assert_eq!(fn_ptr as usize, 2);
+        let (entry, _) = router.match_route("/other", "GET").unwrap();
+        assert_eq!(entry.handler_fn as usize, 2);
     }
 
     #[test]
     fn test_router_no_match() {
         let router = MeshRouter {
-            routes: vec![RouteEntry {
-                pattern: "/only-this".to_string(),
-                method: None,
-                handler_fn: 1 as *mut u8,
-                handler_env: std::ptr::null_mut(),
-            }],
+            routes: vec![plain_route("/only-this", None, 1)],
             middlewares: vec![],
         };
         assert!(router.match_route("/other", "GET").is_none());
@@ -488,13 +467,48 @@ mod tests {
         let router2 = mesh_http_route(router, pattern, handler_fn);
         assert!(!router2.is_null());
 
-        // Verify the new router has the route.
         unsafe {
             let r = &*(router2 as *const MeshRouter);
             assert_eq!(r.routes.len(), 1);
             assert_eq!(r.routes[0].pattern, "/hello");
             assert_eq!(r.routes[0].handler_fn as usize, 42);
             assert!(r.routes[0].method.is_none());
+            assert!(r.routes[0].declared_handler_runtime_name.is_none());
+            assert_eq!(r.routes[0].replication_count, None);
         }
+    }
+
+    #[test]
+    fn router_registration_attaches_clustered_runtime_metadata() {
+        let _guard = clustered_route_test_lock();
+        mesh_rt_init();
+        clear_declared_handler_registry_for_test();
+
+        let runtime_name = "Api.Todos.handle_list_todos";
+        let executable_name = "__declared_route_api_todos_handle_list_todos";
+        mesh_register_declared_handler(
+            runtime_name.as_ptr(),
+            runtime_name.len() as u64,
+            executable_name.as_ptr(),
+            executable_name.len() as u64,
+            2,
+            clustered_route_handler as *const u8,
+        );
+
+        let router = mesh_http_router();
+        let pattern = mesh_string_new(b"/todos".as_ptr(), 6);
+        let routed = mesh_http_route_get(router, pattern, clustered_route_handler as *mut u8);
+
+        unsafe {
+            let router = &*(routed as *const MeshRouter);
+            assert_eq!(router.routes.len(), 1);
+            assert_eq!(
+                router.routes[0].declared_handler_runtime_name.as_deref(),
+                Some(runtime_name)
+            );
+            assert_eq!(router.routes[0].replication_count, Some(2));
+        }
+
+        clear_declared_handler_registry_for_test();
     }
 }
