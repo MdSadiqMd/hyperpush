@@ -68,6 +68,8 @@ Thumbs.db
 node_modules/
 .next/
 dist/
+!compiler/mesh-rt/src/dist/
+!compiler/mesh-rt/src/dist/*.rs
 build/
 __pycache__/
 *.pyc
