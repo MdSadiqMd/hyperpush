@@ -6,7 +6,7 @@ Replace Mesh's proof-app-shaped onboarding with a dual-database scaffold and gen
 ## Slice Overview
 | ID | Slice | Risk | Depends | Done | After this |
 |----|-------|------|---------|------|------------|
-| S01 | Postgres starter contract | high | — | ⬜ | `meshc init --template todo-api --db postgres <name>` emits a modern starter that builds, tests, and tells the serious clustered/deployable story honestly. |
+| S01 | Postgres starter contract | high | — | ✅ | `meshc init --template todo-api --db postgres <name>` emits a modern starter that builds, tests, and tells the serious clustered/deployable story honestly. |
 | S02 | SQLite local starter contract | medium | S01 | ⬜ | `meshc init --template todo-api --db sqlite <name>` emits the matching local-first starter with explicit single-node/local guidance and no fake clustered durability claims. |
 | S03 | Generated `/examples` from scaffold output | high | S01, S02 | ⬜ | `/examples/todo-postgres` and `/examples/todo-sqlite` exist as generated outputs that build, test, and match scaffold output mechanically. |
 | S04 | Retire top-level proof-app onboarding surfaces | high | S03 | ⬜ | `tiny-cluster/` and `cluster-proof/` are gone as top-level onboarding projects, and repo references now point at `/examples` or lower-level fixtures/support instead. |

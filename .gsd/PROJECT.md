@@ -8,6 +8,8 @@ M048 is complete. The repo now ships a default-plus-override executable-entry co
 
 The current wave continues the evaluator-facing public-surface reset: M049 will replace stale scaffold/example surfaces with generated SQLite-local and Postgres-clustered starters, M050 will rewrite public docs into evaluator-facing material instead of a proof maze, M051 will retire `reference-backend/` in favor of `mesher/` as the deeper living reference app, and later milestones will align landing/packages/deploy/load-balancing surfaces with that same truthful story.
 
+M049/S01 is now green: `meshc init --template todo-api --db postgres <name>` emits a migration-first Postgres Todo API starter, the generated app passes `meshc migrate` / `meshc test` / `meshc build` plus live boot/CRUD/error rails, and the starter now fails closed on missing `DATABASE_URL` instead of hanging behind runtime keepalive actors. The remaining M049 slices still need to land the SQLite-local parity story, generated `/examples`, and the public proof-app retirement wave.
+
 ## Core Value
 
 If Mesh claims it can cluster, route work, survive node loss, and report truthful runtime status, those claims must be proven through small docs-grade examples where the language/runtime owns the magic instead of the example app reimplementing distributed behavior — including the syntax users actually write.

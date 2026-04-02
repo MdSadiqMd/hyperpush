@@ -1,5 +1,6 @@
 use super::m046_route_free as route_free;
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -11,6 +12,23 @@ use std::time::{Duration, Instant};
 pub const TODO_STARTUP_HANDLER: &str = "@cluster pub fn sync_todos()";
 pub const TODO_RUNTIME_HANDLER: &str = "Work.sync_todos";
 pub const TODO_LIST_ROUTE_RUNTIME_HANDLER: &str = "Api.Todos.handle_list_todos";
+pub const TODO_FIXTURE_ROOT_RELATIVE: &str = "scripts/fixtures/m047-s05-clustered-todo";
+pub const TODO_FIXTURE_PACKAGE_NAME: &str = "todo-starter";
+pub const TODO_FIXTURE_REQUIRED_FILES: &[&str] = &[
+    ".dockerignore",
+    "Dockerfile",
+    "README.md",
+    "api/health.mpl",
+    "api/router.mpl",
+    "api/todos.mpl",
+    "main.mpl",
+    "mesh.toml",
+    "runtime/registry.mpl",
+    "services/rate_limiter.mpl",
+    "storage/todos.mpl",
+    "types/todo.mpl",
+    "work.mpl",
+];
 pub const DOCKER_BUILD_TIMEOUT: Duration = Duration::from_secs(1_800);
 pub const DOCKER_PHASE_TIMEOUT: Duration = Duration::from_secs(45);
 const TODO_CONTAINER_PORT: u16 = 8080;
@@ -193,34 +211,196 @@ pub fn unused_port() -> u16 {
         .port()
 }
 
-pub fn init_todo_project(workspace_dir: &Path, project_name: &str, artifacts: &Path) -> PathBuf {
-    let output = Command::new(meshc_bin())
-        .current_dir(workspace_dir)
-        .args(["init", "--template", "todo-api", project_name])
-        .output()
-        .unwrap_or_else(|error| {
-            panic!(
-                "failed to invoke meshc init --template todo-api {} in {}: {error}",
-                project_name,
-                workspace_dir.display()
-            )
-        });
-    write_artifact(&artifacts.join("init.log"), command_output_text(&output));
-    assert!(
-        output.status.success(),
-        "meshc init --template todo-api {} should succeed:\n{}",
-        project_name,
-        command_output_text(&output)
-    );
+pub fn todo_fixture_root() -> PathBuf {
+    repo_root().join(TODO_FIXTURE_ROOT_RELATIVE)
+}
+
+fn normalize_relative_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
+fn fail_fixture_init(artifacts: &Path, message: impl Into<String>) -> ! {
+    let message = message.into();
+    write_artifact(&artifacts.join("init.error.txt"), &message);
+    panic!("{message}");
+}
+
+fn collect_relative_file_set(
+    root: &Path,
+    current_dir: &Path,
+    files: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    let entries = fs::read_dir(current_dir)
+        .map_err(|error| format!("failed to read fixture directory {}: {error}", current_dir.display()))?;
+
+    for entry in entries {
+        let entry = entry
+            .map_err(|error| format!("failed to iterate fixture directory {}: {error}", current_dir.display()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_relative_file_set(root, &path, files)?;
+        } else if path.is_file() {
+            let relative = path.strip_prefix(root).map_err(|error| {
+                format!(
+                    "failed to strip fixture root {} from {}: {error}",
+                    root.display(),
+                    path.display()
+                )
+            })?;
+            files.insert(normalize_relative_path(relative));
+        } else {
+            return Err(format!(
+                "fixture path {} is neither a file nor a directory",
+                path.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn fixture_file_set(root: &Path) -> Result<BTreeSet<String>, String> {
+    if !root.is_dir() {
+        return Err(format!(
+            "todo scaffold fixture root {} is missing",
+            root.display()
+        ));
+    }
+
+    let mut files = BTreeSet::new();
+    collect_relative_file_set(root, root, &mut files)?;
+    Ok(files)
+}
+
+fn validate_todo_fixture_tree(root: &Path) -> Result<BTreeSet<String>, String> {
+    let actual_files = fixture_file_set(root)?;
+    let expected_files = TODO_FIXTURE_REQUIRED_FILES
+        .iter()
+        .map(|path| (*path).to_string())
+        .collect::<BTreeSet<_>>();
+    let missing_files = expected_files
+        .difference(&actual_files)
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_files.is_empty() {
+        return Err(format!(
+            "todo scaffold fixture {} is missing required files: {}",
+            root.display(),
+            missing_files.join(", ")
+        ));
+    }
+    Ok(actual_files)
+}
+
+fn copy_directory_tree(source_dir: &Path, dest_dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(dest_dir)
+        .map_err(|error| format!("failed to create fixture destination {}: {error}", dest_dir.display()))?;
+
+    let entries = fs::read_dir(source_dir)
+        .map_err(|error| format!("failed to read fixture source {}: {error}", source_dir.display()))?;
+    for entry in entries {
+        let entry = entry
+            .map_err(|error| format!("failed to iterate fixture source {}: {error}", source_dir.display()))?;
+        let source_path = entry.path();
+        let dest_path = dest_dir.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_directory_tree(&source_path, &dest_path)?;
+        } else if source_path.is_file() {
+            fs::copy(&source_path, &dest_path).map_err(|error| {
+                format!(
+                    "failed to copy fixture file {} -> {}: {error}",
+                    source_path.display(),
+                    dest_path.display()
+                )
+            })?;
+        } else {
+            return Err(format!(
+                "fixture source path {} is neither a file nor a directory",
+                source_path.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn init_todo_project_from_fixture_root(
+    fixture_root: &Path,
+    workspace_dir: &Path,
+    project_name: &str,
+    artifacts: &Path,
+) -> PathBuf {
+    if project_name != TODO_FIXTURE_PACKAGE_NAME {
+        fail_fixture_init(
+            artifacts,
+            format!(
+                "historical M047 todo fixture only supports project name {TODO_FIXTURE_PACKAGE_NAME:?}; requested {project_name:?}"
+            ),
+        );
+    }
+
+    let fixture_files = validate_todo_fixture_tree(fixture_root)
+        .unwrap_or_else(|message| fail_fixture_init(artifacts, message));
 
     let project_dir = workspace_dir.join(project_name);
-    assert!(
-        project_dir.is_dir(),
-        "meshc init --template todo-api reported success but {} is missing",
-        project_dir.display()
+    if project_dir.exists() {
+        fail_fixture_init(
+            artifacts,
+            format!(
+                "fixture-backed todo init target {} already exists",
+                project_dir.display()
+            ),
+        );
+    }
+
+    if let Err(message) = copy_directory_tree(fixture_root, &project_dir) {
+        let _ = fs::remove_dir_all(&project_dir);
+        fail_fixture_init(artifacts, message);
+    }
+
+    let copied_files = fixture_file_set(&project_dir).unwrap_or_else(|message| {
+        let _ = fs::remove_dir_all(&project_dir);
+        fail_fixture_init(artifacts, message)
+    });
+    if copied_files != fixture_files {
+        let missing_files = fixture_files
+            .difference(&copied_files)
+            .cloned()
+            .collect::<Vec<_>>();
+        let extra_files = copied_files
+            .difference(&fixture_files)
+            .cloned()
+            .collect::<Vec<_>>();
+        let _ = fs::remove_dir_all(&project_dir);
+        fail_fixture_init(
+            artifacts,
+            format!(
+                "fixture-backed todo copy into {} was malformed; missing: [{}] extra: [{}]",
+                project_dir.display(),
+                missing_files.join(", "),
+                extra_files.join(", "),
+            ),
+        );
+    }
+
+    let init_log = format!(
+        "source=fixture-copy\nfixture_root_relative={TODO_FIXTURE_ROOT_RELATIVE}\nfixture_root={}\nproject_name={project_name}\nproject_dir={}\nfile_count={}\nfiles:\n{}\n",
+        fixture_root.display(),
+        project_dir.display(),
+        copied_files.len(),
+        copied_files
+            .iter()
+            .map(|path| format!("- {path}"))
+            .collect::<Vec<_>>()
+            .join("\n")
     );
+    write_artifact(&artifacts.join("init.log"), init_log);
     archive_directory_tree(&project_dir, &artifacts.join("generated-project"));
     project_dir
+}
+
+pub fn init_todo_project(workspace_dir: &Path, project_name: &str, artifacts: &Path) -> PathBuf {
+    init_todo_project_from_fixture_root(&todo_fixture_root(), workspace_dir, project_name, artifacts)
 }
 
 pub fn build_todo_binary(project_dir: &Path, artifacts: &Path) -> PathBuf {

@@ -242,6 +242,52 @@ copy_new_artifacts_or_fail \
   "$ARTIFACT_DIR/retained-m047-s05-artifacts.manifest.txt"
 record_phase retain-m047-s05-artifacts passed
 
+record_phase m047-s05-fixture-provenance started
+if ! python3 - "$RETAINED_M047_S05_ARTIFACTS_DIR" >"$ARTIFACT_DIR/m047-s05-fixture-provenance.log" 2>"$ARTIFACT_DIR/m047-s05-fixture-provenance.error.log" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+init_logs = sorted(root.rglob('init.log'))
+if not init_logs:
+    raise SystemExit('missing retained init.log files from the fixture-backed todo replay')
+
+matching_logs = []
+for path in init_logs:
+    text = path.read_text(errors='replace')
+    if 'source=fixture-copy' not in text:
+        continue
+    if 'fixture_root_relative=scripts/fixtures/m047-s05-clustered-todo' not in text:
+        raise SystemExit(f'{path}: missing fixture_root_relative marker')
+    if 'meshc init --template todo-api' in text:
+        raise SystemExit(f'{path}: retained fixture provenance regressed back to public meshc init text')
+    matching_logs.append(path)
+
+if not matching_logs:
+    raise SystemExit('missing retained fixture-copy provenance markers in init.log files')
+
+required = [
+    'generated-project/mesh.toml',
+    'generated-project/main.mpl',
+    'generated-project/work.mpl',
+    'generated-project/README.md',
+]
+for relative in required:
+    if not any(path.as_posix().endswith(relative) for path in root.rglob(Path(relative).name)):
+        raise SystemExit(f'missing retained {relative} in copied m047-s05 artifacts')
+
+print('fixture provenance logs:')
+for path in matching_logs:
+    print(path)
+print('retained generated-project markers:')
+for relative in required:
+    print(relative)
+PY
+then
+  fail_phase m047-s05-fixture-provenance "missing fixture-copy provenance or generated-project markers in retained m047-s05 artifacts" "$ARTIFACT_DIR/m047-s05-fixture-provenance.error.log" "$RETAINED_M047_S05_ARTIFACTS_DIR"
+fi
+record_phase m047-s05-fixture-provenance passed
+
 record_phase m047-s05-bundle-shape started
 rm -rf "$RETAINED_PROOF_BUNDLE_DIR"
 mkdir -p "$RETAINED_PROOF_BUNDLE_DIR"

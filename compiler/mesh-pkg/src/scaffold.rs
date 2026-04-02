@@ -359,7 +359,7 @@ __NAME__/
 ## Clustered contract
 
 - `mesh.toml` stays package-only and intentionally omits `[cluster]`
-- `main.mpl` boots through `Node.start_from_env()` before opening the local PostgreSQL pool and starting the local HTTP server
+- `main.mpl` validates config, opens the local PostgreSQL pool, then boots through `Node.start_from_env()` before starting the local HTTP server
 - `work.mpl` declares `@cluster pub fn sync_todos()`
 - the runtime-owned handler name is derived from the ordinary source function name as `Work.sync_todos`
 - `GET /todos` and `GET /todos/:id` use `HTTP.clustered(1, ...)` so the starter truthfully dogfoods the shipped wrapper while `GET /health` and mutating routes stay local
@@ -573,6 +573,16 @@ fn on_pool_ready(port :: Int, window_seconds :: Int, max_requests :: Int, pool :
   start_runtime(port, window_seconds, max_requests)
 end
 
+fn maybe_boot_with_pool(port :: Int, window_seconds :: Int, max_requests :: Int, pool :: PoolHandle) do
+  case Node.start_from_env() do
+    Ok( status) -> do
+      log_bootstrap(status)
+      on_pool_ready(port, window_seconds, max_requests, pool)
+    end
+    Err( reason) -> log_bootstrap_failure(reason)
+  end
+end
+
 fn start_with_values(database_url :: String, port :: Int, window_seconds :: Int, max_requests :: Int) do
   println(
     "[todo-api] Config loaded port=#{port} write_limit_window_seconds=#{window_seconds} write_limit_max=#{max_requests}"
@@ -580,7 +590,7 @@ fn start_with_values(database_url :: String, port :: Int, window_seconds :: Int,
   println("[todo-api] Connecting to PostgreSQL pool...")
   let pool_result = Pool.open(database_url, 1, 4, 5000)
   case pool_result do
-    Ok( pool) -> on_pool_ready(port, window_seconds, max_requests, pool)
+    Ok( pool) -> maybe_boot_with_pool(port, window_seconds, max_requests, pool)
     Err( e) -> println("[todo-api] PostgreSQL connect failed: #{e}")
   end
 end
@@ -610,11 +620,6 @@ fn maybe_start_with_port(database_url :: String) do
 end
 
 fn main() do
-  case Node.start_from_env() do
-    Ok(status) -> log_bootstrap(status)
-    Err(reason) -> log_bootstrap_failure(reason)
-  end
-
   let database_url_env = database_url_key()
   let database_url = Env.get(database_url_env, "")
   if database_url == "" do
@@ -894,11 +899,14 @@ end
 fn update_completed_value(pool :: PoolHandle, id :: String, next_completed) -> Todo ! String do
   let q = Query.from(todos_table())
     |> Query.where_expr(Expr.eq(Expr.column("id"), Pg.uuid(Expr.value(id))))
-  let updated = Repo.update_where_expr(pool, todos_table(), %{"completed" => next_completed}, q) ?
-  if updated == 0 do
-    Err("todo not found")
-  else
-    get_todo(pool, id)
+  let updated_result = Repo.update_where_expr(pool, todos_table(), %{"completed" => next_completed}, q)
+  case updated_result do
+    Ok( _row) -> get_todo(pool, id)
+    Err( reason) -> if String.contains(reason, "no rows matched") do
+      Err("todo not found")
+    else
+      Err(reason)
+    end
   end
 end
 

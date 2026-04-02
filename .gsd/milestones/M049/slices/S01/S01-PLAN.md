@@ -21,7 +21,7 @@
 - `cargo test -p mesh-pkg m047_s05_scaffold_todo_api_project_ -- --nocapture`
 - `cargo test -p meshc --test tooling_e2e test_init_todo_template_postgres_ -- --nocapture`
 - `cargo test -p meshc --test tooling_e2e test_init_clustered_todo_ -- --nocapture`
-- [ ] **T03: Prove the generated Postgres starter on the live runtime path** — - Why: The slice is not done until the generated Postgres starter migrates, builds, tests, boots, and exposes diagnosable failure paths.
+- [x] **T03: Prove the generated Postgres starter on the live runtime path** — - Why: The slice is not done until the generated Postgres starter migrates, builds, tests, boots, and exposes diagnosable failure paths.
 - Do: Add a dedicated M049 Postgres scaffold harness that creates an isolated database, runs `meshc migrate <project> up`, `meshc test <project>`, `meshc build <project>`, boots the starter, exercises `/health` plus CRUD/error paths, and archives logs/HTTP output without leaking `DATABASE_URL`.
 - Done when: `compiler/meshc/tests/e2e_m049_s01.rs` proves the generated Postgres starter end-to-end and the M048 non-regression contract still passes if the CLI/help surface changed.
   - Estimate: 2h
