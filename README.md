@@ -154,7 +154,7 @@ The PostgreSQL Todo starter keeps the clustered-function contract source-first a
 
 If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the PostgreSQL Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
 
-The primary clustered-app story still starts with `meshc init --clustered`, but it now shares one canonical route-free contract with [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) and [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md). The PostgreSQL Todo starter is the fuller shared/deployable app layered on top of that same contract. The SQLite Todo starter is intentionally local and is not a canonical clustered/operator proof surface. Use the continuity list form first to discover startup or request keys, then inspect a single continuity record.
+The primary clustered-app story still starts with `meshc init --clustered`. After that, use [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md) for the serious shared/deployable PostgreSQL starter and [`examples/todo-sqlite/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md) for the honest local single-node SQLite starter. Keep [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md) as the deeper backend proof surface rather than a first-contact clustered tutorial. Use the continuity list form first to discover startup or request keys, then inspect a single continuity record.
 
 ### 3. Hello World
 
@@ -223,16 +223,15 @@ meshc cluster diagnostics <node-name@host:port> --json
 
 New clustered packages should declare route-free startup work with `@cluster` in `work.mpl` while keeping `mesh.toml` package-only. If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the PostgreSQL Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. The SQLite Todo starter is the honest local path: single-node SQLite, generated package tests, and no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
 
-When you need the public clustered story, start with any of the three canonical route-free surfaces, then add the explicit starter that matches the contract you actually want:
+When you need the public clustered story, start with the scaffold and the generated repo examples, then use the verifier map and retained rails behind them:
 
 - [Clustered Example](https://meshlang.dev/docs/getting-started/clustered-example/) — public scaffold-first walkthrough for `meshc init --clustered`
-- [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) — the smallest repo-owned route-free package surface
-- [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md) — the deeper packaged failover/operator runbook
-- `meshc init --template todo-api --db sqlite <name>` — the honest local single-node SQLite starter; no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story
-- `meshc init --template todo-api --db postgres <name>` — the fuller shared/deployable starter that keeps the same source-first `@cluster` contract while adding PostgreSQL, selected read-route `HTTP.clustered(1, ...)`, and Docker packaging
-- [Distributed Proof](https://meshlang.dev/docs/distributed-proof/) — public map of the route-free canonical surfaces, the explicit SQLite-local vs PostgreSQL-clustered starter split, bounded automatic promotion, runtime-owned authority fields, stale-primary fencing, and the read-only Fly evidence path
+- [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md) — the serious shared/deployable PostgreSQL starter with route-free `work.mpl`, bounded `HTTP.clustered(1, ...)` read routes, and Docker packaging
+- [`examples/todo-sqlite/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md) — the honest local single-node SQLite starter; no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story
+- [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md) — the deeper backend proof surface once the starter examples stop being enough
+- [Distributed Proof](https://meshlang.dev/docs/distributed-proof/) — public map of the scaffold/examples-first story, the explicit SQLite-local vs PostgreSQL-clustered split, bounded automatic promotion, runtime-owned authority fields, stale-primary fencing, lower-level retained fixture rails, and the read-only Fly evidence path
 - `bash scripts/verify-m047-s04.sh` — the authoritative cutover rail for the source-first route-free clustered contract
-- `bash scripts/verify-m047-s05.sh` — the retained historical clustered Todo subrail kept behind fixture-backed rails instead of the public starter contract
+- `bash scripts/verify-m047-s05.sh` — the retained historical clustered Todo subrail kept behind the public starter contract
 - `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` — the repo S07 rail for default-count and two-node `HTTP.clustered(...)` behavior beyond the PostgreSQL Todo starter's explicit-count read routes
 - `bash scripts/verify-m047-s06.sh` — the docs and retained-proof closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle
 - `bash scripts/verify-m046-s06.sh` — the historical M046 closeout wrapper retained as a compatibility alias into the M047 cutover rail
@@ -298,7 +297,7 @@ Full documentation, including guides and API references, is available at **[mesh
 
 For the canonical backend proof story, use **[Production Backend Proof](https://meshlang.dev/docs/production-backend-proof/)** and the repo runbook at [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md).
 
-For the canonical distributed clustered-work proof story, use **[Distributed Proof](https://meshlang.dev/docs/distributed-proof/)** plus the equal-surface runbooks at [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) and [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md).
+For the canonical distributed clustered-work proof story, use **[Distributed Proof](https://meshlang.dev/docs/distributed-proof/)** plus the public scaffold/examples-first surfaces at [Clustered Example](https://meshlang.dev/docs/getting-started/clustered-example/), [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md), and [`examples/todo-sqlite/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md). Keep [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md) as the deeper backend proof surface.
 
 ## Project Status
 

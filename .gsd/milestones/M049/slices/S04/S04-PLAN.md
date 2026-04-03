@@ -83,7 +83,7 @@
 - `cargo run -q -p meshc -- build scripts/fixtures/clustered/cluster-proof`
 - `cargo test -p meshc --test e2e_m046_s04 -- --nocapture`
 - `cargo test -p meshc --test e2e_m045_s02 -- --nocapture`
-- [ ] **T03: Rewrite public clustered onboarding to scaffold plus generated `/examples`** — Replace the old equal-surface proof-app story with the new scaffold/examples-first story across README, site docs, generated clustered README text, and the Mesh clustering skill. Public surfaces must point readers to `meshc init --clustered`, `examples/todo-postgres`, and `examples/todo-sqlite`, keep `reference-backend` as the deeper backend proof, and preserve the explicit SQLite-local vs Postgres-clustered split.
+- [x] **T03: Repointed public clustered onboarding to the scaffold plus generated examples and added a fail-closed onboarding contract test.** — Replace the old equal-surface proof-app story with the new scaffold/examples-first story across README, site docs, generated clustered README text, and the Mesh clustering skill. Public surfaces must point readers to `meshc init --clustered`, `examples/todo-postgres`, and `examples/todo-sqlite`, keep `reference-backend` as the deeper backend proof, and preserve the explicit SQLite-local vs Postgres-clustered split.
 
 ## Failure Modes
 

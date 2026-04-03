@@ -9,8 +9,9 @@ Rules:
 1. Declare clustered startup work in source with `@cluster` or `@cluster(N)` on a public function in `work.mpl`.
 2. `main.mpl` boots through `Node.start_from_env()`; the runtime owns startup, placement, continuity, and diagnostics.
 3. The runtime derives the clustered handler name from the ordinary function name (for example, `Work.add` or `Work.sync_todos`).
-4. The generated `meshc init --clustered` scaffold, `tiny-cluster/`, and `cluster-proof/` all teach the same route-free clustered contract.
-5. Keep the clustered story source-first and runtime-owned — do not invent package-owned control or inspection surfaces, and do not project clustered/operator claims onto the SQLite starter.
+4. The public onboarding flow starts with `meshc init --clustered`, then branches to `examples/todo-postgres` for the shared/deployable starter and `examples/todo-sqlite` for the honest local starter.
+5. Keep `reference-backend/README.md` as the deeper backend proof once the generated starters stop being enough.
+6. Keep the clustered story source-first and runtime-owned — do not invent package-owned control or inspection surfaces, and do not project clustered/operator claims onto the SQLite starter.
 
 Code example (minimal clustered surface):
 ```mesh
@@ -30,12 +31,13 @@ end
 
 Rules:
 1. `meshc init --clustered <name>` is the primary public clustered-app scaffold.
-2. It generates `main.mpl` with `Node.start_from_env()`, `work.mpl` with `@cluster pub fn add()`, and a README aligned with `tiny-cluster/` and `cluster-proof/`.
+2. It generates `main.mpl` with `Node.start_from_env()`, `work.mpl` with `@cluster pub fn add()`, and a README aligned with the generated repo examples `examples/todo-postgres` and `examples/todo-sqlite` instead of internal proof fixtures.
 3. `meshc init --template todo-api --db postgres <name>` is the fuller shared or deployable starter layered on top of that same route-free clustered contract.
 4. The PostgreSQL Todo starter keeps `work.mpl` on `@cluster pub fn sync_todos()`, starts with `Node.start_from_env()`, and dogfoods explicit-count `HTTP.clustered(1, ...)` only on `GET /todos` and `GET /todos/:id`; `GET /health` plus mutating routes stay local.
 5. `meshc init --template todo-api --db sqlite <name>` is the honest local single-node starter: generated package tests, local `/health`, actor-backed write rate limiting, and Docker packaging around `meshc build .`.
 6. The SQLite Todo starter does not claim `work.mpl`, `HTTP.clustered(...)`, `meshc cluster`, or clustered/operator proof surfaces.
 7. Use the Postgres Todo template when you need the packaged clustered HTTP starter; use the clustered scaffold when you want the minimal route-free public clustered surface; use the SQLite Todo template only when you want the local-first path.
+8. The generated repo examples live at `examples/todo-postgres` and `examples/todo-sqlite`; keep `reference-backend/README.md` as the deeper backend proof instead of a first-contact clustered tutorial.
 
 ## Runtime Inspection
 
