@@ -80,7 +80,7 @@
   - Estimate: 45m
   - Files: examples/todo-sqlite/mesh.toml, examples/todo-sqlite/README.md, examples/todo-sqlite/tests/storage.test.mpl, examples/todo-postgres/mesh.toml, examples/todo-postgres/README.md, examples/todo-postgres/migrations/20260402120000_create_todos.mpl
   - Verify: - `node scripts/tests/verify-m049-s03-materialize-examples.mjs --check`
-- [ ] **T03: Add a slice-owned parity, test, and build rail for the committed examples** — Prove the checked-in examples are not decorative. Add a dedicated `meshc` integration target that regenerates fresh examples through the public CLI, compares them byte-for-byte against the committed trees, runs `meshc test` on both examples, and builds both examples to `.tmp` outputs. Reuse the T01 materializer/check seam instead of copying generation logic again.
+- [x] **T03: Added retained parity, `meshc test`, and `meshc build --output` rails for `examples/todo-sqlite` and `examples/todo-postgres`.** — Prove the checked-in examples are not decorative. Add a dedicated `meshc` integration target that regenerates fresh examples through the public CLI, compares them byte-for-byte against the committed trees, runs `meshc test` on both examples, and builds both examples to `.tmp` outputs. Reuse the T01 materializer/check seam instead of copying generation logic again.
 
 ## Failure Modes
 
