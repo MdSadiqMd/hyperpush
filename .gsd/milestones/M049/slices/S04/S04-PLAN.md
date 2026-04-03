@@ -117,7 +117,7 @@
 - `node --test scripts/tests/verify-m048-s04-skill-contract.test.mjs`
 - `node --test scripts/tests/verify-m048-s05-contract.test.mjs`
 - `npm --prefix website run build`
-- [ ] **T04: Retarget retained Rust contract rails to the internal clustered fixtures** — Once the packages and public copy are moved, the retained Rust e2e rails still need to resolve lower-level fixtures instead of the old root dirs. Update the contract, equal-surface, and historical clustered tests to read from the new shared helper paths and assert the new public story rather than repo-root onboarding runbooks.
+- [x] **T04: Retarget retained Rust contract rails to the internal clustered fixtures** — Once the packages and public copy are moved, the retained Rust e2e rails still need to resolve lower-level fixtures instead of the old root dirs. Update the contract, equal-surface, and historical clustered tests to read from the new shared helper paths and assert the new public story rather than repo-root onboarding runbooks.
 
 ## Failure Modes
 
@@ -157,7 +157,7 @@
 - `cargo test -p meshc --test e2e_m045_s02 -- --nocapture`
 - `cargo test -p meshc --test e2e_m046_s05 -- --nocapture`
 - `cargo test -p meshc --test e2e_m047_s04 -- --nocapture`
-- [ ] **T05: Sweep older direct bash verifiers onto a shared clustered fixture helper** — Split the broad bash path churn into one bounded task: add a shared shell helper for clustered fixture roots and retarget the older direct verifier family that still shells out to `tiny-cluster` / `cluster-proof` repo-root paths.
+- [x] **T05: Centralized clustered-fixture shell paths for the older verifier family and moved the M044 declared-work LLVM replay onto the current source-first @cluster contract.** — Split the broad bash path churn into one bounded task: add a shared shell helper for clustered fixture roots and retarget the older direct verifier family that still shells out to `tiny-cluster` / `cluster-proof` repo-root paths.
 
 ## Failure Modes
 

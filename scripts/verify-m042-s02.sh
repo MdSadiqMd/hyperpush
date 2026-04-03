@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source scripts/lib/clustered_fixture_paths.sh
+clustered_fixture_require_cluster_proof_root
+
 ARTIFACT_ROOT=".tmp/m042-s02"
 ARTIFACT_DIR="$ARTIFACT_ROOT/verify"
 PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
@@ -363,9 +366,9 @@ run_expect_success mesh-rt 00-mesh-rt no 180 \
 assert_file_exists mesh-rt target/debug/libmesh_rt.a "mesh-rt static library" "$ARTIFACT_DIR/00-mesh-rt.log"
 
 run_expect_success cluster-proof-tests 01-cluster-proof-tests no 180 \
-  cargo run -q -p meshc -- test cluster-proof/tests
+  cargo run -q -p meshc -- test "$CLUSTER_PROOF_FIXTURE_TESTS"
 run_expect_success build-cluster-proof 02-build-cluster-proof no 180 \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT"
 run_expect_success s01-standalone 03-s01-standalone yes 180 \
   cargo test -p meshc --test e2e_m042_s01 continuity_api_standalone_keyed_submit_status_and_retry_contract -- --nocapture
 

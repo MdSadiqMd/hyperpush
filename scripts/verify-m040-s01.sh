@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+source scripts/lib/clustered_fixture_paths.sh
+clustered_fixture_require_cluster_proof_root
+
 ARTIFACT_DIR="$ROOT_DIR/.tmp/m040-s01/verify"
 if [[ -n "${M040_S01_HTTP_PORT:-}" ]]; then
   HTTP_PORT="$M040_S01_HTTP_PORT"
@@ -34,10 +39,13 @@ record_phase() {
 }
 
 record_phase "build-cluster-proof\tstarted"
-cargo run -q -p meshc -- build cluster-proof >"$ARTIFACT_DIR/build.log" 2>&1
+cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT" >"$ARTIFACT_DIR/build.log" 2>&1
 record_phase "build-cluster-proof\tpassed"
 
-PORT="$HTTP_PORT" ./cluster-proof/cluster-proof >"$ARTIFACT_DIR/cluster-proof.stdout.log" 2>"$ARTIFACT_DIR/cluster-proof.stderr.log" &
+(
+  cd "$CLUSTER_PROOF_FIXTURE_ROOT"
+  PORT="$HTTP_PORT" "$CLUSTER_PROOF_FIXTURE_BINARY"
+) >"$ARTIFACT_DIR/cluster-proof.stdout.log" 2>"$ARTIFACT_DIR/cluster-proof.stderr.log" &
 SERVER_PID="$!"
 
 record_phase "wait-for-http\tstarted"

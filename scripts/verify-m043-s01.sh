@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source scripts/lib/clustered_fixture_paths.sh
+clustered_fixture_require_cluster_proof_root
 source scripts/lib/m043_cluster_proof.sh
 
 ARTIFACT_ROOT=".tmp/m043-s01"
@@ -318,9 +320,9 @@ copy_selected_artifacts() {
 run_expect_success runtime-continuity 00-runtime-continuity yes 240 \
   cargo test -p mesh-rt continuity -- --nocapture
 run_expect_success cluster-proof-tests 01-cluster-proof-tests no 240 \
-  cargo run -q -p meshc -- test cluster-proof/tests
+  cargo run -q -p meshc -- test "$CLUSTER_PROOF_FIXTURE_TESTS"
 run_expect_success build-cluster-proof 02-build-cluster-proof no 240 \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT"
 
 M043_BEFORE="$ARTIFACT_DIR/03-m043.before.txt"
 capture_snapshot "$M043_BEFORE"

@@ -4,9 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source scripts/lib/clustered_fixture_paths.sh
+clustered_fixture_require_cluster_proof_root
+
 ARTIFACT_DIR=".tmp/m039-s01/verify"
 PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
-CLUSTER_PROOF_FIXTURE_ROOT="scripts/fixtures/clustered/cluster-proof"
 mkdir -p "$ARTIFACT_DIR"
 : >"$PHASE_REPORT_PATH"
 

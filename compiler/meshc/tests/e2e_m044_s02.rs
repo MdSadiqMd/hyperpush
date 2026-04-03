@@ -14,6 +14,9 @@ use std::process::{Command, Output};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+mod support;
+use support::m046_route_free as route_free;
+
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -52,6 +55,10 @@ fn command_output_text(output: &Output) -> String {
     )
 }
 
+fn package_manifest(name: &str) -> String {
+    format!("[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n")
+}
+
 fn service_project_main_source() -> &'static str {
     "from Services import Jobs\n\nfn main() do\n  let pid = Jobs.start(0)\n  let _ = Jobs.submit(pid, \"demo\")\n  let _ = Jobs.reset(pid)\nend\n"
 }
@@ -61,11 +68,11 @@ fn service_project_services_source() -> &'static str {
 }
 
 fn declared_work_project_main_source() -> &'static str {
-    "from Work import handle_submit, local_only\n\nfn main() do\n  let _ = handle_submit(\"req-1\", \"attempt-1\")\n  let _ = local_only(\"demo\")\nend\n"
+    "from Work import handle_submit, local_only\n\nfn main() do\n  let _ = handle_submit()\n  let _ = local_only(\"demo\")\nend\n"
 }
 
 fn declared_work_project_work_source() -> &'static str {
-    "pub fn handle_submit(request_key :: String, attempt_id :: String) -> Int do\n  if String.length(request_key) > 0 do\n    String.length(attempt_id)\n  else\n    0\n  end\nend\n\npub fn local_only(payload :: String) -> String do\n  payload\nend\n\nfn hidden_submit(payload :: String) -> String do\n  payload\nend\n"
+    "@cluster pub fn handle_submit() -> Int do\n  1 + 1\nend\n\npub fn local_only(payload :: String) -> String do\n  payload\nend\n\nfn hidden_submit(payload :: String) -> String do\n  payload\nend\n"
 }
 
 fn write_project_sources(project_dir: &Path, manifest: Option<&str>, sources: &[(&str, &str)]) {
@@ -354,9 +361,10 @@ fn m044_s02_metadata_undeclared_targets_stay_absent_from_execution_plan() {
 }
 
 #[test]
-fn m044_s02_declared_work_llvm_registers_manifest_declared_handler_only() {
+fn m044_s02_declared_work_llvm_registers_source_declared_handler_only() {
+    let manifest = package_manifest("work-proof");
     let (output, llvm) = build_temp_project_with_sources(
-        Some(work_cluster_manifest()),
+        Some(manifest.as_str()),
         &[
             ("main.mpl", declared_work_project_main_source()),
             ("work.mpl", declared_work_project_work_source()),
@@ -365,10 +373,10 @@ fn m044_s02_declared_work_llvm_registers_manifest_declared_handler_only() {
     );
     assert!(
         output.status.success(),
-        "declared-work build should succeed:\n{}",
+        "source-declared work build should succeed:\n{}",
         command_output_text(&output)
     );
-    let llvm = llvm.expect("declared-work build should emit llvm");
+    let llvm = llvm.expect("source-declared work build should emit llvm");
 
     assert!(
         llvm.contains("mesh_register_declared_handler"),
@@ -381,7 +389,7 @@ fn m044_s02_declared_work_llvm_registers_manifest_declared_handler_only() {
     );
     assert!(
         llvm.contains("fn_reg___declared_work_work_handle_submit"),
-        "expected manifest-approved declared-work wrapper to stay remote-spawnable:\n{llvm}"
+        "expected source-declared work wrapper to stay remote-spawnable:\n{llvm}"
     );
     assert!(
         !llvm.contains("fn_reg___actor___declared_work_work_handle_submit_body"),
@@ -550,28 +558,32 @@ fn m044_s02_service_llvm_registers_declared_wrappers_without_widening_manifestle
 #[test]
 fn m044_s02_cluster_proof_build_and_tests_pass_on_runtime_owned_submit_surface() {
     let artifacts = artifact_dir("cluster-proof-runtime-owned-submit");
+    let cluster_proof_dir = route_free::cluster_proof_fixture_root();
+    let cluster_proof_tests = cluster_proof_dir.join("tests");
 
     let build = Command::new(meshc_bin())
         .current_dir(repo_root())
-        .args(["build", "cluster-proof"])
+        .arg("build")
+        .arg(cluster_proof_dir.to_str().unwrap())
         .output()
-        .expect("failed to invoke meshc build cluster-proof");
+        .expect("failed to invoke meshc build cluster-proof fixture");
     write_artifact(
         &artifacts.join("cluster-proof-build.log"),
         command_output_text(&build),
     );
     assert!(
         build.status.success(),
-        "cluster-proof build should succeed:\n{}\nartifacts: {}",
+        "cluster-proof fixture build should succeed:\n{}\nartifacts: {}",
         command_output_text(&build),
         artifacts.display()
     );
 
     let tests = Command::new(meshc_bin())
         .current_dir(repo_root())
-        .args(["test", "cluster-proof/tests"])
+        .arg("test")
+        .arg(cluster_proof_tests.to_str().unwrap())
         .output()
-        .expect("failed to invoke meshc test cluster-proof/tests");
+        .expect("failed to invoke meshc test cluster-proof fixture tests");
     write_artifact(
         &artifacts.join("cluster-proof-tests.log"),
         command_output_text(&tests),
@@ -583,18 +595,17 @@ fn m044_s02_cluster_proof_build_and_tests_pass_on_runtime_owned_submit_surface()
         artifacts.display()
     );
 
-    let continuity_source =
-        fs::read_to_string(repo_root().join("cluster-proof/work_continuity.mpl"))
-            .expect("failed to read cluster-proof/work_continuity.mpl");
+    let continuity_source = fs::read_to_string(cluster_proof_dir.join("work_continuity.mpl"))
+        .expect("failed to read cluster-proof fixture work_continuity.mpl");
     write_artifact(&artifacts.join("work_continuity.mpl"), continuity_source);
     write_artifact(
         &artifacts.join("scenario-meta.json"),
         concat!(
             "{\n",
             "  \"test\": \"m044_s02_cluster_proof_build_and_tests_pass_on_runtime_owned_submit_surface\",\n",
-            "  \"build_command\": \"meshc build cluster-proof\",\n",
-            "  \"test_command\": \"meshc test cluster-proof/tests\",\n",
-            "  \"source_snapshot\": \"cluster-proof/work_continuity.mpl\"\n",
+            "  \"build_command\": \"meshc build scripts/fixtures/clustered/cluster-proof\",\n",
+            "  \"test_command\": \"meshc test scripts/fixtures/clustered/cluster-proof/tests\",\n",
+            "  \"source_snapshot\": \"scripts/fixtures/clustered/cluster-proof/work_continuity.mpl\"\n",
             "}\n"
         ),
     );
@@ -602,8 +613,9 @@ fn m044_s02_cluster_proof_build_and_tests_pass_on_runtime_owned_submit_surface()
 
 #[test]
 fn m044_s02_cluster_proof_submit_status_hot_path_omits_legacy_selection_and_dispatch_helpers() {
-    let source = fs::read_to_string(repo_root().join("cluster-proof/work_continuity.mpl"))
-        .expect("failed to read cluster-proof/work_continuity.mpl");
+    let source =
+        fs::read_to_string(route_free::cluster_proof_fixture_root().join("work_continuity.mpl"))
+            .expect("failed to read cluster-proof fixture work_continuity.mpl");
 
     let submit_segment = segment_between(
         &source,

@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source scripts/lib/clustered_fixture_paths.sh
+clustered_fixture_require_cluster_proof_root
+
 ARTIFACT_ROOT=".tmp/m042-s03"
 ARTIFACT_DIR="$ARTIFACT_ROOT/verify"
 PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
@@ -376,9 +379,9 @@ PY
 run_expect_success runtime-continuity 00-runtime-continuity yes 240 \
   cargo test -p mesh-rt continuity -- --nocapture
 run_expect_success cluster-proof-tests 01-cluster-proof-tests no 240 \
-  cargo run -q -p meshc -- test cluster-proof/tests
+  cargo run -q -p meshc -- test "$CLUSTER_PROOF_FIXTURE_TESTS"
 run_expect_success build-cluster-proof 02-build-cluster-proof no 240 \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT"
 run_expect_success s02-contract 03-s02-contract no 420 \
   bash scripts/verify-m042-s02.sh
 assert_file_exists s02-contract .tmp/m042-s02/verify/phase-report.txt "S02 phase report" "$ARTIFACT_DIR/03-s02-contract.log"

@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source scripts/lib/clustered_fixture_paths.sh
+clustered_fixture_require_cluster_proof_root
+
 ARTIFACT_DIR=".tmp/m045-s01/verify"
 PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
 STATUS_PATH="$ARTIFACT_DIR/status.txt"
@@ -160,9 +163,9 @@ copy_dir_or_fail() {
 run_expect_success 00-m045-bootstrap-rails 00-m045-bootstrap-rails yes 2400 \
   cargo test -p meshc --test e2e_m045_s01 m045_s01_ -- --nocapture
 run_expect_success 01-cluster-proof-build 01-cluster-proof-build no 1800 \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT"
 run_expect_success 02-cluster-proof-tests 02-cluster-proof-tests no 1800 \
-  cargo run -q -p meshc -- test cluster-proof/tests
+  cargo run -q -p meshc -- test "$CLUSTER_PROOF_FIXTURE_TESTS"
 run_expect_success 03-m044-s03-replay 03-m044-s03-replay no 2400 \
   bash scripts/verify-m044-s03.sh
 copy_dir_or_fail 04-copy-m044-s03-verify .tmp/m044-s03/verify retained-m044-s03-verify

@@ -8,6 +8,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
+mod support;
+use support::m046_route_free as route_free;
+
 const LOOPBACK_V4: &str = "127.0.0.1";
 const LOOPBACK_V6: &str = "::1";
 const DISCOVERY_SEED: &str = "localhost";
@@ -82,27 +85,37 @@ fn meshc_bin() -> PathBuf {
 }
 
 fn cluster_proof_binary() -> PathBuf {
-    repo_root().join("cluster-proof").join("cluster-proof")
+    route_free::cluster_proof_fixture_root().join("cluster-proof")
 }
 
 fn assert_cluster_proof_build_succeeds() {
+    let fixture_root = route_free::cluster_proof_fixture_root();
     let output = Command::new(meshc_bin())
         .current_dir(repo_root())
-        .args(["build", "cluster-proof"])
+        .arg("build")
+        .arg(fixture_root.to_str().unwrap())
         .output()
-        .expect("failed to invoke meshc build cluster-proof");
+        .expect("failed to invoke meshc build cluster-proof fixture");
 
-    assert_command_success(&output, "meshc build cluster-proof");
+    assert_command_success(
+        &output,
+        "meshc build scripts/fixtures/clustered/cluster-proof",
+    );
 }
 
 fn assert_cluster_proof_tests_pass() {
+    let fixture_tests = route_free::cluster_proof_fixture_root().join("tests");
     let output = Command::new(meshc_bin())
         .current_dir(repo_root())
-        .args(["test", "cluster-proof/tests"])
+        .arg("test")
+        .arg(fixture_tests.to_str().unwrap())
         .output()
-        .expect("failed to invoke meshc test cluster-proof/tests");
+        .expect("failed to invoke meshc test cluster-proof fixture tests");
 
-    assert_command_success(&output, "meshc test cluster-proof/tests");
+    assert_command_success(
+        &output,
+        "meshc test scripts/fixtures/clustered/cluster-proof/tests",
+    );
 }
 
 fn assert_command_success(output: &Output, description: &str) {
@@ -175,7 +188,7 @@ fn spawn_cluster_proof(
     let binary = cluster_proof_binary();
     assert!(
         binary.exists(),
-        "cluster-proof binary not found at {}. Run `meshc build cluster-proof` first.",
+        "cluster-proof binary not found at {}. Run `meshc build scripts/fixtures/clustered/cluster-proof` first.",
         binary.display()
     );
 
@@ -186,7 +199,7 @@ fn spawn_cluster_proof(
         .unwrap_or_else(|e| panic!("failed to create {}: {}", stderr_path.display(), e));
 
     let child = Command::new(&binary)
-        .current_dir(repo_root().join("cluster-proof"))
+        .current_dir(route_free::cluster_proof_fixture_root())
         .env("PORT", config.http_port.to_string())
         .env("MESH_CLUSTER_PORT", config.cluster_port.to_string())
         .env("CLUSTER_PROOF_COOKIE", SHARED_COOKIE)

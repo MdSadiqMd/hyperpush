@@ -21,8 +21,7 @@ pub const STARTUP_RUNTIME_NAME_GUIDANCE: &str =
     "the runtime-owned handler name is derived from the ordinary source function name as `Work.add`";
 pub const STARTUP_AUTOSTART_GUIDANCE: &str =
     "The runtime automatically starts the source-declared `@cluster` function and closes the continuity record when it returns.";
-pub const TINY_CLUSTER_FIXTURE_ROOT_RELATIVE: &str =
-    "scripts/fixtures/clustered/tiny-cluster";
+pub const TINY_CLUSTER_FIXTURE_ROOT_RELATIVE: &str = "scripts/fixtures/clustered/tiny-cluster";
 pub const TINY_CLUSTER_FIXTURE_PACKAGE_NAME: &str = "tiny-cluster";
 pub const TINY_CLUSTER_FIXTURE_REQUIRED_FILES: &[&str] = &[
     "mesh.toml",
@@ -31,8 +30,7 @@ pub const TINY_CLUSTER_FIXTURE_REQUIRED_FILES: &[&str] = &[
     "README.md",
     "tests/work.test.mpl",
 ];
-pub const CLUSTER_PROOF_FIXTURE_ROOT_RELATIVE: &str =
-    "scripts/fixtures/clustered/cluster-proof";
+pub const CLUSTER_PROOF_FIXTURE_ROOT_RELATIVE: &str = "scripts/fixtures/clustered/cluster-proof";
 pub const CLUSTER_PROOF_FIXTURE_DOCKERFILE_RELATIVE: &str =
     "scripts/fixtures/clustered/cluster-proof/Dockerfile";
 pub const CLUSTER_PROOF_FIXTURE_PACKAGE_NAME: &str = "cluster-proof";

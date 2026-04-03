@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source scripts/lib/clustered_fixture_paths.sh
+clustered_fixture_require_cluster_proof_root
+
 ARTIFACT_DIR=".tmp/m039-s02/verify"
 PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
 STATUS_PATH="$ARTIFACT_DIR/status.txt"
@@ -286,9 +289,9 @@ run_expect_success build-tooling 00-build-tooling no 120 \
 assert_file_exists build-tooling target/debug/libmesh_rt.a "mesh-rt static library" "$ARTIFACT_DIR/00-build-tooling.log"
 
 run_expect_success cluster-proof-tests 01-cluster-proof-tests no 120 \
-  cargo run -q -p meshc -- test cluster-proof/tests
+  cargo run -q -p meshc -- test "$CLUSTER_PROOF_FIXTURE_TESTS"
 run_expect_success build-cluster-proof 02-build-cluster-proof no 120 \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT"
 run_expect_success s01-contract 03-s01-contract no 300 \
   bash scripts/verify-m039-s01.sh
 assert_file_exists s01-contract .tmp/m039-s01/verify/phase-report.txt "S01 phase report" "$ARTIFACT_DIR/03-s01-contract.log"

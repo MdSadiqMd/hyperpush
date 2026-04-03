@@ -9,8 +9,7 @@ use std::process::Command;
 pub const SQLITE_EXAMPLE_NAME: &str = "todo-sqlite";
 pub const POSTGRES_EXAMPLE_NAME: &str = "todo-postgres";
 pub const SQLITE_STORAGE_TEST_RELATIVE_PATH: &str = "tests/storage.test.mpl";
-pub const POSTGRES_MIGRATION_RELATIVE_PATH: &str =
-    "migrations/20260402120000_create_todos.mpl";
+pub const POSTGRES_MIGRATION_RELATIVE_PATH: &str = "migrations/20260402120000_create_todos.mpl";
 
 const MATERIALIZER_RUNNER_SCRIPT: &str = r#"
 import path from 'node:path';
@@ -145,7 +144,10 @@ pub fn materialize_examples_check(examples_root: &Path, artifacts: &Path) -> Mat
             run.stderr
         )
     });
-    assert_eq!(summary.mode, "check", "materializer summary mode drifted: {summary:?}");
+    assert_eq!(
+        summary.mode, "check",
+        "materializer summary mode drifted: {summary:?}"
+    );
 
     write_json_artifact(
         &materializer_artifacts.join("materializer-summary.json"),
@@ -166,14 +168,13 @@ pub fn materialize_examples_check(examples_root: &Path, artifacts: &Path) -> Mat
         if entry.target_dir.is_dir() {
             route_free::archive_directory_tree(
                 &entry.target_dir,
-                &materializer_artifacts.join("target").join(&entry.example.name),
+                &materializer_artifacts
+                    .join("target")
+                    .join(&entry.example.name),
             );
         }
         write_json_artifact(
-            &materializer_artifacts.join(format!(
-                "{}-generated-manifest.json",
-                entry.example.name
-            )),
+            &materializer_artifacts.join(format!("{}-generated-manifest.json", entry.example.name)),
             &entry.generated_manifest,
         );
         write_json_artifact(
@@ -182,10 +183,8 @@ pub fn materialize_examples_check(examples_root: &Path, artifacts: &Path) -> Mat
         );
         if let Some(target_manifest) = &entry.target_manifest {
             write_json_artifact(
-                &materializer_artifacts.join(format!(
-                    "{}-target-manifest.json",
-                    entry.example.name
-                )),
+                &materializer_artifacts
+                    .join(format!("{}-target-manifest.json", entry.example.name)),
                 target_manifest,
             );
         }
@@ -266,7 +265,11 @@ pub fn example_entry<'a>(summary: &'a MaterializeSummary, name: &str) -> &'a Mat
 
 pub fn assert_sqlite_example_shape(project_dir: &Path) {
     assert_project_name(project_dir, SQLITE_EXAMPLE_NAME);
-    assert_required_file(project_dir, SQLITE_STORAGE_TEST_RELATIVE_PATH, "SQLite example");
+    assert_required_file(
+        project_dir,
+        SQLITE_STORAGE_TEST_RELATIVE_PATH,
+        "SQLite example",
+    );
     assert_absent_path(project_dir, "work.mpl", "SQLite example");
     assert_absent_path(project_dir, ".env.example", "SQLite example");
     assert_absent_path(project_dir, "migrations", "SQLite example");
@@ -274,10 +277,18 @@ pub fn assert_sqlite_example_shape(project_dir: &Path) {
 
 pub fn assert_postgres_example_shape(project_dir: &Path) {
     assert_project_name(project_dir, POSTGRES_EXAMPLE_NAME);
-    assert_required_file(project_dir, POSTGRES_MIGRATION_RELATIVE_PATH, "Postgres example");
+    assert_required_file(
+        project_dir,
+        POSTGRES_MIGRATION_RELATIVE_PATH,
+        "Postgres example",
+    );
     assert_required_file(project_dir, "work.mpl", "Postgres example");
     assert_required_file(project_dir, ".env.example", "Postgres example");
-    assert_absent_path(project_dir, SQLITE_STORAGE_TEST_RELATIVE_PATH, "Postgres example");
+    assert_absent_path(
+        project_dir,
+        SQLITE_STORAGE_TEST_RELATIVE_PATH,
+        "Postgres example",
+    );
 }
 
 pub fn verify_sqlite_example_meshc_test_and_build(project_dir: &Path, artifacts: &Path) {
@@ -289,12 +300,16 @@ pub fn verify_sqlite_example_meshc_test_and_build(project_dir: &Path, artifacts:
     let meshc_test = sqlite::run_meshc_tests(project_dir, &test_artifacts);
     sqlite::assert_phase_success(&meshc_test, "meshc test <project> should succeed");
     assert!(
-        meshc_test.stdout.contains("SQLite todo-api config > exposes local environment keys and defaults"),
+        meshc_test
+            .stdout
+            .contains("SQLite todo-api config > exposes local environment keys and defaults"),
         "expected SQLite config test names in meshc test output, got:\n{}",
         meshc_test.combined
     );
     assert!(
-        meshc_test.stdout.contains("SQLite todo storage > local storage module compiles for the generated starter"),
+        meshc_test.stdout.contains(
+            "SQLite todo storage > local storage module compiles for the generated starter"
+        ),
         "expected SQLite storage test names in meshc test output, got:\n{}",
         meshc_test.combined
     );
