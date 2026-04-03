@@ -40,7 +40,7 @@ description: Mesh programming language — use for any question about Mesh synta
 
 ## Ecosystem Overview
 1. Actors & Supervisors: Erlang/OTP-style lightweight actors with typed PIDs and supervision trees.
-2. Clustered Runtime & Bootstrap: source-first `@cluster` / `@cluster(N)`, route-free startup through `Node.start_from_env()`, scaffolds from `meshc init --clustered` and `meshc init --template todo-api`, and runtime-owned inspection through `meshc cluster status|continuity|diagnostics`.
+2. Clustered Runtime & Bootstrap: source-first `@cluster` / `@cluster(N)`, route-free startup through `Node.start_from_env()`, scaffolds from `meshc init --clustered` and `meshc init --template todo-api --db postgres`, the honest local single-node starter at `meshc init --template todo-api --db sqlite`, and runtime-owned inspection through `meshc cluster status|continuity|diagnostics`.
 3. HTTP Server/WebSocket: built-in `HTTP.router()`, `HTTP.route()`, `HTTP.serve()`, `HTTP.use()` for middleware plus `HTTP.on_get()`/`HTTP.on_post()`/`HTTP.on_put()`/`HTTP.on_delete()` helpers; `Ws.serve()` for WebSocket.
 4. Database: Sqlite and PostgreSQL raw clients plus an ORM query builder (deriving Row, schema DSL).
 5. Stdlib: List, Map, Set, Range, Queue, Iter (pipeline), String, Json (encode/parse + `json { }` literals), IO, Env, Regex, Crypto (sha256/sha512/hmac/uuid4), Base64, Hex, DateTime modules.
@@ -61,10 +61,10 @@ description: Mesh programming language — use for any question about Mesh synta
 9. `skills/strings` — String interpolation, heredocs, `json { }` object literals, String stdlib, Env vars, Regex
 10. `skills/http` — HTTP server/client, routing, middleware, WebSocket
 11. `skills/database` — Sqlite, PostgreSQL, ORM query builder, schema deriving, upserts
-12. `skills/clustering` — `@cluster`, `Node.start_from_env()`, clustered scaffolds, runtime inspection, and `HTTP.clustered(...)` boundaries
+12. `skills/clustering` — `@cluster`, `Node.start_from_env()`, `meshc init --clustered`, the PostgreSQL clustered Todo starter, the SQLite local-only starter boundary, runtime inspection, and `HTTP.clustered(...)` boundaries
 
 ## Routing Rules
 1. After delivering the overview, check if the user question maps to a specific sub-skill.
 2. Load the matching sub-skill(s) for deep answers rather than improvising from the overview.
-3. Clustered runtime, bootstrap, scaffold, failover, or operator questions should load `skills/clustering`; if the same question also touches route helpers or decorator syntax, load `skills/http` and/or `skills/syntax` alongside it.
+3. Clustered runtime, bootstrap, scaffold, failover, or operator questions should load `skills/clustering`; route users toward `meshc init --clustered` or `meshc init --template todo-api --db postgres` for clustered starters, while keeping `meshc init --template todo-api --db sqlite` on its honest local single-node path. If the same question also touches route helpers or decorator syntax, load `skills/http` and/or `skills/syntax` alongside it.
 4. When in doubt, load `skills/syntax` first — it covers the most foundational patterns.

@@ -33,7 +33,7 @@ Rules:
 1. `HTTP.on_get(router, path, handler)`, `HTTP.on_post(router, path, handler)`, `HTTP.on_put(router, path, handler)`, and `HTTP.on_delete(router, path, handler)` register handlers for a specific HTTP method.
 2. They compose naturally with `|>` pipelines and keep the method visible at the callsite.
 3. `HTTP.route(...)` remains the generic route API and is still valid when you do not want method-specific helpers.
-4. The shipped Todo starter uses `HTTP.on_get`, `HTTP.on_post`, `HTTP.on_put`, and `HTTP.on_delete` while keeping clustered read routes bounded and mutating routes local.
+4. The shipped PostgreSQL Todo starter uses `HTTP.on_get`, `HTTP.on_post`, `HTTP.on_put`, and `HTTP.on_delete` while keeping clustered read routes bounded; the SQLite Todo starter keeps all routes local and does not claim `HTTP.clustered(...)`.
 
 Code example (from `compiler/mesh-pkg/src/scaffold.rs`):
 ```mesh
@@ -90,11 +90,12 @@ end
 
 Rules:
 1. `HTTP.clustered(handler)` wraps a bare public handler reference with the default replication count.
-2. `HTTP.clustered(1, handler)` sets an explicit replication count; the shipped Todo starter uses explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`.
+2. `HTTP.clustered(1, handler)` sets an explicit replication count; the shipped PostgreSQL Todo starter uses explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`.
 3. Keep route-free `@cluster` declarations as the canonical clustered surface. `HTTP.clustered(...)` is a routed HTTP wrapper, not a replacement for source-first clustered work.
-4. `GET /health` and mutating routes stay local in the shipped Todo starter.
-5. `HTTP.clustered(...)` must appear in route-handler position and wrap a bare handler reference.
-6. For clustered-runtime bootstrap, scaffold, or operator guidance, also load `skills/clustering`.
+4. `meshc init --template todo-api --db sqlite` is the honest local starter and does not make `HTTP.clustered(...)` part of its public contract.
+5. `GET /health` and mutating routes stay local in the shipped PostgreSQL Todo starter.
+6. `HTTP.clustered(...)` must appear in route-handler position and wrap a bare handler reference.
+7. For clustered-runtime bootstrap, scaffold, or operator guidance, also load `skills/clustering`.
 
 Code example — accepted forms (grounded in `compiler/mesh-typeck/tests/http_clustered_routes.rs`):
 ```mesh

@@ -133,7 +133,7 @@
   - Files: README.md, website/docs/docs/tooling/index.md, website/docs/docs/getting-started/clustered-example/index.md, website/docs/docs/distributed/index.md, website/docs/docs/distributed-proof/index.md, compiler/meshc/tests/e2e_m047_s06.rs
   - Verify: - `cargo test -p meshc --test e2e_m047_s06 -- --nocapture`
 - `npm --prefix website run build`
-- [ ] **T05: Retarget Mesh skill guidance and skill contract tests to the honest starter split** — Finish the assistant-facing contract. The Mesh root/clustering/HTTP skills should keep the route-free clustered runtime story and bounded `HTTP.clustered(...)` guidance, but they must stop teaching the SQLite Todo starter as part of the clustered runtime path.
+- [x] **T05: Retargeted the Mesh skills and retained M048 contract rail to enforce the SQLite-local/Postgres-clustered starter split.** — Finish the assistant-facing contract. The Mesh root/clustering/HTTP skills should keep the route-free clustered runtime story and bounded `HTTP.clustered(...)` guidance, but they must stop teaching the SQLite Todo starter as part of the clustered runtime path.
 
 ## Steps
 
