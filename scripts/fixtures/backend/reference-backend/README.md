@@ -1,6 +1,6 @@
 # retained reference-backend fixture
 
-This README is the canonical maintainer runbook for the retained backend-only proof surface in M051/S02. `scripts/fixtures/backend/reference-backend/` is a maintainer-only/internal fixture that preserves the same package identity (`reference-backend`) and the same backend-only Postgres contract (`GET /health`, `POST /jobs`, `GET /jobs/:id`, staged deploy SQL, worker crash recovery, restart visibility, and whole-process restart recovery) while later slices retarget or delete the repo-root compatibility copy.
+This README is the canonical maintainer runbook for the retained backend-only proof surface in M051/S02. `scripts/fixtures/backend/reference-backend/` is a maintainer-only/internal fixture and the sole in-repo backend-only proof surface after the repo-root `reference-backend/` compatibility tree was deleted. It preserves the same package identity (`reference-backend`) and the same backend-only Postgres contract (`GET /health`, `POST /jobs`, `GET /jobs/:id`, staged deploy SQL, worker crash recovery, restart visibility, and whole-process restart recovery).
 
 ## Startup contract
 
@@ -130,7 +130,7 @@ DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} bash scripts/verify-m051-s02.sh
 
 That verifier is the authoritative retained replay for M051/S02. It runs, in order:
 
-- cheap contract checks for this README, the package-local scripts, the slice contract target, and the preserved repo-root compatibility files
+- cheap contract checks for this README, the package-local scripts, the repo-root deletion surface, and the slice contract target
 - `cargo run -q -p meshc -- test scripts/fixtures/backend/reference-backend/tests`
 - `cargo test -p meshc --test e2e_m051_s02 -- --nocapture`
 - `cargo test -p meshc --test e2e_reference_backend e2e_reference_backend_migration_status_and_apply -- --ignored --nocapture`
@@ -150,6 +150,6 @@ On success the verifier leaves:
 
 Follow `.tmp/m051-s02/verify/latest-proof-bundle.txt` into the copied runtime artifacts when you need the retained bundle instead of the phase logs alone.
 
-## Compatibility boundary
+## Post-deletion boundary
 
-Do not delete or retarget the repo-root compatibility path in this slice. `reference-backend/README.md` and `scripts/verify-production-proof-surface.sh` remain available for later M051 slices that still need the public compatibility surface while this retained fixture becomes the maintainer authority for backend-only proof.
+The repo-root `reference-backend/` tree is intentionally gone. Do not recreate it for maintainer proof, fixture smoke, or staged deploy work. The backend-only maintainer surface now lives entirely under `scripts/fixtures/backend/reference-backend/`, while the public docs handoff stays on Production Backend Proof and `bash scripts/verify-production-proof-surface.sh`.

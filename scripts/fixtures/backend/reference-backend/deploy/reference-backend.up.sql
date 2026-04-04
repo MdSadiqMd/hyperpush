@@ -1,4 +1,4 @@
--- Derived from reference-backend/migrations/20260323010000_create_jobs.mpl.
+-- Derived from scripts/fixtures/backend/reference-backend/migrations/20260323010000_create_jobs.mpl.
 -- Keep the Mesh migration file canonical for compiler-driven workflows.
 
 BEGIN;

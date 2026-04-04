@@ -130,7 +130,7 @@ Clean up the remaining public wording that still leaks `reference-backend/` into
 `node --test scripts/tests/verify-m050-s02-first-contact-contract.test.mjs`
 `node --test scripts/tests/verify-m050-s03-secondary-surfaces.test.mjs`
 `cargo test -p meshc --test e2e_m051_s04 -- --nocapture`
-- [ ] **T03: Flip the retained S02 contract to post-deletion truth and remove the repo-root tree** — ---
+- [x] **T03: Deleted the repo-root reference-backend tree and rewrote the retained S02 contracts to post-deletion truth.** — ---
 estimated_steps: 5
 estimated_files: 6
 skills_used:

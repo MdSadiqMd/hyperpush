@@ -76,17 +76,22 @@ describe("retained reference-backend fixture") do
     assert_contains(migration, "CREATE TABLE IF NOT EXISTS jobs")
     assert_contains(deploy_sql, "_mesh_migrations")
     assert_contains(deploy_sql, "20260323010000")
+    assert_contains(deploy_sql, "scripts/fixtures/backend/reference-backend/migrations/20260323010000_create_jobs.mpl")
   end
 
-  test("readme marks the fixture as internal and retained") do
+  test("readme marks the fixture as internal and post-deletion authoritative") do
     let readme = read_required_file("scripts/fixtures/backend/reference-backend/README.md", "README.md", "../README.md")
 
     assert_contains(readme, "canonical maintainer runbook")
     assert_contains(readme, "maintainer-only/internal fixture")
+    assert_contains(readme, "sole in-repo backend-only proof surface")
+    assert_contains(readme, "repo-root `reference-backend/` compatibility tree was deleted")
     assert_contains(readme, "cargo run -q -p meshc -- test scripts/fixtures/backend/reference-backend/tests")
     assert_contains(readme, "scripts/fixtures/backend/reference-backend/scripts/stage-deploy.sh")
-    assert_contains(readme, "reference-backend/README.md")
-    assert_not_contains(readme, "canonical Mesh backend package for this slice")
+    assert_contains(readme, "bash scripts/verify-production-proof-surface.sh")
+    assert_not_contains(readme, "reference-backend/README.md")
+    assert_not_contains(readme, "Do not delete or retarget the repo-root compatibility path in this slice")
+    assert_not_contains(readme, "## Compatibility boundary")
   end
 
   test("stage and smoke scripts build from the fixture into external artifacts") do
@@ -114,7 +119,12 @@ describe("retained reference-backend fixture") do
     assert_not_contains(smoke, "bash \"$ROOT/reference-backend/scripts/deploy-smoke.sh\"")
   end
 
-  test("public-proof leftovers and in-place binaries stay absent") do
+  test("repo-root compatibility leftovers and in-place binaries stay absent") do
+    assert(file_missing(
+      "reference-backend/README.md",
+      "reference-backend/README.md",
+      "../reference-backend/README.md"
+    ))
     assert(file_missing(
       "scripts/fixtures/backend/reference-backend/reference-backend",
       "reference-backend",
@@ -122,7 +132,7 @@ describe("retained reference-backend fixture") do
     ))
     assert(file_missing(
       "scripts/fixtures/backend/reference-backend/scripts/verify-production-proof-surface.sh",
-      "scripts/verify-production-proof-surface.sh",
+      "scripts/fixtures/backend/reference-backend/scripts/verify-production-proof-surface.sh",
       "../scripts/verify-production-proof-surface.sh"
     ))
   end

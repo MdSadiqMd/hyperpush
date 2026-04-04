@@ -23,8 +23,8 @@ FIXTURE_RUNTIME_DIR="$ROOT_DIR/.tmp/m051-s02/reference-backend-runtime"
 FIXTURE_SMOKE_DIR="$ROOT_DIR/.tmp/m051-s02/fixture-smoke"
 E2E_CONTRACT_FILE="compiler/meshc/tests/e2e_m051_s02.rs"
 E2E_RUNTIME_FILE="compiler/meshc/tests/e2e_reference_backend.rs"
-COMPAT_RUNBOOK="reference-backend/README.md"
-COMPAT_PROOF_SCRIPT="scripts/verify-production-proof-surface.sh"
+GITIGNORE_FILE=".gitignore"
+PROOF_SURFACE_SCRIPT="scripts/verify-production-proof-surface.sh"
 DB_TEST_TARGET="cargo test -p meshc --test e2e_reference_backend"
 
 repo_rel() {
@@ -392,8 +392,9 @@ smoke = root / 'scripts/fixtures/backend/reference-backend/scripts/smoke.sh'
 e2e_contract = root / 'compiler/meshc/tests/e2e_m051_s02.rs'
 e2e_runtime = root / 'compiler/meshc/tests/e2e_reference_backend.rs'
 verifier = root / 'scripts/verify-m051-s02.sh'
-compat_runbook = root / 'reference-backend/README.md'
-compat_verifier = root / 'scripts/verify-production-proof-surface.sh'
+gitignore = root / '.gitignore'
+proof_surface_verifier = root / 'scripts/verify-production-proof-surface.sh'
+legacy_root = root / 'reference-backend'
 
 texts = {
     'runbook': runbook.read_text(errors='replace'),
@@ -404,8 +405,8 @@ texts = {
     'e2e_contract': e2e_contract.read_text(errors='replace'),
     'e2e_runtime': e2e_runtime.read_text(errors='replace'),
     'verifier': verifier.read_text(errors='replace'),
-    'compat_runbook': compat_runbook.read_text(errors='replace'),
-    'compat_verifier': compat_verifier.read_text(errors='replace'),
+    'gitignore': gitignore.read_text(errors='replace'),
+    'proof_surface_verifier': proof_surface_verifier.read_text(errors='replace'),
 }
 
 
@@ -432,13 +433,15 @@ def require_order(label: str, needles: list[str], description: str) -> None:
 for needle in [
     'This README is the canonical maintainer runbook',
     'maintainer-only/internal fixture',
+    'sole in-repo backend-only proof surface',
+    'repo-root `reference-backend/` compatibility tree was deleted',
     '## Startup contract',
     '## Repo-root maintainer loop',
     '## Staged deploy bundle',
     '## Live runtime smoke',
     '## `/health` recovery interpretation',
     '## Authoritative proof rail',
-    '## Compatibility boundary',
+    '## Post-deletion boundary',
     'cargo run -q -p meshc -- test scripts/fixtures/backend/reference-backend/tests',
     'DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate scripts/fixtures/backend/reference-backend status',
     'DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate scripts/fixtures/backend/reference-backend up',
@@ -454,8 +457,7 @@ for needle in [
     'last_recovery_count',
     'recovery_active',
     'bash scripts/verify-m051-s02.sh',
-    'reference-backend/README.md',
-    'scripts/verify-production-proof-surface.sh',
+    'bash scripts/verify-production-proof-surface.sh',
 ]:
     require_contains('runbook', needle, 'retained runbook contract')
 
@@ -468,7 +470,7 @@ require_order(
         '## Live runtime smoke',
         '## `/health` recovery interpretation',
         '## Authoritative proof rail',
-        '## Compatibility boundary',
+        '## Post-deletion boundary',
     ],
     'retained runbook section order',
 )
@@ -477,6 +479,9 @@ for needle in [
     'meshlang.dev/install',
     'meshc init --template',
     'website/docs/docs/production-backend-proof',
+    'reference-backend/README.md',
+    'Do not delete or retarget the repo-root compatibility path in this slice',
+    '## Compatibility boundary',
 ]:
     require_not_contains('runbook', needle, 'retained runbook first-contact drift')
 
@@ -526,6 +531,7 @@ for needle in [
     require_contains('e2e_runtime', needle, 'retained backend e2e rail')
 
 for needle in [
+    'm051_s02_repo_root_compat_tree_is_deleted_and_legacy_ignore_rule_is_gone',
     'This README is the canonical maintainer runbook',
     'm051_s02_retained_backend_verifier_replays_backend_rails_and_retains_bundle_markers',
     'verify-m051-s02.sh',
@@ -533,6 +539,7 @@ for needle in [
     'retained-reference-backend-runtime',
     'retained-fixture-smoke',
     'scripts.verify-production-proof-surface.sh',
+    'repo-root.gitignore',
 ]:
     require_contains('e2e_contract', needle, 'slice contract target marker')
 
@@ -540,6 +547,7 @@ for needle in [
     'm051-s02-contract',
     'm051-s02-package-tests',
     'm051-s02-e2e',
+    'm051-s02-delete-surface',
     'm051-s02-db-env-preflight',
     'm051-s02-migration-status-apply',
     'm051-s02-fixture-smoke',
@@ -551,6 +559,7 @@ for needle in [
     'retain-fixture-smoke',
     'retain-contract-artifacts',
     'm051-s02-bundle-shape',
+    'test ! -e reference-backend',
     'status.txt',
     'current-phase.txt',
     'phase-report.txt',
@@ -559,6 +568,7 @@ for needle in [
     'retained-reference-backend-runtime',
     'retained-fixture-smoke',
     'retained-contract-artifacts',
+    'repo-root.gitignore',
     'verify-m051-s02: ok',
 ]:
     require_contains('verifier', needle, 'verifier contract marker')
@@ -569,6 +579,7 @@ require_order(
         'run_contract_checks "$ARTIFACT_DIR/m051-s02-contract.log"',
         'run_expect_success m051-s02-package-tests',
         'run_expect_success m051-s02-e2e',
+        'run_expect_success m051-s02-delete-surface',
         'begin_phase m051-s02-db-env-preflight',
         'run_expect_success m051-s02-migration-status-apply',
         'run_expect_success m051-s02-fixture-smoke',
@@ -585,10 +596,12 @@ require_order(
     'verifier replay order',
 )
 
+require_not_contains('gitignore', 'reference-backend/reference-backend', 'legacy binary ignore drift')
 
-for label in ['compat_runbook', 'compat_verifier']:
-    if not texts[label].strip():
-        raise SystemExit(f'{label}: expected preserved repo-root compatibility surface to stay non-empty')
+if legacy_root.exists():
+    raise SystemExit(f'repo-root compatibility tree should be deleted, but {legacy_root} still exists')
+if not texts['proof_surface_verifier'].strip():
+    raise SystemExit('proof_surface_verifier: expected top-level proof-page verifier to stay non-empty')
 
 print('m051-s02 retained backend contract: ok')
 PY
@@ -631,7 +644,7 @@ for relative in [
     'fixture.README.md',
     'verify-m051-s02.sh',
     'e2e_m051_s02.rs',
-    'reference-backend.compat.README.md',
+    'repo-root.gitignore',
     'scripts.verify-production-proof-surface.sh',
 ]:
     if not (bundle_root / relative).exists():
@@ -712,8 +725,8 @@ for path in \
   "$ROOT_DIR/$FIXTURE_SMOKE_SCRIPT" \
   "$ROOT_DIR/$E2E_CONTRACT_FILE" \
   "$ROOT_DIR/$E2E_RUNTIME_FILE" \
-  "$ROOT_DIR/$COMPAT_RUNBOOK" \
-  "$ROOT_DIR/$COMPAT_PROOF_SCRIPT"; do
+  "$ROOT_DIR/$GITIGNORE_FILE" \
+  "$ROOT_DIR/$PROOF_SURFACE_SCRIPT"; do
   require_file init "$path" "required retained backend surface"
 done
 record_phase init passed
@@ -731,6 +744,8 @@ run_expect_success m051-s02-package-tests m051-s02-package-tests no 1800 "$FIXTU
   cargo run -q -p meshc -- test scripts/fixtures/backend/reference-backend/tests
 run_expect_success m051-s02-e2e m051-s02-e2e yes 2400 "$ARTIFACT_ROOT" \
   cargo test -p meshc --test e2e_m051_s02 -- --nocapture
+run_expect_success m051-s02-delete-surface m051-s02-delete-surface no 120 "$ARTIFACT_ROOT" \
+  test ! -e reference-backend
 
 begin_phase m051-s02-db-env-preflight
 DB_ENV_LOG="$ARTIFACT_DIR/m051-s02-db-env-preflight.log"
@@ -802,8 +817,8 @@ begin_phase m051-s02-bundle-shape
 cp "$ROOT_DIR/$FIXTURE_RUNBOOK" "$RETAINED_PROOF_BUNDLE_DIR/fixture.README.md"
 cp "$ROOT_DIR/$E2E_CONTRACT_FILE" "$RETAINED_PROOF_BUNDLE_DIR/e2e_m051_s02.rs"
 cp "$ROOT_DIR/scripts/verify-m051-s02.sh" "$RETAINED_PROOF_BUNDLE_DIR/verify-m051-s02.sh"
-cp "$ROOT_DIR/$COMPAT_RUNBOOK" "$RETAINED_PROOF_BUNDLE_DIR/reference-backend.compat.README.md"
-cp "$ROOT_DIR/$COMPAT_PROOF_SCRIPT" "$RETAINED_PROOF_BUNDLE_DIR/scripts.verify-production-proof-surface.sh"
+cp "$ROOT_DIR/$GITIGNORE_FILE" "$RETAINED_PROOF_BUNDLE_DIR/repo-root.gitignore"
+cp "$ROOT_DIR/$PROOF_SURFACE_SCRIPT" "$RETAINED_PROOF_BUNDLE_DIR/scripts.verify-production-proof-surface.sh"
 bundle_root_resolved="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$RETAINED_PROOF_BUNDLE_DIR")"
 printf '%s\n' "$bundle_root_resolved" >"$LATEST_PROOF_BUNDLE_PATH"
 assert_retained_bundle_shape \
@@ -820,6 +835,7 @@ for expected_phase in \
   m051-s02-contract \
   m051-s02-package-tests \
   m051-s02-e2e \
+  m051-s02-delete-surface \
   m051-s02-db-env-preflight \
   m051-s02-migration-status-apply \
   m051-s02-fixture-smoke \

@@ -182,6 +182,19 @@ fn m051_s02_support_helpers_fail_closed_on_wrong_fixture_root() {
 }
 
 #[test]
+fn m051_s02_repo_root_compat_tree_is_deleted_and_legacy_ignore_rule_is_gone() {
+    let legacy_root = backend::repo_root().join("reference-backend");
+    assert!(
+        !legacy_root.exists(),
+        "expected repo-root compatibility tree to be deleted, but {} still exists",
+        legacy_root.display()
+    );
+
+    let gitignore_path = backend::repo_root().join(".gitignore");
+    assert_source_omits(&gitignore_path, "reference-backend/reference-backend");
+}
+
+#[test]
 fn m051_s02_e2e_reference_backend_rebinds_retained_paths_through_support_module() {
     let target_path = backend::repo_root().join("compiler/meshc/tests/e2e_reference_backend.rs");
 
@@ -230,13 +243,15 @@ fn m051_s02_retained_backend_readme_is_the_canonical_maintainer_runbook() {
         &[
             "This README is the canonical maintainer runbook",
             "maintainer-only/internal fixture",
+            "sole in-repo backend-only proof surface",
+            "repo-root `reference-backend/` compatibility tree was deleted",
             "## Startup contract",
             "## Repo-root maintainer loop",
             "## Staged deploy bundle",
             "## Live runtime smoke",
             "## `/health` recovery interpretation",
             "## Authoritative proof rail",
-            "## Compatibility boundary",
+            "## Post-deletion boundary",
             "cargo run -q -p meshc -- test scripts/fixtures/backend/reference-backend/tests",
             "DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate scripts/fixtures/backend/reference-backend status",
             "DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate scripts/fixtures/backend/reference-backend up",
@@ -253,8 +268,7 @@ fn m051_s02_retained_backend_readme_is_the_canonical_maintainer_runbook() {
             "last_recovery_count",
             "recovery_active",
             "bash scripts/verify-m051-s02.sh",
-            "reference-backend/README.md",
-            "scripts/verify-production-proof-surface.sh",
+            "bash scripts/verify-production-proof-surface.sh",
         ],
     );
 
@@ -267,7 +281,7 @@ fn m051_s02_retained_backend_readme_is_the_canonical_maintainer_runbook() {
             "## Live runtime smoke",
             "## `/health` recovery interpretation",
             "## Authoritative proof rail",
-            "## Compatibility boundary",
+            "## Post-deletion boundary",
         ],
     );
 
@@ -277,6 +291,9 @@ fn m051_s02_retained_backend_readme_is_the_canonical_maintainer_runbook() {
             "meshlang.dev/install",
             "meshc init --template",
             "website/docs/docs/production-backend-proof",
+            "reference-backend/README.md",
+            "Do not delete or retarget the repo-root compatibility path in this slice",
+            "## Compatibility boundary",
         ],
     );
 }
@@ -342,6 +359,7 @@ fn m051_s02_retained_backend_verifier_replays_backend_rails_and_retains_bundle_m
             "m051-s02-contract",
             "m051-s02-package-tests",
             "m051-s02-e2e",
+            "m051-s02-delete-surface",
             "m051-s02-db-env-preflight",
             "m051-s02-migration-status-apply",
             "m051-s02-fixture-smoke",
@@ -356,6 +374,7 @@ fn m051_s02_retained_backend_verifier_replays_backend_rails_and_retains_bundle_m
             "run_contract_checks \"$ARTIFACT_DIR/m051-s02-contract.log\"",
             "cargo run -q -p meshc -- test scripts/fixtures/backend/reference-backend/tests",
             "cargo test -p meshc --test e2e_m051_s02 -- --nocapture",
+            "test ! -e reference-backend",
             "cargo test -p meshc --test e2e_reference_backend e2e_reference_backend_migration_status_and_apply -- --ignored --nocapture",
             "env PORT=\"$SMOKE_PORT\" JOB_POLL_MS=200 bash scripts/fixtures/backend/reference-backend/scripts/smoke.sh",
             "cargo test -p meshc --test e2e_reference_backend e2e_reference_backend_deploy_artifact_smoke -- --ignored --nocapture",
@@ -371,6 +390,7 @@ fn m051_s02_retained_backend_verifier_replays_backend_rails_and_retains_bundle_m
             "retained-fixture-smoke",
             "retained-contract-artifacts",
             "fixture.README.md",
+            "repo-root.gitignore",
             "scripts.verify-production-proof-surface.sh",
             "verify-m051-s02: ok",
         ],
@@ -382,6 +402,7 @@ fn m051_s02_retained_backend_verifier_replays_backend_rails_and_retains_bundle_m
             "run_contract_checks \"$ARTIFACT_DIR/m051-s02-contract.log\"",
             "run_expect_success m051-s02-package-tests",
             "run_expect_success m051-s02-e2e",
+            "run_expect_success m051-s02-delete-surface",
             "begin_phase m051-s02-db-env-preflight",
             "run_expect_success m051-s02-migration-status-apply",
             "run_expect_success m051-s02-fixture-smoke",
@@ -396,6 +417,4 @@ fn m051_s02_retained_backend_verifier_replays_backend_rails_and_retains_bundle_m
             "echo \"verify-m051-s02: ok\"",
         ],
     );
-
-
 }
