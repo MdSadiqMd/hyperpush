@@ -30,6 +30,7 @@ pub struct TodoRuntimeConfig {
     pub cluster_port: u16,
     pub cluster_role: String,
     pub promotion_epoch: u64,
+    pub startup_work_delay_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -173,11 +174,56 @@ pub fn default_runtime_config(project_name: &str, database_url: &str) -> TodoRun
         rate_limit_max_requests: DEFAULT_RATE_LIMIT_MAX_REQUESTS,
         cluster_cookie: format!("m049-s01-cookie-{}", unique_stamp()),
         node_name: format!("{project_name}@127.0.0.1:{cluster_port}"),
-        discovery_seed: "localhost".to_string(),
+        discovery_seed: route_free::LOOPBACK_V4.to_string(),
         cluster_port,
         cluster_role: "primary".to_string(),
         promotion_epoch: 0,
+        startup_work_delay_ms: None,
     }
+}
+
+pub fn assert_valid_runtime_config(config: &TodoRuntimeConfig) {
+    assert!(
+        !config.database_url.trim().is_empty(),
+        "DATABASE_URL is required for generated Postgres todo runtime helpers"
+    );
+    assert!(
+        config.database_url.starts_with("postgres://")
+            || config.database_url.starts_with("postgresql://"),
+        "DATABASE_URL must start with postgres:// or postgresql:// for generated Postgres todo runtime helpers"
+    );
+    assert!(config.http_port > 0, "PORT must be a positive port for generated Postgres todo runtime helpers");
+    assert!(
+        !config.cluster_cookie.trim().is_empty(),
+        "MESH_CLUSTER_COOKIE is required for generated Postgres todo runtime helpers"
+    );
+    assert!(
+        !config.discovery_seed.trim().is_empty(),
+        "MESH_DISCOVERY_SEED is required for generated Postgres todo runtime helpers"
+    );
+    assert!(
+        !config.cluster_role.trim().is_empty(),
+        "MESH_CONTINUITY_ROLE is required for generated Postgres todo runtime helpers"
+    );
+    assert!(
+        config.cluster_port > 0,
+        "MESH_CLUSTER_PORT must be a positive port for generated Postgres todo runtime helpers"
+    );
+    if let Some(delay_ms) = config.startup_work_delay_ms {
+        assert!(
+            delay_ms > 0,
+            "MESH_STARTUP_WORK_DELAY_MS must be greater than 0 when configured for generated Postgres todo runtime helpers"
+        );
+    }
+
+    let parsed_node_port = parse_cluster_node_name(&config.node_name).unwrap_or_else(|message| {
+        panic!("{message}");
+    });
+    assert_eq!(
+        parsed_node_port, config.cluster_port,
+        "MESH_NODE_NAME port {} must match MESH_CLUSTER_PORT {} for generated Postgres todo runtime helpers",
+        parsed_node_port, config.cluster_port
+    );
 }
 
 pub fn create_isolated_database(
@@ -799,6 +845,7 @@ fn drop_database_if_exists(admin_database_url: &str, database_name: &str) -> Res
 }
 
 fn apply_runtime_env(command: &mut Command, config: &TodoRuntimeConfig) {
+    assert_valid_runtime_config(config);
     command
         .env("DATABASE_URL", &config.database_url)
         .env("PORT", config.http_port.to_string())
@@ -819,6 +866,57 @@ fn apply_runtime_env(command: &mut Command, config: &TodoRuntimeConfig) {
             "MESH_CONTINUITY_PROMOTION_EPOCH",
             config.promotion_epoch.to_string(),
         );
+
+    if let Some(delay_ms) = config.startup_work_delay_ms {
+        command.env("MESH_STARTUP_WORK_DELAY_MS", delay_ms.to_string());
+    } else {
+        command.env_remove("MESH_STARTUP_WORK_DELAY_MS");
+    }
+}
+
+fn parse_cluster_node_name(node_name: &str) -> Result<u16, String> {
+    let (name, host_and_port) = node_name
+        .split_once('@')
+        .ok_or_else(|| format!("MESH_NODE_NAME must contain <name>@<host>:<port>, got `{node_name}`"))?;
+    if name.trim().is_empty() {
+        return Err(format!(
+            "MESH_NODE_NAME must contain a non-empty name before `@`, got `{node_name}`"
+        ));
+    }
+    if host_and_port.starts_with('[') {
+        let closing = host_and_port.find(']').ok_or_else(|| {
+            format!("MESH_NODE_NAME has an unterminated bracketed host in `{node_name}`")
+        })?;
+        let host = &host_and_port[1..closing];
+        if host.trim().is_empty() {
+            return Err(format!(
+                "MESH_NODE_NAME must include a non-empty bracketed host in `{node_name}`"
+            ));
+        }
+        let port_text = host_and_port
+            .get(closing + 1..)
+            .and_then(|suffix| suffix.strip_prefix(':'))
+            .ok_or_else(|| {
+                format!(
+                    "MESH_NODE_NAME must include `:<port>` after the bracketed host in `{node_name}`"
+                )
+            })?;
+        return port_text.parse::<u16>().map_err(|_| {
+            format!("MESH_NODE_NAME has an invalid port in `{node_name}`")
+        });
+    }
+
+    let (host, port_text) = host_and_port.rsplit_once(':').ok_or_else(|| {
+        format!("MESH_NODE_NAME must include <host>:<port> after `@`, got `{node_name}`")
+    })?;
+    if host.trim().is_empty() {
+        return Err(format!(
+            "MESH_NODE_NAME must include a non-empty host in `{node_name}`"
+        ));
+    }
+    port_text
+        .parse::<u16>()
+        .map_err(|_| format!("MESH_NODE_NAME has an invalid port in `{node_name}`"))
 }
 
 fn format_command(command: &Command) -> String {

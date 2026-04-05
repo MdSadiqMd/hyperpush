@@ -25,7 +25,8 @@ Usage:
   [CLUSTER_PROOF_REQUEST_KEY=<existing-request-key>] \
     bash scripts/verify-m043-s04-fly.sh
 
-Read-only Fly verifier for the M043 failover/operator rail.
+Read-only Fly verifier for the retained `cluster-proof` reference rail.
+This help surface documents a bounded reference/proof lane; it does not define a public starter surface.
 
 Required live-mode environment:
   CLUSTER_PROOF_FLY_APP    Existing Fly app name to inspect.
@@ -54,10 +55,11 @@ What it does not do:
 Artifacts:
   .tmp/m043-s04/fly/
 
-This script is a read-only sanity/config/log/probe rail. The destructive
+This script is a retained reference sanity/config/log/probe rail. The destructive
 same-image local authority remains `bash scripts/verify-m043-s03.sh`; this lane
-only inspects an already-deployed Fly app and verifies that live payloads expose
-runtime-owned `cluster_role`, `promotion_epoch`, and `replication_health` truth.
+only inspects an already-deployed Fly app, verifies that live payloads expose
+runtime-owned `cluster_role`, `promotion_epoch`, and `replication_health` truth,
+and does not promote Fly or `cluster-proof` into a public starter surface.
 EOF
 }
 

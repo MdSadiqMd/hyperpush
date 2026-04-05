@@ -1689,7 +1689,7 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
     assert_contains(
         "website/docs/docs/distributed-proof/index.md",
         &distributed_proof,
-        "ordinary `@cluster pub fn add()` / `@cluster pub fn sync_todos()`-style declaration",
+        "The clustered proof story now centers the generated PostgreSQL starter's M053 chain: `bash scripts/verify-m053-s01.sh` owns staged deploy truth, `bash scripts/verify-m053-s02.sh` owns failover truth, and `bash scripts/verify-m053-s03.sh` keeps packages/public-surface proof in the same hosted contract.",
     );
     assert_contains(
         "website/docs/docs/distributed-proof/index.md",
@@ -1753,7 +1753,17 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
     assert_contains(
         "website/docs/docs/tooling/index.md",
         &tooling,
-        "The SQLite Todo starter is the honest local starter",
+        "The SQLite Todo starter is the honest local-only starter",
+    );
+    assert_contains(
+        "website/docs/docs/tooling/index.md",
+        &tooling,
+        "staged deploy + failover proof chain",
+    );
+    assert_contains(
+        "website/docs/docs/tooling/index.md",
+        &tooling,
+        "hosted packages/public-surface contract",
     );
     assert_contains(
         "website/docs/docs/tooling/index.md",
@@ -1896,13 +1906,7 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
         verify_m051_s02,
     );
 
-    for (label, source) in [
-        (
-            "website/docs/docs/distributed-proof/index.md",
-            &distributed_proof,
-        ),
-        ("website/docs/docs/tooling/index.md", &tooling),
-    ] {
+    for (label, source) in [("website/docs/docs/tooling/index.md", &tooling)] {
         assert_contains(label, source, "execute_declared_work(...)");
         assert_contains(label, source, "Work.execute_declared_work");
         assert_contains(label, source, "HTTP.clustered(1, ...)");
@@ -1912,6 +1916,42 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
         assert_contains(label, source, "mutating routes stay local");
         assert_omits(label, source, "HTTP.clustered(...) is still not shipped");
     }
+
+    assert_contains(
+        "website/docs/docs/distributed-proof/index.md",
+        &distributed_proof,
+        "HTTP.clustered(1, ...)",
+    );
+    assert_contains(
+        "website/docs/docs/distributed-proof/index.md",
+        &distributed_proof,
+        "GET /todos",
+    );
+    assert_contains(
+        "website/docs/docs/distributed-proof/index.md",
+        &distributed_proof,
+        "GET /todos/:id",
+    );
+    assert_contains(
+        "website/docs/docs/distributed-proof/index.md",
+        &distributed_proof,
+        "GET /health",
+    );
+    assert_contains(
+        "website/docs/docs/distributed-proof/index.md",
+        &distributed_proof,
+        "mutating routes stay local",
+    );
+    assert_contains(
+        "website/docs/docs/distributed-proof/index.md",
+        &distributed_proof,
+        "ordinary verbs",
+    );
+    assert_omits(
+        "website/docs/docs/distributed-proof/index.md",
+        &distributed_proof,
+        "HTTP.clustered(...) is still not shipped",
+    );
 
     for (label, source) in [("README.md", &readme)] {
         assert_contains(label, source, "HTTP.clustered(1, ...)");

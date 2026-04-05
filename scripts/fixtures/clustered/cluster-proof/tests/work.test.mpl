@@ -91,9 +91,11 @@ describe("cluster-proof package smoke") do
     assert_not_contains(work_source, "from Cluster")
   end
 
-  test("readme points operators to mesh-owned cli inspection") do
+  test("readme keeps cluster-proof on the retained reference rail") do
     let readme = read_required_file("scripts/fixtures/clustered/cluster-proof/README.md", "README.md", "../README.md")
 
+    assert_contains(readme, "retained reference/proof fixture")
+    assert_contains(readme, "It is not a public starter surface")
     assert_contains(readme, "@cluster pub fn add()")
     assert_contains(readme, "Work.add")
     assert_contains(readme, "Node.start_from_env()")
@@ -107,6 +109,8 @@ describe("cluster-proof package smoke") do
     assert_contains(readme, "automatically starts the source-declared `@cluster` function")
     assert_contains(readme, "scripts/fixtures/clustered/cluster-proof/Dockerfile")
     assert_contains(readme, "scripts/fixtures/clustered/cluster-proof/fly.toml")
+    assert_contains(readme, "bounded read-only/reference environment")
+    assert_not_contains(readme, "one of the three equal canonical clustered surfaces")
     assert_not_contains(readme, "declared_work_runtime_name()")
     assert_not_contains(readme, "clustered(work)")
     assert_not_contains(readme, "[cluster]")
@@ -120,6 +124,16 @@ describe("cluster-proof package smoke") do
     assert_not_contains(readme, "cargo run -q -p meshc -- build cluster-proof")
     assert_not_contains(readme, "cargo run -q -p meshc -- test cluster-proof/tests")
     assert_not_contains(readme, "docker build -f cluster-proof/Dockerfile -t mesh-cluster-proof .")
+  end
+
+  test("fly verifier help stays reference-only and read-only") do
+    let verifier = read_required_file("scripts/verify-m043-s04-fly.sh", "../../../verify-m043-s04-fly.sh", "../../../../verify-m043-s04-fly.sh")
+
+    assert_contains(verifier, "Read-only Fly verifier for the retained `cluster-proof` reference rail.")
+    assert_contains(verifier, "it does not define a public starter surface")
+    assert_contains(verifier, "This script is a retained reference sanity/config/log/probe rail.")
+    assert_contains(verifier, "does not promote Fly or `cluster-proof` into a public starter surface")
+    assert_not_contains(verifier, "Read-only Fly verifier for the M043 failover/operator rail.")
   end
 
   test("packaging files stay honest about the route-free binary") do

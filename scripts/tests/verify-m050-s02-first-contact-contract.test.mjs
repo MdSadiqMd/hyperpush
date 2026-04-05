@@ -27,25 +27,27 @@ const readmeLadderIntro = 'Keep the public ladder starter/examples-first: the sc
 const readmeClusteredNextStep = '- **Clustered walkthrough:** use `meshc init --clustered` and then follow https://meshlang.dev/docs/getting-started/clustered-example/'
 const readmeSqliteNextStep = `- **SQLite Todo starter:** ${sqliteStarterLink}`
 const readmePostgresNextStep = `- **PostgreSQL Todo starter:** ${postgresStarterLink}`
-const readmeProofNextStep = '- **Production Backend Proof:** https://meshlang.dev/docs/production-backend-proof/ — only after the starter/examples-first ladder when you need the maintainer-facing deeper backend proof page.'
+const readmeProofNextStep = '- **Production Backend Proof:** https://meshlang.dev/docs/production-backend-proof/ — only after the starter/examples-first ladder when you need the maintainer-facing proof pages for that PostgreSQL staged deploy + failover chain plus the same hosted packages/public-surface checks.'
 const readmeToolingNextStep = '- **Tooling docs:** https://meshlang.dev/docs/tooling/'
 const readmeMaintainerHeading = '## Maintainers / public release proof'
 const readmeMaintainerMarker = '`mesher/README.md`'
 const readmeMaintainerVerifierMarker = 'named maintainer verifier commands surfaced from that proof page'
 const gettingStartedStarterHeading = '## Choose your next starter'
 const gettingStartedLadderIntro = 'Keep the public first-contact ladder explicit and ordered: clustered scaffold first, then the honest local SQLite starter, then the serious shared/deployable PostgreSQL starter, and only then the maintainer-facing backend proof page.'
+const gettingStartedProofHandoff = 'When you need the staged deploy + failover proof chain and the same hosted packages/public-surface contract, continue from the generated PostgreSQL starter into Production Backend Proof. Keep those deeper proof commands behind the proof pages instead of turning this first-contact guide into a verifier runbook.'
 const gettingStartedClusteredNextStep = '- [Clustered Example](/docs/getting-started/clustered-example/)'
 const gettingStartedSqliteNextStep = `- [SQLite Todo starter](${sqliteStarterLink})`
 const gettingStartedPostgresNextStep = `- [PostgreSQL Todo starter](${postgresStarterLink})`
 const gettingStartedProofNextStep = '- [Production Backend Proof](/docs/production-backend-proof/) -- the maintainer-facing backend proof page after the starter/examples-first ladder'
-const clusteredExampleIntroMarker = 'This page stays on that scaffold first. Once you have the route-free clustered contract in hand, keep the public follow-on ladder ordered: honest local SQLite starter, serious shared/deployable PostgreSQL starter, then Production Backend Proof only when you need the maintainer-facing deeper backend proof. The retained verifier map stays behind the proof pages instead of a direct repo-root runbook handoff.'
+const clusteredExampleIntroMarker = 'This page stays on that scaffold first. Once you have the route-free clustered contract in hand, keep the public follow-on ladder ordered: honest local SQLite starter, serious shared/deployable PostgreSQL starter, then Production Backend Proof only when you need the maintainer-facing deeper backend proof. The generated PostgreSQL starter owns the staged deploy + failover proof chain plus the same hosted packages/public-surface contract there, and the retained verifier map stays behind the proof pages instead of a direct repo-root runbook handoff.'
 const clusteredExampleStarterHeading = '## After the scaffold, pick the follow-on starter'
 const clusteredExampleLadderIntro = 'Take the public follow-on ladder in order: honest local SQLite starter, serious shared/deployable PostgreSQL starter, then Production Backend Proof only when you need the maintainer-facing deeper backend proof.'
 const clusteredExampleProofHeading = '## Need the retained verifier map?'
 const clusteredExampleProofPage = '/docs/distributed-proof/'
-const clusteredExampleProofNextStep = '- [Production Backend Proof](/docs/production-backend-proof/) — the maintainer-facing backend proof page after the starter/examples-first ladder.'
-const toolingWorkflowMarker = 'Keep the public CLI workflow explicit and examples-first: hello world first, then the clustered scaffold, then the honest local SQLite starter or the serious shared/deployable PostgreSQL starter, and only after that the maintainer-facing backend proof page.'
-const toolingStarterLadderIntro = 'After that CLI order, keep the public follow-on ladder explicit:'
+const clusteredExampleProofPageHandoff = 'Use [Distributed Proof](/docs/distributed-proof/) when you need the repo-owned verifier map, retained compatibility wrappers, or the lower-level fixture-backed rails behind this public starter story. The generated PostgreSQL starter owns the staged deploy + failover proof chain plus the same hosted packages/public-surface contract there, so this page stays focused on the scaffold plus the SQLite/PostgreSQL starter split.'
+const clusteredExampleProofNextStep = '- [Production Backend Proof](/docs/production-backend-proof/) — the maintainer-facing backend proof page after the starter/examples-first ladder, where those deeper proof commands stay behind the proof pages.'
+const toolingWorkflowMarker = 'Keep the public CLI workflow explicit and examples-first: hello world first, then the clustered scaffold, then the honest local SQLite starter or the serious shared/deployable PostgreSQL starter, and only after that the maintainer-facing backend proof page. SQLite stays local-only and single-node only here; the generated PostgreSQL starter is the serious shared/deployable path and the handoff into the staged deploy + failover proof chain plus the same hosted packages/public-surface contract.'
+const toolingStarterLadderIntro = 'After that CLI order, keep the public follow-on ladder explicit. Keep the deeper proof commands behind Production Backend Proof and Distributed Proof instead of turning this first-contact tooling page into a verifier runbook:'
 const toolingProofNextStep = '- [Production Backend Proof](/docs/production-backend-proof/) — the maintainer-facing backend proof page after the starter/examples-first ladder'
 const toolingDocsVerifierHeading = '## Assembled first-contact docs verifier'
 const toolingReleaseRunbookHeading = '## Release Assembly Runbook'
@@ -141,8 +143,10 @@ function validateFirstContactContract(baseRoot) {
 
   requireIncludes(errors, readmePath, readme, [
     ...starterCommands,
-    'honest local starter',
-    'shared/deployable',
+    'honest local-only starter',
+    'single-node only',
+    'staged deploy + failover proof chain',
+    'hosted packages/public-surface contract',
     readmeLadderIntro,
     readmeClusteredNextStep,
     readmeSqliteNextStep,
@@ -158,8 +162,11 @@ function validateFirstContactContract(baseRoot) {
     ...starterCommands,
     gettingStartedStarterHeading,
     gettingStartedLadderIntro,
-    'honest local starter',
-    'shared/deployable',
+    gettingStartedProofHandoff,
+    'honest local-only starter',
+    'single-node only',
+    'staged deploy + failover proof chain',
+    'hosted packages/public-surface contract',
     currentRepoUrl,
     gettingStartedClusteredNextStep,
     gettingStartedSqliteNextStep,
@@ -180,10 +187,15 @@ function validateFirstContactContract(baseRoot) {
     'meshc cluster status',
     'meshc cluster continuity',
     'meshc cluster diagnostics',
+    'local-only',
+    'single-node',
+    'staged deploy + failover proof chain',
+    'hosted packages/public-surface contract',
     sqliteStarterLink,
     postgresStarterLink,
     clusteredExampleProofNextStep,
     clusteredExampleProofPage,
+    clusteredExampleProofPageHandoff,
   ])
 
   requireIncludes(errors, toolingPath, tooling, [
@@ -193,8 +205,11 @@ function validateFirstContactContract(baseRoot) {
     toolingWorkflowMarker,
     '### Creating a New Project',
     ...starterCommands,
-    'honest local starter',
+    'honest local-only starter',
+    'single-node only',
     'shared/deployable',
+    'staged deploy + failover proof chain',
+    'hosted packages/public-surface contract',
     sqliteStarterLink,
     postgresStarterLink,
     'meshc cluster status',
@@ -276,6 +291,7 @@ function validateFirstContactContract(baseRoot) {
     ...starterCommands,
     '## What\'s Next?',
     gettingStartedLadderIntro,
+    gettingStartedProofHandoff,
     gettingStartedClusteredNextStep,
     gettingStartedSqliteNextStep,
     gettingStartedPostgresNextStep,
@@ -291,7 +307,7 @@ function validateFirstContactContract(baseRoot) {
     'meshc init --template todo-api --db postgres my_shared_todo',
     clusteredExampleProofNextStep,
     clusteredExampleProofHeading,
-    clusteredExampleProofPage,
+    clusteredExampleProofPageHandoff,
   ])
 
   requireOrdered(errors, toolingPath, tooling, [

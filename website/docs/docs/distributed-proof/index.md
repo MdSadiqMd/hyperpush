@@ -1,82 +1,74 @@
 ---
 title: Distributed Proof
-description: Canonical clustered proof map for the scaffold/examples-first clustered story, the serious PostgreSQL Todo starter, the honest SQLite local starter, and the retained verifier rails behind them.
+description: Canonical clustered proof map for the scaffold/examples-first clustered story, the serious PostgreSQL starter, the honest SQLite local starter, the hosted packages/public-surface contract, and the retained Fly reference rail.
 prev: false
 next: false
 ---
 
 # Distributed Proof
 
-This is the only public-secondary docs page that carries the named clustered verifier rails. Use [Distributed Actors](/docs/distributed/) for the language/runtime primitives, [Clustered Example](/docs/getting-started/clustered-example/) for the scaffold-first walkthrough, and [Production Backend Proof](/docs/production-backend-proof/) when the work becomes backend-specific. That proof page stays compact: it keeps public readers on scaffold/examples-first surfaces, points repo maintainers to [`mesher/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/mesher/README.md) plus `bash scripts/verify-m051-s01.sh`, and keeps the retained backend-only proof behind `bash scripts/verify-m051-s02.sh`.
+This is the only public-secondary docs page that carries the named clustered verifier rails.
 
-Mesh exposes one clustered-work story through a public starter split plus a deeper backend handoff:
+Use [Distributed Actors](/docs/distributed/) for the language/runtime primitives, [Clustered Example](/docs/getting-started/clustered-example/) for the scaffold-first walkthrough, and [Production Backend Proof](/docs/production-backend-proof/) when the work becomes backend-specific. The clustered proof story now centers the generated PostgreSQL starter's M053 chain: `bash scripts/verify-m053-s01.sh` owns staged deploy truth, `bash scripts/verify-m053-s02.sh` owns failover truth, and `bash scripts/verify-m053-s03.sh` keeps packages/public-surface proof in the same hosted contract.
 
-- [Clustered Example](/docs/getting-started/clustered-example/) — the public scaffold-first walkthrough for `meshc init --clustered`
-- [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md) — the serious shared/deployable PostgreSQL starter
-- [`examples/todo-sqlite/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md) — the honest local single-node SQLite starter
-- [Production Backend Proof](/docs/production-backend-proof/) — the compact backend proof handoff before any maintainer-only surface
-- [`mesher/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/mesher/README.md) — the deeper maintained app runbook for repo maintainers
-- `bash scripts/verify-m051-s01.sh` — maintainer verifier for the shipped Mesher app surface
-- `bash scripts/verify-m051-s02.sh` — maintainer verifier for the retained backend-only proof replay
-
-The clustered public surfaces keep the same source-first runtime-owned contract, and the PostgreSQL Todo starter adds one bounded read-route adoption on top of it:
-
-- `mesh.toml` stays package-only
-- `work.mpl` owns an ordinary `@cluster pub fn add()` / `@cluster pub fn sync_todos()`-style declaration instead of a helper-shaped public entrypoint
-- `main.mpl` boots only through `Node.start_from_env()` on the scaffold and PostgreSQL starter
-- the runtime automatically starts declared work at startup
-- operators inspect truth through `meshc cluster status`, continuity list, continuity record, and diagnostics
-- the PostgreSQL Todo starter keeps `work.mpl` route-free, dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, and keeps `GET /health` plus mutating routes local instead of inventing package-owned cluster control planes
-- the SQLite starter stays outside this clustered proof surface on purpose: The SQLite Todo starter is the honest local path: single-node SQLite, generated package tests, and no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story
-
-If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the PostgreSQL Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
+Keep the public starter split honest here too: [`examples/todo-sqlite/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md) is the honest local single-node starter with no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story, while [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md) is the serious shared/deployable starter that keeps source-first `@cluster` work and only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`.
 
 ## Public surfaces and verifier rails
 
 This page is the canonical clustered proof map. The other public-secondary pages should hand readers here instead of repeating the named clustered verifier ledger.
 
 - [Clustered Example](/docs/getting-started/clustered-example/) — first stop for the public scaffold surface
-- [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md) — the fuller shared/deployable starter that keeps the same source-first contract while adding PostgreSQL, selected read-route `HTTP.clustered(1, ...)`, and Docker packaging
+- [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md) — the serious shared/deployable starter that owns the shipped clustered contract
 - [`examples/todo-sqlite/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md) — the honest local single-node SQLite starter, not a clustered/operator proof surface
+- `bash scripts/verify-m053-s01.sh` — starter-owned staged deploy proof that retains the generated PostgreSQL bundle plus bundled artifacts
+- `bash scripts/verify-m053-s02.sh` — starter-owned failover proof that replays S01, exercises the staged PostgreSQL starter under failover, and retains the failover proof bundle
+- `bash scripts/verify-m053-s03.sh` — hosted packages/public-surface contract that checks the same starter proof remains visible in the public hosted story
 - [Production Backend Proof](/docs/production-backend-proof/) — the compact backend proof handoff before any maintainer-only surface
 - [`mesher/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/mesher/README.md) — the deeper maintained app runbook for repo maintainers
 - `bash scripts/verify-m051-s01.sh` — maintainer verifier for the shipped Mesher app surface
 - `bash scripts/verify-m051-s02.sh` — maintainer verifier for the retained backend-only proof replay
-- `bash scripts/verify-m047-s04.sh` — the authoritative cutover rail for the source-first route-free clustered contract
-- `bash scripts/verify-m047-s05.sh` — the retained historical clustered Todo subrail kept behind fixture-backed rails instead of the public starter contract
-- `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` — the repo S07 rail for default-count and two-node `HTTP.clustered(...)` behavior beyond the PostgreSQL Todo starter's explicit-count read routes
-- `bash scripts/verify-m047-s06.sh` — the docs and retained-proof closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle
-- `bash scripts/verify-m046-s06.sh` — the historical M046 closeout wrapper retained as a compatibility alias into the M047 cutover rail
-- `bash scripts/verify-m046-s05.sh` — the historical M046 equal-surface wrapper retained as a compatibility alias into the M047 cutover rail
-- `bash scripts/verify-m046-s04.sh` — the historical M046 package/startup wrapper retained as a compatibility alias into the M047 cutover rail
-- `bash scripts/verify-m045-s05.sh` — the historical M045 closeout wrapper retained as a compatibility alias into the M047 cutover rail
-- `bash scripts/verify-m045-s04.sh` — the historical M045 assembled wrapper retained as a compatibility alias into the M047 cutover rail
-- `bash scripts/verify-m045-s03.sh` — historical failover-specific subrail
-- `bash scripts/verify-m043-s04-fly.sh` — read-only Fly sanity/config/log/probe verifier
-
-The lower-level retained fixture rails still exist for repo-owned proof, but they now live under `scripts/fixtures/clustered/tiny-cluster/` and `scripts/fixtures/clustered/cluster-proof/` instead of public README onboarding runbooks.
+- `bash scripts/verify-m043-s04-fly.sh` — retained read-only Fly sanity/config/log/probe verifier for an already-deployed reference environment
 
 ## What the public clustered contract proves
 
-The public clustered story is intentionally smaller than a generic clustering marketing page:
+The public clustered story is intentionally smaller than the repo's full retained proof inventory:
 
 - start with `meshc init --clustered`, then branch to the generated Postgres or SQLite example that matches the contract you actually want
 - keep `meshc init --template todo-api --db postgres` as the fuller shared/deployable starter without changing the source-first `@cluster` contract
 - keep `meshc init --template todo-api --db sqlite` on its honest local single-node contract instead of projecting clustered/operator claims onto it
+- let `bash scripts/verify-m053-s01.sh` own staged deploy proof for the generated PostgreSQL starter
+- let `bash scripts/verify-m053-s02.sh` own failover proof for that same staged PostgreSQL starter
+- let `bash scripts/verify-m053-s03.sh` prove the hosted packages/public-surface contract still tells the same story
 - keep clustered declaration state in source instead of the manifest
 - rename legacy helper-shaped names to ordinary verbs instead of preserving runtime-plumbing-shaped public APIs
 - let the runtime own startup, placement, continuity, promotion, recovery, and diagnostics
 - use the same operator flow everywhere: status, continuity list, continuity record, diagnostics
 - keep the PostgreSQL Todo starter's clustered-route adoption narrow: `work.mpl` stays route-free, `GET /todos` and `GET /todos/:id` use explicit-count `HTTP.clustered(1, ...)`, and `GET /health` plus mutating routes stay local application routes
-- defer default-count and two-node `HTTP.clustered(...)` behavior to `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` instead of implying the public starter surfaces already prove it
-- keep Fly as read-only evidence instead of destructive failover proof
+- keep Fly as a retained read-only reference/proof lane for already-deployed environments instead of treating it as a coequal public starter surface
 - keep the deeper backend handoff on Production Backend Proof, Mesher, and the retained backend-only verifier instead of promoting any repo-root runbook as a coequal first-contact clustered starter
+
+## Retained reference rails
+
+Older repo-owned rails still exist for compatibility, history, and deeper operator proof, but they are secondary to the M053 starter-owned chain above:
+
+- `bash scripts/verify-m047-s04.sh` — authoritative M047 cutover rail for the source-first route-free clustered contract
+- `bash scripts/verify-m047-s05.sh` — retained historical clustered Todo subrail kept behind fixture-backed rails instead of the public starter contract
+- `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` — repo S07 rail for default-count and two-node `HTTP.clustered(...)` behavior beyond the PostgreSQL starter's explicit-count read routes
+- `bash scripts/verify-m047-s06.sh` — docs and retained-proof closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle
+- `bash scripts/verify-m046-s06.sh`, `bash scripts/verify-m046-s05.sh`, `bash scripts/verify-m046-s04.sh`, `bash scripts/verify-m045-s05.sh`, `bash scripts/verify-m045-s04.sh`, and `bash scripts/verify-m045-s03.sh` — historical compatibility aliases and subrails retained for replay, not for first-contact starter teaching
+- `cargo run -q -p meshc -- build scripts/fixtures/clustered/tiny-cluster` plus `cargo run -q -p meshc -- test scripts/fixtures/clustered/tiny-cluster/tests` — lower-level retained tiny-cluster fixture contract
+- `cargo run -q -p meshc -- build scripts/fixtures/clustered/cluster-proof` plus `cargo run -q -p meshc -- test scripts/fixtures/clustered/cluster-proof/tests` — retained fixture contract for the bounded Fly/reference package
 
 ## Named proof commands
 
 These are the repo-level commands behind the current distributed proof story:
 
 ```bash
+bash scripts/verify-m053-s01.sh
+bash scripts/verify-m053-s02.sh
+bash scripts/verify-m053-s03.sh
+bash scripts/verify-m051-s01.sh
+bash scripts/verify-m051-s02.sh
 bash scripts/verify-m047-s04.sh
 bash scripts/verify-m047-s05.sh
 cargo test -p meshc --test e2e_m047_s07 -- --nocapture
@@ -98,7 +90,7 @@ CLUSTER_PROOF_BASE_URL=https://mesh-cluster-proof.fly.dev \
   bash scripts/verify-m043-s04-fly.sh
 ```
 
-> **Note:** The Fly verifier is intentionally read-only. Use `bash scripts/verify-m043-s04-fly.sh --help` when you only want the non-live syntax/help path. Live mode inspects an already-deployed app and optionally reads an existing continuity key with `CLUSTER_PROOF_REQUEST_KEY`; it does not create new work or mutate authority.
+> **Note:** The Fly verifier is intentionally read-only and intentionally secondary. Use `bash scripts/verify-m043-s04-fly.sh --help` when you only want the non-live syntax/help path. Live mode inspects an already-deployed reference app and optionally reads an existing continuity key with `CLUSTER_PROOF_REQUEST_KEY`; it does not create new work, does not mutate authority, and does not replace the portable staged PostgreSQL starter contract.
 
 ## Operator workflow across the public clustered surfaces
 
@@ -117,8 +109,8 @@ Supported topology and operator seam:
 
 - one primary plus one standby using the same image and the same repo packaging path
 - small env surface: cookie, discovery seed, explicit identity injection, continuity role, and promotion epoch
-- same-image local proof for destructive failover and rejoin truth
-- read-only Fly inspection for already-deployed apps
+- same-image local proof for destructive failover and rejoin truth through the staged PostgreSQL starter chain
+- read-only Fly inspection for already-deployed reference apps
 
 Non-goals for this public rail:
 
@@ -127,23 +119,28 @@ Non-goals for this public rail:
 - package-owned operator surfaces that compete with the runtime CLI
 - presenting retained internal fixtures as the public onboarding story
 - projecting clustered/operator claims onto the SQLite starter
-- claiming the PostgreSQL starter already proves default-count or two-node `HTTP.clustered(...)` behavior that is actually owned by the repo S07 rail
-- destructive failover on Fly as a required proof surface
+- implying Fly is a required deploy target for the public clustered contract
+- implying the retained `cluster-proof` fixture is a coequal public starter surface
 
 ## When to use this page vs the generic distributed guide
 
 Use the generic [Distributed Actors](/docs/distributed/) guide when you want the language/runtime primitives.
 
-Use this page when you want the named proof surfaces behind the scaffold/examples-first clustered story, the PostgreSQL starter, the SQLite-local boundary, the Production Backend Proof handoff into Mesher plus the retained backend-only verifier, and the repo-owned S07 clustered-route rail.
+Use this page when you want the named proof surfaces behind the scaffold/examples-first clustered story, the PostgreSQL starter's staged deploy + failover + hosted-contract chain, the SQLite-local boundary, the Production Backend Proof handoff into Mesher plus the retained backend-only verifier, and the retained Fly reference rail.
 
 ## Failure inspection map
 
 If a proof fails, rerun the named command for the exact surface you care about:
 
-- **Docs + retained-proof closeout rail:** `bash scripts/verify-m047-s06.sh`
+- **Starter staged deploy proof:** `bash scripts/verify-m053-s01.sh`
+- **Starter failover proof:** `bash scripts/verify-m053-s02.sh`
+- **Hosted starter/packages/public-surface proof:** `bash scripts/verify-m053-s03.sh`
+- **Mesher app proof:** `bash scripts/verify-m051-s01.sh`
+- **Retained backend-only replay:** `bash scripts/verify-m051-s02.sh`
+- **Authoritative M047 cutover rail:** `bash scripts/verify-m047-s04.sh`
 - **Historical clustered Todo subrail:** `bash scripts/verify-m047-s05.sh`
 - **Repo S07 clustered-route rail:** `cargo test -p meshc --test e2e_m047_s07 -- --nocapture`
-- **Authoritative cutover rail:** `bash scripts/verify-m047-s04.sh`
+- **Docs + retained-proof closeout rail:** `bash scripts/verify-m047-s06.sh`
 - **Historical M046 closeout alias:** `bash scripts/verify-m046-s06.sh`
 - **Historical M046 equal-surface alias:** `bash scripts/verify-m046-s05.sh`
 - **Historical M046 package/startup alias:** `bash scripts/verify-m046-s04.sh`
@@ -153,8 +150,4 @@ If a proof fails, rerun the named command for the exact surface you care about:
 - **Lower-level retained tiny-cluster fixture contract:** `cargo run -q -p meshc -- build scripts/fixtures/clustered/tiny-cluster && cargo run -q -p meshc -- test scripts/fixtures/clustered/tiny-cluster/tests`
 - **Lower-level retained cluster-proof fixture contract:** `cargo run -q -p meshc -- build scripts/fixtures/clustered/cluster-proof && cargo run -q -p meshc -- test scripts/fixtures/clustered/cluster-proof/tests`
 - **Public docs build:** `npm --prefix website run build`
-- **Read-only Fly sanity:** `bash scripts/verify-m043-s04-fly.sh --help` for syntax, or `CLUSTER_PROOF_FLY_APP=mesh-cluster-proof CLUSTER_PROOF_BASE_URL=https://mesh-cluster-proof.fly.dev bash scripts/verify-m043-s04-fly.sh` for live inspection
-pts/verify-m043-s04-fly.sh` for live inspection
-er-proof.fly.dev bash scripts/verify-m043-s04-fly.sh` for live inspection
-`CLUSTER_PROOF_FLY_APP=mesh-cluster-proof CLUSTER_PROOF_BASE_URL=https://mesh-cluster-proof.fly.dev bash scripts/verify-m043-s04-fly.sh` for live inspection
-R_PROOF_FLY_APP=mesh-cluster-proof CLUSTER_PROOF_BASE_URL=https://mesh-cluster-proof.fly.dev bash scripts/verify-m043-s04-fly.sh` for live inspection
+- **Read-only Fly reference check:** `bash scripts/verify-m043-s04-fly.sh --help` for syntax, or `CLUSTER_PROOF_FLY_APP=mesh-cluster-proof CLUSTER_PROOF_BASE_URL=https://mesh-cluster-proof.fly.dev bash scripts/verify-m043-s04-fly.sh` for live inspection

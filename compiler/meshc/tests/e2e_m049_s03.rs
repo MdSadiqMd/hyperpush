@@ -33,8 +33,8 @@ fn m049_s03_committed_examples_match_public_cli_output_and_preserve_mode_specifi
     let postgres = todo::example_entry(&summary, todo::POSTGRES_EXAMPLE_NAME);
     assert_eq!(postgres.example.db, "postgres");
     assert!(
-        postgres.generated_manifest.file_count >= 16,
-        "expected Postgres generated manifest to retain the full scaffold tree, got {:?}",
+        postgres.generated_manifest.file_count >= 20,
+        "expected Postgres generated manifest to retain the full staged-deploy scaffold tree, got {:?}",
         postgres.generated_manifest
     );
 
@@ -120,6 +120,14 @@ fn m049_s03_materializer_check_names_missing_extra_and_changed_files_in_mutated_
             )
         },
     );
+    fs::remove_file(postgres_root.join(todo::POSTGRES_DEPLOY_SQL_RELATIVE_PATH)).unwrap_or_else(
+        |error| {
+            panic!(
+                "failed to remove Postgres deploy SQL from {}: {error}",
+                postgres_root.display()
+            )
+        },
+    );
     fs::write(postgres_root.join("HAND_EDITED.txt"), "drift\n").unwrap_or_else(|error| {
         panic!(
             "failed to write hand-edited drift marker under {}: {error}",
@@ -133,7 +141,7 @@ fn m049_s03_materializer_check_names_missing_extra_and_changed_files_in_mutated_
             "examples_root": temp_examples_root,
             "checks": [
                 "materializer check reports changed mesh.toml when the project name drifts",
-                "materializer check reports missing SQLite storage and Postgres migration files",
+                "materializer check reports missing SQLite storage, Postgres migration, and staged deploy files",
                 "materializer check reports extra hand-edited files instead of normalizing them away"
             ]
         }),
@@ -162,8 +170,10 @@ fn m049_s03_materializer_check_names_missing_extra_and_changed_files_in_mutated_
     );
     assert!(
         run.stderr
-            .contains("missing=migrations/20260402120000_create_todos.mpl"),
-        "expected Postgres missing migration report, got:\n{}",
+            .contains("missing=migrations/20260402120000_create_todos.mpl, deploy/todo-postgres.up.sql")
+            || run.stderr
+                .contains("missing=deploy/todo-postgres.up.sql, migrations/20260402120000_create_todos.mpl"),
+        "expected Postgres missing migration + deploy SQL report, got:\n{}",
         run.combined
     );
     assert!(

@@ -61,3 +61,8 @@ jobs:
     secrets:
       MESH_PUBLISH_OWNER: ${{ secrets.MESH_PUBLISH_OWNER }}
       MESH_PUBLISH_TOKEN: ${{ secrets.MESH_PUBLISH_TOKEN }}
+
+  starter-failover-proof:
+    name: Authoritative starter failover proof
+    needs: whitespace-guard
+    uses: ./.github/workflows/authoritative-starter-failover-proof.yml

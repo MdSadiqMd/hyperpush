@@ -1,6 +1,6 @@
 # cluster-proof
 
-`scripts/fixtures/clustered/cluster-proof/` is one of the three equal canonical clustered surfaces in this repository alongside the generated `meshc init --clustered` scaffold and `scripts/fixtures/clustered/tiny-cluster/`. It keeps the same route-free source-first contract while carrying the deeper packaged failover/operator runbook.
+`scripts/fixtures/clustered/cluster-proof/` is a retained reference/proof fixture for the older Fly-oriented packaging rail. It keeps the same route-free source-first contract. It is not a public starter surface: the generated `meshc init --clustered` scaffold and the PostgreSQL Todo starter own the shipped M053 clustered contract, while this directory stays as a bounded repo fixture for read-only/reference proof.
 
 ## Package contract
 
@@ -54,4 +54,4 @@ Use the list form first to discover request keys and runtime-owned startup recor
 
 ## Scope
 
-This directory is intentionally the deeper packaged failover/operator runbook, not a separate clustered contract. Keep it aligned with the generated scaffold and `scripts/fixtures/clustered/tiny-cluster/`, and treat package-owned control routes as drift rather than documentation variation.
+This directory is intentionally the deeper retained reference/proof runbook, not a coequal public starter. Keep it aligned with the generated scaffold and `examples/todo-postgres` contract, treat Fly as a bounded read-only/reference environment, and treat package-owned control routes as drift rather than documentation variation.

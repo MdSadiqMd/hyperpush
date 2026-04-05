@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 ARTIFACT_DIR=".tmp/m034-s02/verify"
-REUSABLE_WORKFLOW_PATH=".github/workflows/authoritative-live-proof.yml"
+LIVE_PROOF_WORKFLOW_PATH=".github/workflows/authoritative-live-proof.yml"
+STARTER_REUSABLE_WORKFLOW_PATH=".github/workflows/authoritative-starter-failover-proof.yml"
 CALLER_WORKFLOW_PATH=".github/workflows/authoritative-verification.yml"
 RELEASE_WORKFLOW_PATH=".github/workflows/release.yml"
 mkdir -p "$ARTIFACT_DIR"
@@ -28,11 +29,11 @@ fail_with_log() {
 
 run_reusable_contract_check() {
   local phase_name="reusable"
-  local command_text="ruby reusable workflow contract sweep ${REUSABLE_WORKFLOW_PATH}"
+  local command_text="ruby reusable workflow contract sweep ${LIVE_PROOF_WORKFLOW_PATH}"
   local log_path="$ARTIFACT_DIR/reusable.log"
 
   echo "==> [${phase_name}] ${command_text}"
-  if ! ruby - "$REUSABLE_WORKFLOW_PATH" "$ROOT_DIR" >"$log_path" 2>&1 <<'RUBY'
+  if ! ruby - "$LIVE_PROOF_WORKFLOW_PATH" "$ROOT_DIR" >"$log_path" 2>&1 <<'RUBY'
 require "yaml"
 
 workflow_path = ARGV.fetch(0)
@@ -266,6 +267,341 @@ RUBY
   fi
 }
 
+run_starter_reusable_contract_check() {
+  local phase_name="starter-reusable"
+  local command_text="ruby starter reusable workflow contract sweep ${STARTER_REUSABLE_WORKFLOW_PATH}"
+  local log_path="$ARTIFACT_DIR/starter-reusable.log"
+
+  echo "==> [${phase_name}] ${command_text}"
+  if ! ruby - "$STARTER_REUSABLE_WORKFLOW_PATH" "$ROOT_DIR" >"$log_path" 2>&1 <<'RUBY'
+require "yaml"
+
+workflow_path = ARGV.fetch(0)
+root_dir = ARGV.fetch(1)
+workflow = YAML.load_file(workflow_path)
+raw = File.read(workflow_path)
+script_path = File.join(root_dir, "scripts/verify-m053-s02.sh")
+
+errors = []
+
+unless File.file?(script_path)
+  errors << "scripts/verify-m053-s02.sh is missing"
+end
+
+on_key = if workflow.key?("on")
+  "on"
+elsif workflow.key?(true)
+  true
+else
+  "on"
+end
+on_block = workflow[on_key]
+unless on_block.is_a?(Hash) && on_block.keys == ["workflow_call"]
+  errors << "workflow must trigger only via workflow_call"
+end
+
+call_block = on_block.is_a?(Hash) ? on_block["workflow_call"] : nil
+unless call_block.nil? || (call_block.is_a?(Hash) && call_block.empty?)
+  errors << "workflow_call must not require inputs or secrets for the hosted starter proof"
+end
+
+permissions = workflow["permissions"]
+unless permissions.is_a?(Hash) && permissions["contents"] == "read"
+  errors << "workflow must set permissions.contents to read"
+end
+
+jobs = workflow["jobs"]
+unless jobs.is_a?(Hash) && jobs.keys == ["starter-failover-proof"]
+  errors << "workflow must define exactly one starter-failover-proof job"
+end
+job = jobs.is_a?(Hash) ? jobs["starter-failover-proof"] : nil
+if job.is_a?(Hash)
+  errors << "job name must stay 'Authoritative starter failover proof'" unless job["name"] == "Authoritative starter failover proof"
+  errors << "job must run on ubuntu-24.04" unless job["runs-on"] == "ubuntu-24.04"
+  unless job["timeout-minutes"].is_a?(Integer) && job["timeout-minutes"] >= 170
+    errors << "job timeout-minutes must cover the long-running hosted starter proof"
+  end
+
+  services = job["services"]
+  postgres = services.is_a?(Hash) ? services["postgres"] : nil
+  if postgres.is_a?(Hash)
+    errors << "Postgres service must use postgres:16" unless postgres["image"] == "postgres:16"
+    postgres_env = postgres["env"]
+    unless postgres_env.is_a?(Hash) && postgres_env["POSTGRES_USER"] == "postgres"
+      errors << "Postgres service must set POSTGRES_USER=postgres"
+    end
+    unless postgres_env.is_a?(Hash) && postgres_env["POSTGRES_PASSWORD"] == "postgres"
+      errors << "Postgres service must set POSTGRES_PASSWORD=postgres"
+    end
+    unless postgres_env.is_a?(Hash) && postgres_env["POSTGRES_DB"] == "mesh_starter"
+      errors << "Postgres service must set POSTGRES_DB=mesh_starter"
+    end
+    unless postgres["ports"].is_a?(Array) && postgres["ports"] == ["5432:5432"]
+      errors << "Postgres service must bind 5432:5432 on the runner"
+    end
+    options = postgres["options"].to_s
+    [
+      'pg_isready -U postgres -d mesh_starter',
+      '--health-interval 10s',
+      '--health-timeout 5s',
+      '--health-retries 12',
+    ].each do |needle|
+      errors << "Postgres service options missing #{needle.inspect}" unless options.include?(needle)
+    end
+  else
+    errors << "workflow must provision a runner-local Postgres service"
+  end
+
+  job_env = job["env"]
+  unless job_env.is_a?(Hash) && job_env["PGHOST"] == "127.0.0.1"
+    errors << "job must set PGHOST=127.0.0.1"
+  end
+  unless job_env.is_a?(Hash) && job_env["PGPORT"].to_s == "5432"
+    errors << "job must set PGPORT=5432"
+  end
+  unless job_env.is_a?(Hash) && job_env["PGUSER"] == "postgres"
+    errors << "job must set PGUSER=postgres"
+  end
+  unless job_env.is_a?(Hash) && job_env["PGPASSWORD"] == "postgres"
+    errors << "job must set PGPASSWORD=postgres"
+  end
+  unless job_env.is_a?(Hash) && job_env["PGDATABASE"] == "mesh_starter"
+    errors << "job must set PGDATABASE=mesh_starter"
+  end
+
+  steps = job["steps"]
+  unless steps.is_a?(Array)
+    errors << "starter-failover-proof job must define steps"
+    steps = []
+  end
+
+  find_step = lambda do |name|
+    steps.find { |step| step.is_a?(Hash) && step["name"] == name }
+  end
+
+  checkout = find_step.call("Checkout")
+  unless checkout.is_a?(Hash) && checkout["uses"] == "actions/checkout@v4"
+    errors << "Checkout step must use actions/checkout@v4"
+  end
+
+  diagnostics_init = find_step.call("Initialize starter proof diagnostics")
+  if diagnostics_init.is_a?(Hash)
+    init_run = diagnostics_init["run"].to_s
+    unless diagnostics_init["shell"] == "bash"
+      errors << "Initialize starter proof diagnostics step must use shell: bash"
+    end
+    unless init_run.include?("mkdir -p .tmp/m053-s02/verify") && init_run.include?("hosted-workflow-metadata.txt")
+      errors << "Initialize starter proof diagnostics step must seed .tmp/m053-s02/verify metadata"
+    end
+  else
+    errors << "workflow must initialize hosted starter proof diagnostics"
+  end
+
+  preflight = find_step.call("Verify starter failover proof entrypoint")
+  unless preflight.is_a?(Hash) && preflight["run"].to_s.include?("test -f scripts/verify-m053-s02.sh")
+    errors << "workflow must fail early if scripts/verify-m053-s02.sh is missing"
+  end
+
+  setup_node = find_step.call("Set up Node.js")
+  if setup_node.is_a?(Hash)
+    unless setup_node["uses"] == "actions/setup-node@v4"
+      errors << "Set up Node.js step must use actions/setup-node@v4"
+    end
+    setup_with = setup_node["with"]
+    unless setup_with.is_a?(Hash) && setup_with["node-version"].to_s == "20"
+      errors << "Set up Node.js must pin node-version 20"
+    end
+  else
+    errors << "workflow must install Node.js for the hosted starter proof"
+  end
+
+  cache_llvm = find_step.call("Cache LLVM")
+  if cache_llvm.is_a?(Hash)
+    unless cache_llvm["uses"] == "actions/cache@v4"
+      errors << "Cache LLVM step must use actions/cache@v4"
+    end
+    unless cache_llvm["id"] == "cache-llvm"
+      errors << "Cache LLVM step must keep id cache-llvm"
+    end
+    cache_with = cache_llvm["with"]
+    unless cache_with.is_a?(Hash) && cache_with["path"] == "~/llvm"
+      errors << "Cache LLVM step must cache ~/llvm"
+    end
+    unless cache_with.is_a?(Hash) && cache_with["key"] == "llvm-21.1.8-v3-x86_64-unknown-linux-gnu"
+      errors << "Cache LLVM key drifted away from the Linux x86_64 starter proof bootstrap"
+    end
+  else
+    errors << "workflow must cache the Linux LLVM toolchain"
+  end
+
+  install_llvm = find_step.call("Install LLVM 21 (Linux x86_64)")
+  if install_llvm.is_a?(Hash)
+    install_run = install_llvm["run"].to_s
+    unless install_llvm["if"].to_s.include?("steps.cache-llvm.outputs.cache-hit != 'true'")
+      errors << "LLVM install step must skip when the cache hits"
+    end
+    unless install_llvm["timeout-minutes"].is_a?(Integer) && install_llvm["timeout-minutes"] >= 5
+      errors << "LLVM install step must declare timeout-minutes"
+    end
+    [
+      'LLVM_VERSION="21.1.8"',
+      'LLVM_ARCHIVE="LLVM-${LLVM_VERSION}-Linux-X64.tar.xz"',
+      'llvmorg-${LLVM_VERSION}',
+      'tar xf llvm.tar.xz --strip-components=1 -C "$HOME/llvm"',
+    ].each do |needle|
+      errors << "LLVM install step missing #{needle}" unless install_run.include?(needle)
+    end
+  else
+    errors << "workflow must install LLVM 21 for Linux x86_64"
+  end
+
+  set_prefix = find_step.call("Set LLVM prefix (Linux tarball)")
+  unless set_prefix.is_a?(Hash) && set_prefix["run"].to_s.include?('echo "LLVM_SYS_211_PREFIX=$HOME/llvm" >> "$GITHUB_ENV"')
+    errors << "workflow must export LLVM_SYS_211_PREFIX from the Linux tarball location"
+  end
+
+  install_rust = find_step.call("Install Rust")
+  if install_rust.is_a?(Hash)
+    unless install_rust["uses"] == "dtolnay/rust-toolchain@stable"
+      errors << "Install Rust step must use dtolnay/rust-toolchain@stable"
+    end
+    unless install_rust["timeout-minutes"].is_a?(Integer) && install_rust["timeout-minutes"] >= 5
+      errors << "Install Rust step must declare timeout-minutes"
+    end
+    targets = install_rust.fetch("with", {})["targets"]
+    unless targets == "x86_64-unknown-linux-gnu"
+      errors << "Install Rust step must target x86_64-unknown-linux-gnu"
+    end
+  else
+    errors << "workflow must install the Rust toolchain"
+  end
+
+  cargo_cache = find_step.call("Cargo cache")
+  if cargo_cache.is_a?(Hash)
+    unless cargo_cache["uses"] == "Swatinem/rust-cache@v2"
+      errors << "Cargo cache step must use Swatinem/rust-cache@v2"
+    end
+    cache_with = cargo_cache["with"]
+    unless cache_with.is_a?(Hash) && cache_with["key"] == "authoritative-starter-failover-proof-x86_64-unknown-linux-gnu"
+      errors << "Cargo cache key drifted away from the hosted starter proof contract"
+    end
+  else
+    errors << "workflow must cache Cargo outputs for the proof job"
+  end
+
+  export_db = find_step.call("Export runner-local DATABASE_URL")
+  if export_db.is_a?(Hash)
+    export_run = export_db["run"].to_s
+    unless export_db["shell"] == "bash"
+      errors << "Export runner-local DATABASE_URL step must use shell: bash"
+    end
+    [
+      'postgres://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}',
+      'echo "::add-mask::$db_url"',
+      'postgres://*|postgresql://*',
+      'runner-local DATABASE_URL is malformed',
+      'echo "DATABASE_URL=$db_url" >> "$GITHUB_ENV"',
+    ].each do |needle|
+      errors << "Export runner-local DATABASE_URL step missing #{needle.inspect}" unless export_run.include?(needle)
+    end
+  else
+    errors << "workflow must export a masked runner-local DATABASE_URL"
+  end
+
+  wait_postgres = find_step.call("Wait for runner-local Postgres")
+  if wait_postgres.is_a?(Hash)
+    wait_run = wait_postgres["run"].to_s
+    unless wait_postgres["timeout-minutes"].is_a?(Integer) && wait_postgres["timeout-minutes"] >= 1
+      errors << "Wait for runner-local Postgres step must declare timeout-minutes"
+    end
+    [
+      'python3 - <<\'PY\'',
+      'sock.connect(("127.0.0.1", 5432))',
+      'runner-local Postgres did not open 127.0.0.1:5432 within 60s',
+    ].each do |needle|
+      errors << "Wait for runner-local Postgres step missing #{needle.inspect}" unless wait_run.include?(needle)
+    end
+  else
+    errors << "workflow must wait for the runner-local Postgres socket before proving failover"
+  end
+
+  proof = find_step.call("Run authoritative starter failover proof")
+  if proof.is_a?(Hash)
+    unless proof["id"] == "proof"
+      errors << "proof step id must stay 'proof'"
+    end
+    unless proof["run"].to_s.strip == "bash scripts/verify-m053-s02.sh"
+      errors << "proof step must shell out to bash scripts/verify-m053-s02.sh unchanged"
+    end
+    unless proof["timeout-minutes"].is_a?(Integer) && proof["timeout-minutes"] >= 150
+      errors << "proof step must declare timeout-minutes for the long-running hosted starter replay"
+    end
+  else
+    errors << "workflow must contain the authoritative starter failover proof step"
+  end
+
+  upload = find_step.call("Upload starter failover diagnostics")
+  if upload.is_a?(Hash)
+    unless upload["uses"] == "actions/upload-artifact@v4"
+      errors << "diagnostic upload must use actions/upload-artifact@v4"
+    end
+    unless upload["if"].to_s.include?("failure()")
+      errors << "diagnostic upload must run on hosted starter proof failure"
+    end
+    unless upload["timeout-minutes"].is_a?(Integer) && upload["timeout-minutes"] >= 1
+      errors << "diagnostic upload must declare timeout-minutes"
+    end
+    upload_with = upload["with"]
+    unless upload_with.is_a?(Hash) && upload_with["name"] == "authoritative-starter-failover-proof-diagnostics"
+      errors << "diagnostic upload artifact name drifted"
+    end
+    unless upload_with.is_a?(Hash) && upload_with["path"] == ".tmp/m053-s02/**"
+      errors << "diagnostic upload must retain .tmp/m053-s02/**"
+    end
+    unless upload_with.is_a?(Hash) && upload_with["if-no-files-found"] == "error"
+      errors << "diagnostic upload must fail when starter proof artifacts are missing"
+    end
+  else
+    errors << "workflow must upload starter proof failure diagnostics"
+  end
+end
+
+workflow_glob = File.join(root_dir, ".github/workflows/*.yml")
+direct_proof_workflows = Dir.glob(workflow_glob).select do |path|
+  File.read(path).include?("bash scripts/verify-m053-s02.sh")
+end.map { |path| File.expand_path(path) }
+expected_direct_workflow = File.expand_path(workflow_path)
+unless direct_proof_workflows == [expected_direct_workflow]
+  errors << "the hosted starter reusable workflow must be the only workflow file that directly runs bash scripts/verify-m053-s02.sh"
+end
+
+if raw.scan("bash scripts/verify-m053-s02.sh").length != 1
+  errors << "workflow must invoke bash scripts/verify-m053-s02.sh exactly once"
+end
+
+[
+  "MESH_PUBLISH_OWNER",
+  "MESH_PUBLISH_TOKEN",
+  "bash scripts/verify-m034-s01.sh",
+  "packages.meshlang.dev",
+  "flyctl",
+].each do |forbidden|
+  if raw.include?(forbidden)
+    errors << "workflow must stay thin and starter-scoped (found #{forbidden.inspect})"
+  end
+end
+
+if errors.empty?
+  puts "starter reusable workflow contract ok"
+else
+  raise errors.join("\n")
+end
+RUBY
+  then
+    fail_with_log "$phase_name" "$command_text" "starter reusable workflow contract drifted" "$log_path"
+  fi
+}
+
 run_caller_contract_check() {
   local phase_name="caller"
   local command_text="ruby caller workflow contract sweep ${CALLER_WORKFLOW_PATH}"
@@ -350,31 +686,67 @@ unless concurrency["cancel-in-progress"] == false
 end
 
 jobs = workflow["jobs"]
-unless jobs.is_a?(Hash) && jobs.keys == ["live-proof"]
-  errors << "caller workflow must define exactly one live-proof job"
+unless jobs.is_a?(Hash) && jobs.keys == ["whitespace-guard", "live-proof", "starter-failover-proof"]
+  errors << "caller workflow must define whitespace-guard, live-proof, and starter-failover-proof jobs"
 end
-job = jobs.is_a?(Hash) ? jobs["live-proof"] : nil
-if job.is_a?(Hash)
-  errors << "caller job name must stay 'Authoritative live proof'" unless job["name"] == "Authoritative live proof"
-  unless job["uses"] == "./.github/workflows/authoritative-live-proof.yml"
+
+whitespace_guard = jobs.is_a?(Hash) ? jobs["whitespace-guard"] : nil
+if whitespace_guard.is_a?(Hash)
+  errors << "whitespace guard job name must stay 'Whitespace guard'" unless whitespace_guard["name"] == "Whitespace guard"
+else
+  errors << "caller workflow must keep the whitespace-guard job"
+end
+
+live_proof = jobs.is_a?(Hash) ? jobs["live-proof"] : nil
+if live_proof.is_a?(Hash)
+  errors << "caller job name must stay 'Authoritative live proof'" unless live_proof["name"] == "Authoritative live proof"
+  unless live_proof["needs"] == "whitespace-guard"
+    errors << "live-proof job must depend on whitespace-guard"
+  end
+  unless live_proof["uses"] == "./.github/workflows/authoritative-live-proof.yml"
     errors << "caller must invoke the reusable workflow at ./.github/workflows/authoritative-live-proof.yml"
   end
 
-  trust_guard = job["if"].to_s.gsub(/\s+/, " ").strip
+  trust_guard = live_proof["if"].to_s.gsub(/\s+/, " ").strip
   unless trust_guard.include?("github.event_name != 'pull_request'")
-    errors << "caller must allow trusted non-pull_request events through the guard"
+    errors << "caller must allow trusted non-pull_request events through the live-proof guard"
   end
   unless trust_guard.include?("github.event.pull_request.head.repo.full_name == github.repository")
     errors << "caller must fail closed for fork PRs using head.repo.full_name == github.repository"
   end
 
-  secrets = job["secrets"]
+  secrets = live_proof["secrets"]
   unless secrets.is_a?(Hash) && secrets["MESH_PUBLISH_OWNER"] == "${{ secrets.MESH_PUBLISH_OWNER }}"
     errors << "caller must map MESH_PUBLISH_OWNER explicitly into the reusable workflow"
   end
   unless secrets.is_a?(Hash) && secrets["MESH_PUBLISH_TOKEN"] == "${{ secrets.MESH_PUBLISH_TOKEN }}"
     errors << "caller must map MESH_PUBLISH_TOKEN explicitly into the reusable workflow"
   end
+else
+  errors << "caller workflow must define the live-proof job"
+end
+
+starter_proof = jobs.is_a?(Hash) ? jobs["starter-failover-proof"] : nil
+if starter_proof.is_a?(Hash)
+  errors << "starter-failover-proof job name must stay 'Authoritative starter failover proof'" unless starter_proof["name"] == "Authoritative starter failover proof"
+  unless starter_proof["needs"] == "whitespace-guard"
+    errors << "starter-failover-proof job must depend on whitespace-guard"
+  end
+  unless starter_proof["uses"] == "./.github/workflows/authoritative-starter-failover-proof.yml"
+    errors << "starter-failover-proof job must invoke ./.github/workflows/authoritative-starter-failover-proof.yml"
+  end
+  if starter_proof.key?("if")
+    errors << "starter-failover-proof job must not fork-guard away the secret-free starter proof"
+  end
+  if starter_proof.key?("secrets")
+    errors << "starter-failover-proof job must not request inherited or explicit secrets"
+  end
+  starter_permissions = starter_proof["permissions"]
+  if starter_permissions.is_a?(Hash) && starter_permissions["contents"] == "write"
+    errors << "starter-failover-proof job must not request contents: write"
+  end
+else
+  errors << "caller workflow must define the starter-failover-proof job"
 end
 
 unless raw.include?("Fork PRs stay on the repo's secret-free build/test lanes.")
@@ -385,8 +757,16 @@ if raw.include?("bash scripts/verify-m034-s01.sh")
   errors << "caller workflow must not inline the live proof script"
 end
 
+if raw.include?("bash scripts/verify-m053-s02.sh")
+  errors << "caller workflow must not inline the starter failover proof script"
+end
+
 if raw.scan("./.github/workflows/authoritative-live-proof.yml").length != 1
-  errors << "caller workflow must reference the reusable workflow exactly once"
+  errors << "caller workflow must reference the live proof reusable workflow exactly once"
+end
+
+if raw.scan("./.github/workflows/authoritative-starter-failover-proof.yml").length != 1
+  errors << "caller workflow must reference the starter proof reusable workflow exactly once"
 end
 
 if errors.empty?
@@ -453,8 +833,8 @@ unless permissions.is_a?(Hash) && permissions == { "contents" => "read" }
 end
 
 jobs = workflow["jobs"]
-unless jobs.is_a?(Hash) && jobs.keys == ["build", "build-meshpkg", "authoritative-live-proof", "verify-release-assets", "release"]
-  errors << "release workflow must define build, build-meshpkg, authoritative-live-proof, verify-release-assets, and release jobs"
+unless jobs.is_a?(Hash) && jobs.keys == ["build", "build-meshpkg", "authoritative-live-proof", "authoritative-starter-failover-proof", "verify-release-assets", "release"]
+  errors << "release workflow must define build, build-meshpkg, authoritative-live-proof, authoritative-starter-failover-proof, verify-release-assets, and release jobs"
 end
 
 build = jobs.is_a?(Hash) ? jobs["build"] : nil
@@ -554,6 +934,26 @@ if proof.is_a?(Hash)
   end
 else
   errors << "release workflow must define the authoritative-live-proof job"
+end
+
+starter_proof = jobs.is_a?(Hash) ? jobs["authoritative-starter-failover-proof"] : nil
+if starter_proof.is_a?(Hash)
+  errors << "release starter proof job name must stay 'Authoritative starter failover proof'" unless starter_proof["name"] == "Authoritative starter failover proof"
+  unless starter_proof["if"].to_s.include?("startsWith(github.ref, 'refs/tags/v')")
+    errors << "release starter proof job must stay tag-only"
+  end
+  unless starter_proof["uses"] == "./.github/workflows/authoritative-starter-failover-proof.yml"
+    errors << "release starter proof job must invoke the reusable workflow at ./.github/workflows/authoritative-starter-failover-proof.yml"
+  end
+  if starter_proof.key?("secrets")
+    errors << "release starter proof job must not request inherited or explicit secrets"
+  end
+  starter_permissions = starter_proof["permissions"]
+  if starter_permissions.is_a?(Hash) && starter_permissions["contents"] == "write"
+    errors << "release starter proof job must not request contents: write"
+  end
+else
+  errors << "release workflow must define the authoritative-starter-failover-proof job"
 end
 
 verify_release_assets = jobs.is_a?(Hash) ? jobs["verify-release-assets"] : nil
@@ -747,9 +1147,9 @@ if release.is_a?(Hash)
   errors << "release job must stay on ubuntu-latest" unless release["runs-on"] == "ubuntu-latest"
 
   release_needs = release["needs"]
-  expected_release_needs = %w[authoritative-live-proof build build-meshpkg verify-release-assets]
+  expected_release_needs = %w[authoritative-live-proof authoritative-starter-failover-proof build build-meshpkg verify-release-assets]
   unless release_needs.is_a?(Array) && release_needs.sort == expected_release_needs.sort
-    errors << "release job must depend on build, build-meshpkg, authoritative-live-proof, and verify-release-assets"
+    errors << "release job must depend on build, build-meshpkg, authoritative-live-proof, authoritative-starter-failover-proof, and verify-release-assets"
   end
 
   release_permissions = release["permissions"]
@@ -797,8 +1197,16 @@ if raw.include?("bash scripts/verify-m034-s01.sh")
   errors << "release workflow must not inline the live proof script"
 end
 
+if raw.include?("bash scripts/verify-m053-s02.sh")
+  errors << "release workflow must not inline the starter failover proof script"
+end
+
 if raw.scan("./.github/workflows/authoritative-live-proof.yml").length != 1
-  errors << "release workflow must reference the reusable workflow exactly once"
+  errors << "release workflow must reference the live proof reusable workflow exactly once"
+end
+
+if raw.scan("./.github/workflows/authoritative-starter-failover-proof.yml").length != 1
+  errors << "release workflow must reference the starter proof reusable workflow exactly once"
 end
 
 if raw.scan("bash scripts/verify-m034-s03.sh").length != 1
@@ -838,6 +1246,7 @@ run_full_contract_check() {
   echo "==> [${phase_name}] ${command_text}"
   if ! (
     run_reusable_contract_check
+    run_starter_reusable_contract_check
     run_caller_contract_check
     run_release_contract_check
   ) >"$log_path" 2>&1; then
@@ -850,6 +1259,9 @@ case "$mode" in
   reusable)
     run_reusable_contract_check
     ;;
+  starter-reusable)
+    run_starter_reusable_contract_check
+    ;;
   caller)
     run_caller_contract_check
     ;;
@@ -861,7 +1273,7 @@ case "$mode" in
     ;;
   *)
     echo "unknown mode: $mode" >&2
-    echo "usage: bash scripts/verify-m034-s02-workflows.sh [reusable|caller|release|all]" >&2
+    echo "usage: bash scripts/verify-m034-s02-workflows.sh [reusable|starter-reusable|caller|release|all]" >&2
     exit 1
     ;;
 esac

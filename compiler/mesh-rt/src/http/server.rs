@@ -818,6 +818,7 @@ pub extern "C" fn mesh_http_serve(router: *mut u8, port: i64) {
     };
 
     eprintln!("[mesh-rt] HTTP server listening on {}", addr);
+    crate::dist::node::mesh_trigger_startup_work();
 
     let router_addr = router as usize;
 
@@ -896,6 +897,7 @@ pub extern "C" fn mesh_http_serve_tls(
     };
 
     eprintln!("[mesh-rt] HTTPS server listening on {}", addr);
+    crate::dist::node::mesh_trigger_startup_work();
 
     let router_addr = router as usize;
     // Leak the Arc<ServerConfig> as a raw pointer for transfer into the loop.

@@ -148,6 +148,7 @@ static DECLARED_HANDLER_REGISTRY: OnceLock<RwLock<FxHashMap<String, DeclaredHand
 /// after the app entrypoint returns.
 static STARTUP_WORK_REGISTRY: OnceLock<RwLock<Vec<String>>> = OnceLock::new();
 static STARTUP_KEEPALIVE_SPAWNED: AtomicBool = AtomicBool::new(false);
+static STARTUP_WORK_TRIGGERED: AtomicBool = AtomicBool::new(false);
 
 /// Get or initialize the function registry.
 fn function_registry() -> &'static RwLock<FxHashMap<String, FnPtr>> {
@@ -251,6 +252,17 @@ pub extern "C" fn mesh_register_startup_work(runtime_name_ptr: *const u8, runtim
 #[no_mangle]
 pub extern "C" fn mesh_trigger_startup_work() {
     let runtime_names = startup_work_registry().read().clone();
+    if runtime_names.is_empty() {
+        return;
+    }
+
+    if STARTUP_WORK_TRIGGERED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
     let authority = crate::dist::continuity::continuity_registry().authority_status();
     trigger_startup_work_registrations(
         &runtime_names,
@@ -5523,6 +5535,7 @@ mod tests {
         startup_work_registry().write().clear();
         declared_handler_registry().write().clear();
         STARTUP_KEEPALIVE_SPAWNED.store(false, Ordering::SeqCst);
+        STARTUP_WORK_TRIGGERED.store(false, Ordering::SeqCst);
     }
 
     fn register_startup_work_test_handler(runtime_name: &str) {

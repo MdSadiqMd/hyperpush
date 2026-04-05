@@ -10,6 +10,10 @@ pub const SQLITE_EXAMPLE_NAME: &str = "todo-sqlite";
 pub const POSTGRES_EXAMPLE_NAME: &str = "todo-postgres";
 pub const SQLITE_STORAGE_TEST_RELATIVE_PATH: &str = "tests/storage.test.mpl";
 pub const POSTGRES_MIGRATION_RELATIVE_PATH: &str = "migrations/20260402120000_create_todos.mpl";
+pub const POSTGRES_DEPLOY_SQL_RELATIVE_PATH: &str = "deploy/todo-postgres.up.sql";
+pub const POSTGRES_STAGE_DEPLOY_SCRIPT_RELATIVE_PATH: &str = "scripts/stage-deploy.sh";
+pub const POSTGRES_APPLY_DEPLOY_SCRIPT_RELATIVE_PATH: &str = "scripts/apply-deploy-migrations.sh";
+pub const POSTGRES_DEPLOY_SMOKE_SCRIPT_RELATIVE_PATH: &str = "scripts/deploy-smoke.sh";
 
 const MATERIALIZER_RUNNER_SCRIPT: &str = r#"
 import path from 'node:path';
@@ -273,6 +277,12 @@ pub fn assert_sqlite_example_shape(project_dir: &Path) {
     assert_absent_path(project_dir, "work.mpl", "SQLite example");
     assert_absent_path(project_dir, ".env.example", "SQLite example");
     assert_absent_path(project_dir, "migrations", "SQLite example");
+    assert_absent_path(project_dir, "deploy", "SQLite example");
+    assert_absent_path(
+        project_dir,
+        POSTGRES_STAGE_DEPLOY_SCRIPT_RELATIVE_PATH,
+        "SQLite example",
+    );
 }
 
 pub fn assert_postgres_example_shape(project_dir: &Path) {
@@ -280,6 +290,26 @@ pub fn assert_postgres_example_shape(project_dir: &Path) {
     assert_required_file(
         project_dir,
         POSTGRES_MIGRATION_RELATIVE_PATH,
+        "Postgres example",
+    );
+    assert_required_file(
+        project_dir,
+        POSTGRES_DEPLOY_SQL_RELATIVE_PATH,
+        "Postgres example",
+    );
+    assert_required_file(
+        project_dir,
+        POSTGRES_STAGE_DEPLOY_SCRIPT_RELATIVE_PATH,
+        "Postgres example",
+    );
+    assert_required_file(
+        project_dir,
+        POSTGRES_APPLY_DEPLOY_SCRIPT_RELATIVE_PATH,
+        "Postgres example",
+    );
+    assert_required_file(
+        project_dir,
+        POSTGRES_DEPLOY_SMOKE_SCRIPT_RELATIVE_PATH,
         "Postgres example",
     );
     assert_required_file(project_dir, "work.mpl", "Postgres example");

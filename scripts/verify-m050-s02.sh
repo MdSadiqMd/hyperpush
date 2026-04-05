@@ -313,6 +313,12 @@ def marker_map(text: str, markers: list[str], label: str):
     return positions
 
 
+def require_markers(text: str, markers: list[str], label: str):
+    for marker in markers:
+        if marker not in text:
+            raise SystemExit(f'{label}: missing required contract marker {marker!r}')
+
+
 getting_started_html, getting_started_text = load_main(getting_started_path)
 clustered_example_html, clustered_example_text = load_main(clustered_example_path)
 tooling_html, tooling_text = load_main(tooling_path)
@@ -329,8 +335,9 @@ summary = {
                 'meshc init --clustered',
                 'meshc init --template todo-api --db sqlite',
                 'meshc init --template todo-api --db postgres',
+                'When you need the staged deploy + failover proof chain and the same hosted packages/public-surface contract',
                 'Clustered Example',
-                'Production Backend Proof',
+                'Production Backend Proof -- the maintainer-facing backend proof page after the starter/examples-first ladder',
             ],
             'getting-started',
         ),
@@ -364,6 +371,7 @@ summary = {
                 'meshc init --template todo-api --db sqlite',
                 'meshc init --template todo-api --db postgres',
                 'Inspect a running clustered app with the same operator order used by the scaffold',
+                'Keep the deeper proof commands behind Production Backend Proof and Distributed Proof instead of turning this first-contact tooling page into a verifier runbook',
                 'Editor Support',
                 'Assembled first-contact docs verifier',
                 'bash scripts/verify-m050-s02.sh',
@@ -377,6 +385,40 @@ summary = {
         ),
     },
 }
+
+require_markers(
+    getting_started_text,
+    [
+        'local-only starter',
+        'single-node only',
+        'staged deploy + failover proof chain',
+        'hosted packages/public-surface contract',
+        'Keep those deeper proof commands behind the proof pages instead of turning this first-contact guide into a verifier runbook.',
+    ],
+    'getting-started',
+)
+require_markers(
+    clustered_example_text,
+    [
+        'local-only single-node starter',
+        'staged deploy + failover proof chain',
+        'hosted packages/public-surface contract',
+        'where those deeper proof commands stay behind the proof pages.',
+        'This page stays on that scaffold first.',
+    ],
+    'clustered-example',
+)
+require_markers(
+    tooling_text,
+    [
+        'SQLite stays local-only and single-node only here;',
+        'honest local-only starter',
+        'staged deploy + failover proof chain',
+        'hosted packages/public-surface contract',
+        'Keep the deeper proof commands behind Production Backend Proof and Distributed Proof instead of turning this first-contact tooling page into a verifier runbook',
+    ],
+    'tooling',
+)
 
 for marker in [
     '### Support tiers',
