@@ -4,6 +4,24 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+absolutize_env_path() {
+  local name="$1"
+  local value="${!name:-}"
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
+  case "$value" in
+    /*) ;;
+    *)
+      printf -v "$name" '%s/%s' "$ROOT_DIR" "$value"
+      export "$name"
+      ;;
+  esac
+}
+
+absolutize_env_path CARGO_HOME
+absolutize_env_path CARGO_TARGET_DIR
+
 ARTIFACT_ROOT=".tmp/m053-s01"
 ARTIFACT_DIR="$ARTIFACT_ROOT/verify"
 PROOF_BUNDLES_DIR="$ARTIFACT_ROOT/proof-bundles"
@@ -70,11 +88,29 @@ if not path.exists():
     print(f"missing log: {path}")
     raise SystemExit(0)
 lines = path.read_text(errors="replace").splitlines()
-for line in lines[:220]:
-    print(line)
-if len(lines) > 220:
-    print(f"... truncated after 220 lines (total {len(lines)})")
+head_count = 160
+tail_count = 80
+if len(lines) <= head_count + tail_count:
+    for line in lines:
+        print(line)
+else:
+    for line in lines[:head_count]:
+        print(line)
+    skipped = len(lines) - head_count - tail_count
+    print(f"... skipped {skipped} lines ...")
+    for line in lines[-tail_count:]:
+        print(line)
 PY
+}
+
+failure_reason_for_exit() {
+  local exit_code="$1"
+  local timeout_secs="$2"
+  if [[ "$exit_code" -eq 124 ]]; then
+    printf 'command timed out after %ss' "$timeout_secs"
+  else
+    printf 'command exited with status %s before %ss deadline' "$exit_code" "$timeout_secs"
+  fi
 }
 
 fail_phase() {
@@ -572,6 +608,8 @@ capture_snapshot "$ROOT_DIR/.tmp/m053-s01" "$M053_BEFORE" verify proof-bundles
 
 run_expect_success m053-s01-scaffold-rail m053-s01-scaffold-rail yes 1800 compiler/mesh-pkg/src/scaffold.rs \
   cargo test -p mesh-pkg m049_s01_postgres_scaffold_ -- --nocapture
+run_expect_success m053-s01-mesh-rt-staticlib m053-s01-mesh-rt-staticlib no 1800 compiler/mesh-rt/src/lib.rs \
+  cargo build -q -p mesh-rt
 run_expect_success m053-s01-example-e2e m053-s01-example-e2e yes 1800 compiler/meshc/tests/e2e_m049_s03.rs \
   cargo test -p meshc --test e2e_m049_s03 -- --nocapture
 run_expect_success m053-s01-example-parity m053-s01-example-parity no 900 scripts/tests/verify-m049-s03-materialize-examples.mjs \
@@ -626,6 +664,7 @@ record_phase m053-s01-bundle-shape passed
 
 assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-db-env-preflight\tpassed$' "DATABASE_URL preflight did not pass" "$ARTIFACT_DIR/full-contract.log"
 assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-scaffold-rail\tpassed$' "Postgres scaffold rail did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-mesh-rt-staticlib\tpassed$' "mesh-rt prebuild rail did not pass" "$ARTIFACT_DIR/full-contract.log"
 assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-example-e2e\tpassed$' "Postgres example e2e rail did not pass" "$ARTIFACT_DIR/full-contract.log"
 assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-example-parity\tpassed$' "Postgres example parity rail did not pass" "$ARTIFACT_DIR/full-contract.log"
 assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-staged-deploy-e2e\tpassed$' "Staged deploy e2e rail did not pass" "$ARTIFACT_DIR/full-contract.log"

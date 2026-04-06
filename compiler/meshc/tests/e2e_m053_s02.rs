@@ -54,6 +54,22 @@ fn assert_source_omits_all(path: &Path, needles: &[&str]) {
     }
 }
 
+fn assert_source_order(path: &Path, needles: &[&str]) {
+    let source = read_source_file(path);
+    let mut current_index = 0usize;
+    for needle in needles {
+        let local_index = source[current_index..].find(needle).unwrap_or_else(|| {
+            panic!(
+                "expected {} to contain `{}` after byte {}",
+                path.display(),
+                needle,
+                current_index
+            )
+        });
+        current_index += local_index + needle.len();
+    }
+}
+
 fn startup_transitions(snapshot: &Value, request_key: &str) -> Vec<String> {
     route_free::diagnostic_entries_for_request(snapshot, request_key)
         .iter()
@@ -1304,6 +1320,45 @@ fn m053_s02_staged_postgres_failover_proves_clustered_http_and_runtime_recovery(
     );
     assert!(!list_route_request_key.is_empty(), "list route request key should be recorded");
     assert!(!todo_id.is_empty(), "todo id should be recorded");
+}
+
+#[test]
+fn m053_s02_retained_verifier_keeps_nested_s01_logs_and_non_timeout_failure_reasoning() {
+    let verifier_path = deploy::repo_root().join("scripts/verify-m053-s02.sh");
+
+    assert_source_contains_all(
+        &verifier_path,
+        &[
+            "failure_reason_for_exit",
+            "retain_nested_verifier_logs",
+            "run_nested_m053_s01_contract",
+            "upstream-m053-s01-verify",
+            "m053-s01-example-e2e.log",
+            "m053-s01-staged-deploy-e2e.log",
+            "manifest.txt",
+            "command exited with status %s before %ss deadline",
+            "command timed out after %ss",
+        ],
+    );
+
+    assert_source_order(
+        &verifier_path,
+        &[
+            "failure_reason_for_exit",
+            "retain_nested_verifier_logs",
+            "run_nested_m053_s01_contract",
+            "run_nested_m053_s01_contract m053-s01-contract m053-s01-contract 3600 \\",
+            "run_expect_success_with_database_url m053-s02-failover-e2e",
+        ],
+    );
+
+    assert_source_omits_all(
+        &verifier_path,
+        &[
+            "run_expect_success_with_database_url m053-s01-contract m053-s01-contract no 3600 scripts/verify-m053-s01.sh",
+            "expected success within ${timeout_secs}s",
+        ],
+    );
 }
 
 #[test]

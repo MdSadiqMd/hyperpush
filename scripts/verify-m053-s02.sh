@@ -4,6 +4,24 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+absolutize_env_path() {
+  local name="$1"
+  local value="${!name:-}"
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
+  case "$value" in
+    /*) ;;
+    *)
+      printf -v "$name" '%s/%s' "$ROOT_DIR" "$value"
+      export "$name"
+      ;;
+  esac
+}
+
+absolutize_env_path CARGO_HOME
+absolutize_env_path CARGO_TARGET_DIR
+
 ARTIFACT_ROOT=".tmp/m053-s02"
 ARTIFACT_DIR="$ARTIFACT_ROOT/verify"
 PROOF_BUNDLES_DIR="$ARTIFACT_ROOT/proof-bundles"
@@ -70,10 +88,67 @@ if not path.exists():
     print(f"missing log: {path}")
     raise SystemExit(0)
 lines = path.read_text(errors="replace").splitlines()
-for line in lines[:220]:
-    print(line)
-if len(lines) > 220:
-    print(f"... truncated after 220 lines (total {len(lines)})")
+head_count = 160
+tail_count = 80
+if len(lines) <= head_count + tail_count:
+    for line in lines:
+        print(line)
+else:
+    for line in lines[:head_count]:
+        print(line)
+    skipped = len(lines) - head_count - tail_count
+    print(f"... skipped {skipped} lines ...")
+    for line in lines[-tail_count:]:
+        print(line)
+PY
+}
+
+failure_reason_for_exit() {
+  local exit_code="$1"
+  local timeout_secs="$2"
+  if [[ "$exit_code" -eq 124 ]]; then
+    printf 'command timed out after %ss' "$timeout_secs"
+  else
+    printf 'command exited with status %s before %ss deadline' "$exit_code" "$timeout_secs"
+  fi
+}
+
+retain_nested_verifier_logs() {
+  local nested_verify_root="$1"
+  local dest_root="$2"
+  shift 2
+
+  rm -rf "$dest_root"
+  mkdir -p "$dest_root"
+
+  local copied=0
+  local relative_path=""
+  for relative_path in "$@"; do
+    local source_path="$nested_verify_root/$relative_path"
+    if [[ -e "$source_path" ]]; then
+      mkdir -p "$dest_root/$(dirname "$relative_path")"
+      cp -R "$source_path" "$dest_root/$relative_path"
+      copied=1
+    fi
+  done
+
+  if [[ "$copied" -eq 0 ]]; then
+    rmdir "$dest_root" 2>/dev/null || true
+    return 0
+  fi
+
+  python3 - "$dest_root" >"$dest_root/manifest.txt" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+entries = []
+for path in sorted(root.rglob('*')):
+    if path == root / 'manifest.txt':
+        continue
+    entries.append(path.relative_to(root).as_posix())
+(root / 'manifest.txt').write_text(''.join(f"{entry}\n" for entry in entries))
+print(root / 'manifest.txt')
 PY
 }
 
@@ -214,8 +289,9 @@ run_expect_success() {
   begin_phase "$phase"
   echo "==> ${cmd[*]}"
   if ! run_command "$timeout_secs" "$log_path" "${cmd[@]}"; then
+    local exit_code=$?
     record_phase "$phase" failed
-    fail_phase "$phase" "expected success within ${timeout_secs}s" "$log_path" "$artifact_hint"
+    fail_phase "$phase" "$(failure_reason_for_exit "$exit_code" "$timeout_secs")" "$log_path" "$artifact_hint"
   fi
   if [[ "$require_tests" == "yes" ]]; then
     assert_test_filter_ran "$phase" "$log_path" "$label"
@@ -236,12 +312,39 @@ run_expect_success_with_database_url() {
   begin_phase "$phase"
   echo "==> DATABASE_URL=<redacted> ${cmd[*]}"
   if ! run_command_with_database_url "$timeout_secs" "$log_path" "${cmd[@]}"; then
+    local exit_code=$?
     record_phase "$phase" failed
-    fail_phase "$phase" "expected success within ${timeout_secs}s" "$log_path" "$artifact_hint"
+    fail_phase "$phase" "$(failure_reason_for_exit "$exit_code" "$timeout_secs")" "$log_path" "$artifact_hint"
   fi
   if [[ "$require_tests" == "yes" ]]; then
     assert_test_filter_ran "$phase" "$log_path" "$label"
   fi
+  record_phase "$phase" passed
+}
+
+run_nested_m053_s01_contract() {
+  local phase="$1"
+  local label="$2"
+  local timeout_secs="$3"
+  shift 3
+  local -a cmd=("$@")
+  local log_path="$ARTIFACT_DIR/${label}.log"
+  local retained_root="$ARTIFACT_DIR/upstream-m053-s01-verify"
+  local nested_log_path="$retained_root/m053-s01-example-e2e.log"
+
+  begin_phase "$phase"
+  echo "==> DATABASE_URL=<redacted> ${cmd[*]}"
+  if ! run_command_with_database_url "$timeout_secs" "$log_path" "${cmd[@]}"; then
+    local exit_code=$?
+    retain_nested_verifier_logs "$ROOT_DIR/.tmp/m053-s01/verify" "$retained_root"       full-contract.log       phase-report.txt       status.txt       current-phase.txt       m053-s01-example-e2e.log       m053-s01-staged-deploy-e2e.log
+    record_phase "$phase" failed
+    if [[ -f "$nested_log_path" ]]; then
+      fail_phase "$phase" "$(failure_reason_for_exit "$exit_code" "$timeout_secs")" "$nested_log_path" "$retained_root"
+    fi
+    fail_phase "$phase" "$(failure_reason_for_exit "$exit_code" "$timeout_secs")" "$log_path" "$retained_root"
+  fi
+
+  retain_nested_verifier_logs "$ROOT_DIR/.tmp/m053-s01/verify" "$retained_root"     full-contract.log     phase-report.txt     status.txt     current-phase.txt     m053-s01-example-e2e.log     m053-s01-staged-deploy-e2e.log
   record_phase "$phase" passed
 }
 
@@ -664,7 +767,7 @@ record_phase m053-s02-db-env-preflight passed
 M053_S02_BEFORE="$ARTIFACT_DIR/m053-s02-before.snapshot"
 capture_snapshot "$ROOT_DIR/.tmp/m053-s02" "$M053_S02_BEFORE" verify proof-bundles local-postgres
 
-run_expect_success_with_database_url m053-s01-contract m053-s01-contract no 3600 scripts/verify-m053-s01.sh \
+run_nested_m053_s01_contract m053-s01-contract m053-s01-contract 3600 \
   bash scripts/verify-m053-s01.sh
 run_expect_success_with_database_url m053-s02-failover-e2e m053-s02-failover-e2e yes 5400 compiler/meshc/tests/e2e_m053_s02.rs \
   cargo test -p meshc --test e2e_m053_s02 -- --nocapture
@@ -716,12 +819,12 @@ assert_retained_bundle_shape \
   "$RETAINED_PROOF_BUNDLE_DIR/retained-staged-bundle.manifest.json"
 record_phase m053-s02-bundle-shape passed
 
-assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-db-env-preflight\tpassed$' "DATABASE_URL preflight did not pass" "$ARTIFACT_DIR/full-contract.log"
-assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-contract\tpassed$' "S01 replay did not pass" "$ARTIFACT_DIR/full-contract.log"
-assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-failover-e2e\tpassed$' "S02 failover e2e rail did not pass" "$ARTIFACT_DIR/full-contract.log"
-assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-retain-artifacts\tpassed$' "Retained artifact copy did not pass" "$ARTIFACT_DIR/full-contract.log"
-assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-retain-staged-bundle\tpassed$' "Retained staged bundle copy did not pass" "$ARTIFACT_DIR/full-contract.log"
-assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-redaction-drift\tpassed$' "Redaction drift check did not pass" "$ARTIFACT_DIR/full-contract.log"
-assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-bundle-shape\tpassed$' "Retained bundle shape check did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-db-env-preflight	passed$' "DATABASE_URL preflight did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s01-contract	passed$' "S01 replay did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-failover-e2e	passed$' "S02 failover e2e rail did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-retain-artifacts	passed$' "Retained artifact copy did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-retain-staged-bundle	passed$' "Retained staged bundle copy did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-redaction-drift	passed$' "Redaction drift check did not pass" "$ARTIFACT_DIR/full-contract.log"
+assert_file_contains_regex verifier-status "$PHASE_REPORT_PATH" '^m053-s02-bundle-shape	passed$' "Retained bundle shape check did not pass" "$ARTIFACT_DIR/full-contract.log"
 
 echo "verify-m053-s02: ok"

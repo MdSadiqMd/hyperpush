@@ -540,6 +540,7 @@ fn m053_s01_retained_verifier_replays_starter_rails_and_publishes_bundle_markers
         &[
             "m053-s01-db-env-preflight",
             "m053-s01-scaffold-rail",
+            "m053-s01-mesh-rt-staticlib",
             "m053-s01-example-e2e",
             "m053-s01-example-parity",
             "m053-s01-staged-deploy-e2e",
@@ -550,6 +551,7 @@ fn m053_s01_retained_verifier_replays_starter_rails_and_publishes_bundle_markers
             "DATABASE_URL must be set for scripts/verify-m053-s01.sh",
             "DATABASE_URL must start with postgres:// or postgresql://",
             "cargo test -p mesh-pkg m049_s01_postgres_scaffold_ -- --nocapture",
+            "cargo build -q -p mesh-rt",
             "cargo test -p meshc --test e2e_m049_s03 -- --nocapture",
             "node scripts/tests/verify-m049-s03-materialize-examples.mjs --check",
             "cargo test -p meshc --test e2e_m053_s01 -- --nocapture",
@@ -573,13 +575,14 @@ fn m053_s01_retained_verifier_replays_starter_rails_and_publishes_bundle_markers
         &[
             "begin_phase m053-s01-db-env-preflight",
             "run_expect_success m053-s01-scaffold-rail",
+            "run_expect_success m053-s01-mesh-rt-staticlib",
             "run_expect_success m053-s01-example-e2e",
             "run_expect_success m053-s01-example-parity",
             "run_expect_success_with_database_url m053-s01-staged-deploy-e2e",
-            "copy_new_prefixed_artifacts_or_fail \\",
-            "copy_staged_bundle_or_fail \\",
+            "copy_new_prefixed_artifacts_or_fail",
+            "copy_staged_bundle_or_fail",
             "assert_no_secret_leaks m053-s01-redaction-drift",
-            "assert_retained_bundle_shape \\",
+            "assert_retained_bundle_shape",
             "echo \"verify-m053-s01: ok\"",
         ],
     );
@@ -595,12 +598,13 @@ fn m053_s01_retained_verifier_avoids_env_sourcing_and_later_slice_scope() {
             "source \"$ROOT_DIR/.env\"",
             "cat .env",
             "echo \"$DATABASE_URL\"",
-            "printf '%s\\n' \"$DATABASE_URL\"",
+            "printf '%s\n' \"$DATABASE_URL\"",
             "packages-site",
             "verify-production-proof-surface",
             "fly.dev",
             "npm --prefix website run build",
             "bash scripts/verify-m051-s02.sh",
+            "expected success within ${timeout_secs}s",
         ],
     );
 }
