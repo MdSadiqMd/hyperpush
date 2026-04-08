@@ -289,7 +289,7 @@ required_runbook_markers = [
     '## Authoritative proof rail',
     'Node.start_from_env()',
     'mesher/.env.example',
-    './mesher/mesher',
+    '.tmp/mesher-build/mesher',
     'bash scripts/verify-m051-s01.sh',
 ]
 for needle in required_runbook_markers:
@@ -309,11 +309,11 @@ require_order(
 )
 
 canonical_commands = [
-    'cargo run -q -p meshc -- test mesher/tests',
-    'DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate mesher status',
-    'DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate mesher up',
-    'cargo run -q -p meshc -- build mesher',
-    './mesher/mesher',
+    'bash mesher/scripts/test.sh',
+    'DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} bash mesher/scripts/migrate.sh status',
+    'DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} bash mesher/scripts/migrate.sh up',
+    'bash mesher/scripts/build.sh .tmp/mesher-build',
+    '.tmp/mesher-build/mesher',
     'curl -sSf http://127.0.0.1:8080/api/v1/projects/default/settings',
     'http://127.0.0.1:8080/api/v1/events',
     'http://127.0.0.1:8080/api/v1/projects/default/issues?status=unresolved',
@@ -389,8 +389,8 @@ for needle in [
     require_not_contains('runbook', needle, 'maintainer-only boundary')
 
 for needle in [
-    'cargo run -q -p meshc -- test mesher/tests',
-    'cargo run -q -p meshc -- build mesher',
+    'bash mesher/scripts/test.sh',
+    'bash mesher/scripts/build.sh .tmp/mesher-build',
     'cargo test -p meshc --test e2e_m051_s01 -- --nocapture',
     'm051-s01-package-tests',
     'm051-s01-build',
@@ -409,8 +409,8 @@ for needle in [
     require_contains('verifier', needle, 'verifier contract marker')
 
 expected_run_expect_success = {
-    'm051-s01-package-tests': 'cargo run -q -p meshc -- test mesher/tests',
-    'm051-s01-build': 'cargo run -q -p meshc -- build mesher',
+    'm051-s01-package-tests': 'bash mesher/scripts/test.sh',
+    'm051-s01-build': 'bash mesher/scripts/build.sh "$ARTIFACT_DIR/build-proof"',
     'm051-s01-e2e': 'cargo test -p meshc --test e2e_m051_s01 -- --nocapture',
 }
 actual_run_expect_success = {}
@@ -549,9 +549,9 @@ require_command rg
 record_phase init passed
 
 run_expect_success m051-s01-package-tests m051-s01-package-tests no 1800 \
-  cargo run -q -p meshc -- test mesher/tests
+  bash mesher/scripts/test.sh
 run_expect_success m051-s01-build m051-s01-build no 1800 \
-  cargo run -q -p meshc -- build mesher
+  bash mesher/scripts/build.sh "$ARTIFACT_DIR/build-proof"
 
 record_phase m051-s01-contract started
 printf '%s\n' 'm051-s01-contract' >"$CURRENT_PHASE_PATH"

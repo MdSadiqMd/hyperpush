@@ -226,6 +226,8 @@ pub fn start_postgres_container(artifacts: &Path, label: &str) -> StartedPostgre
 }
 
 pub fn run_meshc_migrate_up(database_url: &str, artifacts: &Path) -> CompletedCommand {
+    ensure_mesh_rt_staticlib();
+
     let mut command = Command::new(meshc_bin());
     command
         .current_dir(repo_root())

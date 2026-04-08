@@ -56,28 +56,28 @@ set -a && source .env.mesher && set +a
 ### 2. Run the package tests
 
 ```bash
-cargo run -q -p meshc -- test mesher/tests
+bash mesher/scripts/test.sh
 ```
 
 ### 3. Inspect migration state
 
 ```bash
-DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate mesher status
+DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} bash mesher/scripts/migrate.sh status
 ```
 
 ### 4. Apply migrations
 
 ```bash
-DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo run -q -p meshc -- migrate mesher up
+DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} bash mesher/scripts/migrate.sh up
 ```
 
 ### 5. Build Mesher from the repo root
 
 ```bash
-cargo run -q -p meshc -- build mesher
+bash mesher/scripts/build.sh .tmp/mesher-build
 ```
 
-That build writes the runnable binary to `./mesher/mesher`.
+That build writes the runnable binary to `.tmp/mesher-build/mesher`.
 
 ### 6. Run Mesher
 
@@ -93,7 +93,7 @@ MESH_DISCOVERY_SEED=${MESH_DISCOVERY_SEED:-localhost} \
 MESH_CLUSTER_PORT=${MESH_CLUSTER_PORT:-4370} \
 MESH_CONTINUITY_ROLE=${MESH_CONTINUITY_ROLE:-primary} \
 MESH_CONTINUITY_PROMOTION_EPOCH=${MESH_CONTINUITY_PROMOTION_EPOCH:-0} \
-./mesher/mesher
+.tmp/mesher-build/mesher
 ```
 
 On a healthy boot, Mesher should log:
@@ -170,8 +170,8 @@ bash scripts/verify-m051-s01.sh
 
 That wrapper replays:
 
-- `cargo run -q -p meshc -- test mesher/tests`
-- `cargo run -q -p meshc -- build mesher`
+- `bash mesher/scripts/test.sh`
+- `bash mesher/scripts/build.sh .tmp/mesher-build`
 - `cargo test -p meshc --test e2e_m051_s01 -- --nocapture`
 - fail-closed README contract checks for commands, env keys, route names, header names, and seeded smoke values
 
