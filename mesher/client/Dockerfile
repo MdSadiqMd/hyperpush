@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -6,31 +6,33 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS deps
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install
 
 FROM deps AS dev
 
 COPY . .
 EXPOSE 3000
-CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 FROM deps AS builder
 
 COPY . .
 RUN npm run build
 
-FROM base AS production
+FROM deps AS production
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# copy standalone output
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public 2>/dev/null || true
+# copy TanStack Start runtime output
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server.mjs ./server.mjs
+COPY --from=builder /app/mesher-backend-origin.mjs ./mesher-backend-origin.mjs
+COPY --from=builder /app/public ./public
+RUN npm prune --omit=dev
 
 EXPOSE 3000
 USER node
 
-CMD ["node", "server.js"]
+CMD ["node", "server.mjs"]
