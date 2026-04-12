@@ -2,7 +2,7 @@
 # Provides common utilities used across search, dashboard, and team handlers.
 # All functions are pub for cross-module import.
 
-from Storage.Queries import get_project_id_by_slug
+from Storage.Queries import get_project_id_by_slug, get_org_id_by_slug
 
 # Cluster-aware registry lookup.
 # In cluster mode (Node.self returns non-empty), uses Global.whereis for
@@ -28,6 +28,23 @@ pub fn resolve_project_id(pool :: PoolHandle, raw_id :: String) -> String do
     raw_id
   else
     let result = get_project_id_by_slug(pool, raw_id)
+    case result do
+      Ok( uuid) -> uuid
+      Err( _) -> ""
+    end
+  end
+end
+
+# Resolve an org identifier to a UUID.
+# If the identifier is 36 chars (UUID format), returns it directly.
+# Otherwise, treats it as a slug and looks up the org UUID from the database.
+# Returns the UUID string on success, or an empty string if slug not found.
+
+pub fn resolve_org_id(pool :: PoolHandle, raw_id :: String) -> String do
+  if String.length(raw_id) == 36 do
+    raw_id
+  else
+    let result = get_org_id_by_slug(pool, raw_id)
     case result do
       Ok( uuid) -> uuid
       Err( _) -> ""

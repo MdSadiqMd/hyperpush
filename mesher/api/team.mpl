@@ -15,7 +15,8 @@ from Storage.Queries import (
   revoke_api_key
 )
 from Types.User import User, OrgMembership
-from Api.Helpers import query_or_default, to_json_array, require_param, get_registry, resolve_project_id
+from Types.Project import ApiKey
+from Api.Helpers import query_or_default, to_json_array, require_param, get_registry, resolve_org_id, resolve_project_id
 
 # --- Shared helpers (leaf functions first, per define-before-use requirement) ---
 # Serialize a member row (with user info) to JSON.
@@ -54,16 +55,32 @@ end
 
 # Serialize an API key row to JSON.
 # Fields: id, project_id, key_value, label, created_at, revoked_at
-# If revoked_at is empty string, emit null instead of quoted empty string.
+# Uses Json.encode + Json.get so string fields remain truthful values.
+
+fn api_key_row_to_api_key(row) -> ApiKey do
+  ApiKey {
+    id : Map.get(row, "id"),
+    project_id : Map.get(row, "project_id"),
+    key_value : Map.get(row, "key_value"),
+    label : Map.get(row, "label"),
+    created_at : Map.get(row, "created_at"),
+    revoked_at : if String.length(Map.get(row, "revoked_at")) == 0 do
+      None
+    else
+      Some(Map.get(row, "revoked_at"))
+    end
+  }
+end
 
 fn api_key_to_json(row) -> String do
-  let id = Map.get(row, "id")
-  let project_id = Map.get(row, "project_id")
-  let key_value = Map.get(row, "key_value")
-  let label = Map.get(row, "label")
-  let created_at = Map.get(row, "created_at")
-  let revoked_at_raw = Map.get(row, "revoked_at")
-  let revoked_at = if String.length(revoked_at_raw) == 0 do
+  let api_key_json = Json.encode(api_key_row_to_api_key(row))
+  let id = Json.get(api_key_json, "id")
+  let project_id = Json.get(api_key_json, "project_id")
+  let key_value = Json.get(api_key_json, "key_value")
+  let label = Json.get(api_key_json, "label")
+  let created_at = Json.get(api_key_json, "created_at")
+  let revoked_at_raw = Json.get(api_key_json, "revoked_at")
+  let revoked_at = if revoked_at_raw == "" or revoked_at_raw == "null" do
     "null"
   else
     "\"#{revoked_at_raw}\""
@@ -76,6 +93,12 @@ end
 
 fn extract_json_field(pool :: PoolHandle, body :: String, field :: String) -> String ! String do
   Ok(Json.get(body, field))
+end
+
+# Helper: resolve org path identifiers (UUID or slug) and fail explicitly when unknown.
+
+fn resolve_team_org_id(pool :: PoolHandle, raw_id :: String) -> String do
+  resolve_org_id(pool, raw_id)
 end
 
 # --- Team membership helper functions for case arm extraction (ORG-04) ---
@@ -164,7 +187,11 @@ end
 fn perform_role_update(pool :: PoolHandle, membership_id :: String, role :: String) do
   let result = update_member_role(pool, membership_id, role)
   case result do
-    Ok( _) -> update_role_success()
+    Ok( count) -> if count > 0 do
+      update_role_success()
+    else
+      HTTP.response(400, json { error : "invalid role or membership not found" })
+    end
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
@@ -213,14 +240,19 @@ end
 pub fn handle_list_members(request) do
   let reg_pid = get_registry()
   let pool = PipelineRegistry.get_pool(reg_pid)
-  let org_id = require_param(request, "org_id")
-  let result = get_members_with_users(pool, org_id)
-  case result do
-    Ok( rows) -> HTTP.response(200,
-    rows
-      |> List.map(fn (row) do member_to_json(row) end)
-      |> to_json_array())
-    Err( e) -> HTTP.response(500, json { error : e })
+  let raw_id = require_param(request, "org_id")
+  let org_id = resolve_team_org_id(pool, raw_id)
+  if String.length(org_id) == 0 do
+    HTTP.response(404, json { error : "organization not found" })
+  else
+    let result = get_members_with_users(pool, org_id)
+    case result do
+      Ok( rows) -> HTTP.response(200,
+      rows
+        |> List.map(fn (row) do member_to_json(row) end)
+        |> to_json_array())
+      Err( e) -> HTTP.response(500, json { error : e })
+    end
   end
 end
 
@@ -231,9 +263,14 @@ end
 pub fn handle_add_member(request) do
   let reg_pid = get_registry()
   let pool = PipelineRegistry.get_pool(reg_pid)
-  let org_id = require_param(request, "org_id")
+  let raw_id = require_param(request, "org_id")
+  let org_id = resolve_team_org_id(pool, raw_id)
   let body = Request.body(request)
-  validate_add_member(pool, org_id, body)
+  if String.length(org_id) == 0 do
+    HTTP.response(404, json { error : "organization not found" })
+  else
+    validate_add_member(pool, org_id, body)
+  end
 end
 
 # Handle POST /api/v1/orgs/:org_id/members/:membership_id/role
@@ -242,9 +279,15 @@ end
 pub fn handle_update_member_role(request) do
   let reg_pid = get_registry()
   let pool = PipelineRegistry.get_pool(reg_pid)
+  let raw_id = require_param(request, "org_id")
+  let org_id = resolve_team_org_id(pool, raw_id)
   let membership_id = require_param(request, "membership_id")
   let body = Request.body(request)
-  do_update_role(pool, membership_id, body)
+  if String.length(org_id) == 0 do
+    HTTP.response(404, json { error : "organization not found" })
+  else
+    do_update_role(pool, membership_id, body)
+  end
 end
 
 # Handle POST /api/v1/orgs/:org_id/members/:membership_id/remove
@@ -253,11 +296,21 @@ end
 pub fn handle_remove_member(request) do
   let reg_pid = get_registry()
   let pool = PipelineRegistry.get_pool(reg_pid)
+  let raw_id = require_param(request, "org_id")
+  let org_id = resolve_team_org_id(pool, raw_id)
   let membership_id = require_param(request, "membership_id")
-  let result = remove_member(pool, membership_id)
-  case result do
-    Ok( _) -> remove_success()
-    Err( e) -> HTTP.response(500, json { error : e })
+  if String.length(org_id) == 0 do
+    HTTP.response(404, json { error : "organization not found" })
+  else
+    let result = remove_member(pool, membership_id)
+    case result do
+      Ok( count) -> if count > 0 do
+        remove_success()
+      else
+        HTTP.response(404, json { error : "membership not found" })
+      end
+      Err( e) -> HTTP.response(500, json { error : e })
+    end
   end
 end
 

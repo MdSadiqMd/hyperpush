@@ -72,6 +72,14 @@ pub fn list_orgs(pool :: PoolHandle) -> List < Organization > ! String do
     end))
 end
 
+# Resolve an organization slug to its UUID. Returns the id as a string.
+# Used by API handlers to support slug-based org identifiers (e.g. "default").
+
+pub fn get_org_id_by_slug(pool :: PoolHandle, slug :: String) -> String ! String do
+  let row = Repo.get_by(pool, Organization.__table__(), "slug", slug) ?
+  Ok(Map.get(row, "id"))
+end
+
 # --- Project queries ---
 # Insert a new project. Returns the generated UUID.
 

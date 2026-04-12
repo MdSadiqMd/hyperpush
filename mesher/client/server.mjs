@@ -4,12 +4,25 @@ import { createReadStream } from 'node:fs'
 import { access, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveMesherBackendOrigin } from './mesher-backend-origin.mjs'
 import handler from './dist/server/server.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const clientRoot = path.join(__dirname, 'dist/client')
 const port = Number(process.env.PORT || 3000)
+const mesherBackendOrigin = resolveMesherBackendOrigin()
+const HOP_BY_HOP_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'host',
+])
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -70,6 +83,72 @@ async function maybeServeStatic(req, res) {
   return true
 }
 
+function shouldProxyMesherApi(url = '/') {
+  const pathname = new URL(url, `http://127.0.0.1:${port}`).pathname
+  return pathname === '/api/v1' || pathname.startsWith('/api/v1/')
+}
+
+function buildProxyHeaders(req) {
+  const headers = new Headers()
+
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value == null || HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+      continue
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        headers.append(key, entry)
+      }
+      continue
+    }
+
+    headers.set(key, value)
+  }
+
+  if (req.headers.host) {
+    headers.set('x-forwarded-host', req.headers.host)
+  }
+
+  headers.set('x-forwarded-proto', 'http')
+  return headers
+}
+
+function buildProxyRequestInit(req) {
+  const init = {
+    method: req.method,
+    headers: buildProxyHeaders(req),
+  }
+
+  if (req.method && !['GET', 'HEAD'].includes(req.method)) {
+    init.body = Readable.toWeb(req)
+    init.duplex = 'half'
+  }
+
+  return init
+}
+
+async function maybeProxyMesherApi(req, res) {
+  if (!shouldProxyMesherApi(req.url)) {
+    return false
+  }
+
+  const upstreamUrl = new URL(req.url || '/', mesherBackendOrigin)
+
+  try {
+    const response = await fetch(upstreamUrl, buildProxyRequestInit(req))
+    await sendResponse(res, response)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown error'
+    console.error('[mesher-client] failed to proxy request to Mesher backend', message)
+    res.statusCode = 502
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.end(JSON.stringify({ error: 'Mesher backend unavailable' }))
+  }
+
+  return true
+}
+
 function toRequest(req) {
   const url = new URL(req.url || '/', `http://${req.headers.host || `127.0.0.1:${port}`}`)
   const init = {
@@ -115,6 +194,10 @@ async function sendResponse(res, response) {
 
 const server = createServer(async (req, res) => {
   try {
+    if (await maybeProxyMesherApi(req, res)) {
+      return
+    }
+
     if (await maybeServeStatic(req, res)) {
       return
     }

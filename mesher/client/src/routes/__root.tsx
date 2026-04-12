@@ -15,6 +15,7 @@ import geistMono400 from '@fontsource/geist-mono/400.css?url'
 import geistMono500 from '@fontsource/geist-mono/500.css?url'
 import geistMono600 from '@fontsource/geist-mono/600.css?url'
 import geistMono700 from '@fontsource/geist-mono/700.css?url'
+import { Toaster } from '@/components/ui/toaster'
 import appCss from '../../app/globals.css?url'
 
 export const Route = createRootRoute({
@@ -87,6 +88,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       </head>
       <body className="font-sans antialiased select-none">
         {children}
+        <Toaster />
         {analyticsEnabled ? <Analytics /> : null}
         <Scripts />
       </body>

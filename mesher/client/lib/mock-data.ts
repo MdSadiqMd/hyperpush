@@ -554,8 +554,10 @@ export const MOCK_RELEASE_TREND = Array.from({ length: 30 }, (_, i) => ({
 
 /* ── Alerts data ── */
 
-export type AlertStatus = "firing" | "resolved" | "silenced"
+export type AlertStatus = "firing" | "acknowledged" | "resolved" | "silenced"
 export type AlertType = "error-rate" | "latency" | "availability" | "smart-contract" | "custom"
+export type AlertLiveAction = "acknowledge" | "resolve"
+export type AlertShellAction = "silence" | "unsnooze"
 
 export interface Alert {
   id: string
@@ -582,6 +584,11 @@ export interface Alert {
   silenceUntil?: string
   history: AlertHistory[]
   aiInsight?: string
+  source?: "live" | "fallback"
+  statusSource?: "live" | "fallback"
+  supportedActions?: AlertLiveAction[]
+  unsupportedActions?: AlertShellAction[]
+  ruleName?: string
 }
 
 export interface AlertHistory {
